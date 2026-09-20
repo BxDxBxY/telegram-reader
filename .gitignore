@@ -1,0 +1,23 @@
+# Секреты и сессии Telegram — НИКОГДА не коммитить
+.env
+*.session
+*.session-journal
+sessions/
+
+# Данные аудита (локальные, содержат ваши личные чаты)
+data/
+out/
+*.db
+*.db-wal
+*.db-shm
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+build/
+dist/

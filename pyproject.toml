@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tgaudit"
+version = "0.1.0"
+description = "Аудит Telegram-аккаунта: инвентаризация диалогов, срезы логов, скоринг полезности. Только чтение."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+keywords = ["telegram", "telethon", "audit", "mtproto", "declutter"]
+classifiers = [
+    "Environment :: Console",
+    "Intended Audience :: End Users/Desktop",
+    "Programming Language :: Python :: 3",
+    "Topic :: Communications :: Chat",
+]
+dependencies = ["telethon>=1.36,<2.0"]
+
+[project.optional-dependencies]
+# Ускоряет шифрование при долгих прогонах.
+fast = ["cryptg>=0.4"]
+
+[project.scripts]
+tgaudit = "tgaudit.cli:main"
+
+[tool.setuptools]
+packages = ["tgaudit"]
+
+[tool.setuptools.package-data]
+tgaudit = ["py.typed"]
