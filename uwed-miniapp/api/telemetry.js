@@ -244,6 +244,21 @@ module.exports = async (req, res) => {
     return res.status(200).end();
   }
 
+  // Polling endpoint for Campus Agent on Office PC
+  if (req.method === "GET" && req.query.action === "check_sync_request") {
+    if (!isAuthorizedAdminRequest(req)) {
+      return res.status(403).json({ success: false, error: "Unauthorized" });
+    }
+    const db = await loadDb();
+    const pendingReq = db.pending_sync_request || null;
+    return res.status(200).json({
+      success: true,
+      pending: Boolean(pendingReq),
+      requested_at: pendingReq ? pendingReq.requested_at : null,
+      last_snapshot_meta: db.campus_snapshot_meta || null,
+    });
+  }
+
   // Public safe state for Mini App (crowd-sourced room statuses, campus events & block check)
   if (req.method === "GET" && req.query.action === "public_state") {
     const db = await loadDb();
@@ -357,6 +372,10 @@ module.exports = async (req, res) => {
         return res.status(400).json({ success: false, error: "Invalid snapshot data" });
       }
 
+      const db = await loadDb(true);
+      db.pending_sync_request = null;
+      await saveDb(db, true);
+
       await recordTelemetry({
         user: { id: ADMIN_ID, username: ADMIN_USERNAME, first_name: "Admin Office PC" },
         action: "campus_snapshot_sync",
@@ -374,6 +393,23 @@ module.exports = async (req, res) => {
           teachers: saved.teachers.length,
           events: Object.keys(saved.events).length,
         },
+      });
+    }
+
+    // Remote trigger from Telegram Bot or Mini App: "Синхронизировать сейчас"
+    if (targetAction === "request_sync") {
+      if (!isAuthorizedAdminRequest(req)) {
+        return res.status(403).json({ success: false, error: "Unauthorized" });
+      }
+      const db = await loadDb(true);
+      db.pending_sync_request = {
+        requested_at: Date.now(),
+        requested_by: "admin",
+      };
+      await saveDb(db, true);
+      return res.status(200).json({
+        success: true,
+        message: "Remote sync signal dispatched to campus office PC",
       });
     }
 

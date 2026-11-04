@@ -1,29 +1,71 @@
 @echo off
-chcp 65001 > nul
+setlocal enabledelayedexpansion
 title UWED Campus Agent Setup
+
 echo =======================================================
-echo    Настройка офисного ПК UWED для 24/7 синхронизации
+echo     UWED Campus Agent Setup for Windows 24/7
 echo =======================================================
 echo.
-echo [1/3] Отключение спящего режима Windows...
-powercfg /change standby-timeout-ac 0
-powercfg /change monitor-timeout-ac 15
-powercfg /change hibernate-timeout-ac 0
 
-echo [2/3] Добавление агента в автозагрузку Windows...
-set STARTUP_DIR=%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup
-echo @echo off > "%STARTUP_DIR%\uwed_campus_agent.bat"
-echo cd /d "%~dp0" >> "%STARTUP_DIR%\uwed_campus_agent.bat"
-echo python uwed_campus_agent.py >> "%STARTUP_DIR%\uwed_campus_agent.bat"
+:: 1. Detect Python 3
+set "PY_CMD="
+where py >nul 2>nul && set "PY_CMD=py -3"
+if not defined PY_CMD (
+    where python >nul 2>nul && set "PY_CMD=python"
+)
+if not defined PY_CMD (
+    for /d %%D in ("%LOCALAPPDATA%\Programs\Python\Python3*") do (
+        if exist "%%D\python.exe" set "PY_CMD=%%D\python.exe"
+    )
+)
+if not defined PY_CMD (
+    for /d %%D in ("%ProgramFiles%\Python3*") do (
+        if exist "%%D\python.exe" set "PY_CMD=%%D\python.exe"
+    )
+)
 
-echo [3/3] Запуск агента прямо сейчас...
-start "UWED Campus Agent" python uwed_campus_agent.py
+if not defined PY_CMD (
+    echo [ERROR] Python 3 was not detected on this computer!
+    echo.
+    echo Please install Python 3:
+    echo 1. Download from: https://www.python.org/downloads/
+    echo 2. IMPORTANT: Check the box "Add Python to PATH" during installation.
+    echo 3. Run this script again.
+    echo.
+    pause
+    exit /b 1
+)
+
+echo [1/3] Python detected: !PY_CMD!
+
+:: 2. Configure Power Settings (Prevent Windows Sleep & Wi-Fi disconnect)
+echo [2/3] Configuring Windows power settings (disabling sleep mode)...
+powercfg /change standby-timeout-ac 0 >nul 2>nul
+powercfg /change monitor-timeout-ac 15 >nul 2>nul
+powercfg /change hibernate-timeout-ac 0 >nul 2>nul
+echo       Power sleep disabled successfully.
+
+:: 3. Setup Startup Shortcut
+echo [3/3] Setting up Windows Auto-Start shortcut...
+set "SCRIPT_DIR=%~dp0"
+set "AGENT_PY=%SCRIPT_DIR%uwed_campus_agent.py"
+set "STARTUP_BAT=%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup\uwed_campus_agent.bat"
+
+(
+    echo @echo off
+    echo cd /d "%SCRIPT_DIR%"
+    echo start "UWED Campus Agent" !PY_CMD! "%AGENT_PY%"
+) > "%STARTUP_BAT%"
+echo       Auto-start created at: %STARTUP_BAT%
 
 echo.
 echo =======================================================
-echo  ✅ НАСТРОЙКА УСПЕШНО ЗАВЕРШЕНА!
-echo  Агент запущен в отдельном окне.
-echo  При перезагрузке ПК он запустится сам.
-echo  Спящий режим отключен.
+echo  [SUCCESS] Configuration completed!
+echo  Starting UWED Campus Agent now...
 echo =======================================================
+echo.
+
+cd /d "%SCRIPT_DIR%"
+start "UWED Campus Agent" !PY_CMD! "%AGENT_PY%"
+
 pause

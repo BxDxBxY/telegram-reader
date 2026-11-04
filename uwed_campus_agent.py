@@ -1,15 +1,13 @@
 #!/usr/bin/env python3
 """
-UWED Campus Agent — Автономный агент синхронизации расписания для офисного ПК в кампусе УМЭД.
-Запускается на компьютере внутри сети UWED (Wi-Fi или кабель) и автоматически
-выгружает актуальное расписание, слоты, аудитории и преподавателей на сервер Vercel.
+UWED Campus Agent — Автономный агент синхронизации расписания для кампуса УМЭД.
+Работает на ПК в кампусе UWED и выгружает актуальное расписание на сервер Vercel.
 
-Особенности:
-- Чистый Python 3 (без сторонних библиотек, работает из коробки)
-- Защита от спящего режима Windows (ПК не уснёт и не отключит Wi-Fi)
-- Многопоточная выгрузка расписания за 3-5 секунд
-- Автоматический повтор при временном падении Wi-Fi
-- Возможность автозапуска при включении компьютера
+Триггеры синхронизации ("когда угодно"):
+1. Нажмите [ENTER] в этом окне в любой момент для немедленной синхронизации.
+2. Отправьте команду /sync боту @uwedhelpdesk_bot в Telegram — агент поймает сигнал и обновит данные.
+3. Нажмите кнопку "Синхронизировать" в Mini App.
+4. Фоновый таймер (каждые 30 минут по умолчанию).
 """
 from __future__ import annotations
 
@@ -30,24 +28,28 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
 
-# Настройки сервера Vercel и аутентификации
 VERCEL_SYNC_URL = "https://uwed-miniapp.vercel.app/api/telemetry?action=sync_snapshot"
+VERCEL_CHECK_URL = "https://uwed-miniapp.vercel.app/api/telemetry?action=check_sync_request"
 ADMIN_KEY = "ec86c4b6c733d52d0471cfd9b26ab707"
 UWED_HOST = "manage.uwed.uz"
-SYNC_INTERVAL_MINUTES = 30
+DEFAULT_INTERVAL_MINUTES = 30
+REMOTE_POLL_INTERVAL_SECONDS = 15
 
 CLASSROOM_TYPES = {"PRACTICE", "LECTURE", "LANGUAGE_LAB", "COMPUTER", "SPORT_CENTER"}
 TASHKENT_TZ = dt.timezone(dt.timedelta(hours=5))
 
-# Предотвращение перехода Windows в спящий режим
+sync_lock = threading.Lock()
+manual_trigger_event = threading.Event()
+
 def prevent_windows_sleep():
+    """Предотвращает переход Windows в спящий режим и отключение сети."""
     if sys.platform == "win32":
         try:
             # ES_CONTINUOUS = 0x80000000, ES_SYSTEM_REQUIRED = 0x00000001, ES_AWAYMODE_REQUIRED = 0x00000040
             ctypes.windll.kernel32.SetThreadExecutionState(0x80000000 | 0x00000001 | 0x00000040)
-            print("[power] Защита от спящего режима Windows активна (ПК не уснёт)")
+            print("[Power] Windows Sleep Mode DISABLED (PC will stay online 24/7)")
         except Exception as e:
-            print(f"[power] Предупреждение SetThreadExecutionState: {e}")
+            print(f"[Power] Warning: {e}")
 
 def get_monday_str() -> str:
     now = dt.datetime.now(tz=TASHKENT_TZ).date()
@@ -89,7 +91,7 @@ class CampusFetcher:
                     "GET",
                     full_path,
                     headers={
-                        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) UWED-Campus-Agent/1.0",
+                        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) UWED-Campus-Agent/2.0",
                         "Accept": "application/json",
                         "Connection": "keep-alive",
                         "Referer": f"https://{UWED_HOST}/",
@@ -106,14 +108,15 @@ class CampusFetcher:
 
     def fetch_full_snapshot(self) -> dict[str, Any]:
         monday = get_monday_str()
-        print(f"\n[{dt.datetime.now().strftime('%H:%M:%S')}] 🔄 Начинаю скачивание расписания из сети UWED...")
+        ts_now = dt.datetime.now().strftime("%H:%M:%S")
+        print(f"\n[{ts_now}] === Starting Schedule Download from UWED Intranet ===")
 
-        # 1. Слоты (пары)
+        # 1. Slots
         slots_res = self.api_get("/timetable/public/v1/slots/by/academic/year", {"academic_year_id": "null"})
         slots = slots_res.get("data") if isinstance(slots_res.get("data"), list) else []
-        print(f"  • Получено учебных слотов: {len(slots)}")
+        print(f"  [+] Slots loaded: {len(slots)}")
 
-        # 2. Аудитории (все блоки)
+        # 2. Rooms
         rooms_dict = {}
         for query in ("A-", "B-", "C-", "D-", "E-", "A", "B", "D"):
             res = self.api_get("/timetable/public/v1/search/rooms", {"search": query})
@@ -123,9 +126,9 @@ class CampusFetcher:
                     r["floor"] = extract_floor(r)
                     rooms_dict[rid] = r
         rooms = list(rooms_dict.values())
-        print(f"  • Найдено уникальных аудиторий: {len(rooms)}")
+        print(f"  [+] Rooms found: {len(rooms)}")
 
-        # 3. Преподаватели (популярные запросы + поиск)
+        # 3. Teachers
         teachers_dict = {}
         alphabet = "abcdefghijklmnopqrstuvwxyz"
         for letter in alphabet:
@@ -135,9 +138,9 @@ class CampusFetcher:
                 if tid and tid not in teachers_dict:
                     teachers_dict[tid] = t
         teachers = list(teachers_dict.values())
-        print(f"  • Найдено преподавателей: {len(teachers)}")
+        print(f"  [+] Teachers found: {len(teachers)}")
 
-        # 4. Расписание для аудиторий на текущую неделю
+        # 4. Timetable events for active rooms
         rooms_to_fetch = [
             r["id"]
             for r in rooms
@@ -154,15 +157,15 @@ class CampusFetcher:
             evs = res.get("data")
             return rid, (evs if isinstance(evs, list) else [])
 
-        print(f"  • Выгрузка расписания для {len(rooms_to_fetch)} аудиторий (параллельно)...")
+        print(f"  [+] Fetching schedules for {len(rooms_to_fetch)} classrooms (concurrent)...")
         with ThreadPoolExecutor(max_workers=20) as pool:
             for rid, evs in pool.map(fetch_events_for_room, rooms_to_fetch):
                 events_by_room[rid] = evs
 
-        active_events_count = sum(len(evs) for evs in events_by_room.values())
-        print(f"  • Всего занятий в расписании на эту неделю: {active_events_count}")
+        active_events = sum(len(evs) for evs in events_by_room.values())
+        print(f"  [+] Total weekly class events: {active_events}")
 
-        snapshot = {
+        return {
             "updated_at": int(time.time() * 1000),
             "week_monday": monday,
             "slots": slots,
@@ -170,82 +173,130 @@ class CampusFetcher:
             "teachers": teachers,
             "events": events_by_room,
         }
-        return snapshot
 
-def upload_snapshot_to_vercel(snapshot: dict[str, Any]) -> bool:
-    print(f"[{dt.datetime.now().strftime('%H:%M:%S')}] 📡 Отправка слепка на сервер Vercel...")
-    payload = json.dumps({"snapshot": snapshot, "source": "uwed_office_pc"}).encode("utf-8")
+def upload_snapshot_to_vercel(snapshot: dict[str, Any], trigger_source: str = "office_pc") -> bool:
+    ts_now = dt.datetime.now().strftime("%H:%M:%S")
+    print(f"[{ts_now}] Uploading to Vercel (source: {trigger_source})...")
+    payload = json.dumps({"snapshot": snapshot, "source": trigger_source}).encode("utf-8")
     req = urllib.request.Request(
         VERCEL_SYNC_URL,
         data=payload,
         headers={
             "Content-Type": "application/json",
             "X-Admin-Key": ADMIN_KEY,
-            "User-Agent": "UWED-Campus-Agent/1.0",
+            "User-Agent": "UWED-Campus-Agent/2.0",
         },
     )
     try:
-        with urllib.request.urlopen(req, timeout=25) as resp:
-            raw = resp.read().decode("utf-8")
-            data = json.loads(raw)
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
             if data.get("success"):
                 counts = data.get("counts", {})
-                print(f"✅ УСПЕШНО синхронизировано на сервере!")
-                print(f"   Аудиторий: {counts.get('rooms')} | Преподавателей: {counts.get('teachers')} | Расписаний: {counts.get('events')}")
+                print(f"[{ts_now}] [SUCCESS] Live update saved to Vercel cloud!")
+                print(f"          Rooms: {counts.get('rooms')} | Teachers: {counts.get('teachers')} | Events: {counts.get('events')}")
                 return True
-            else:
-                print(f"❌ Сервер вернул ошибку: {data}")
-                return False
     except Exception as e:
-        print(f"❌ Ошибка отправки на Vercel: {e}")
+        print(f"[{ts_now}] [ERROR] Upload failed: {e}")
+    return False
+
+def check_remote_sync_request() -> bool:
+    """Проверяет, не нажал ли админ кнопку /sync в Telegram или в Mini App."""
+    try:
+        req = urllib.request.Request(
+            f"{VERCEL_CHECK_URL}&key={ADMIN_KEY}",
+            headers={"X-Admin-Key": ADMIN_KEY, "User-Agent": "UWED-Campus-Agent/2.0"},
+        )
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            return bool(data.get("pending"))
+    except Exception:
         return False
 
-def setup_windows_autostart():
-    """Добавляет скрипт в автозагрузку текущего пользователя Windows."""
-    if sys.platform != "win32":
-        return
-    try:
-        startup_dir = Path(os.environ.get("APPDATA", "")) / "Microsoft" / "Windows" / "Start Menu" / "Programs" / "Startup"
-        if startup_dir.exists():
-            bat_path = startup_dir / "uwed_campus_agent.bat"
-            py_path = sys.executable
-            script_path = Path(__file__).resolve()
-            bat_content = f'@echo off\r\nstart "" "{py_path}" "{script_path}"\r\n'
-            bat_path.write_text(bat_content, encoding="utf-8")
-            print(f"[autostart] ✅ Ярлык автозапуска создан: {bat_path}")
-    except Exception as e:
-        print(f"[autostart] Не удалось создать автозапуск: {e}")
-
-def main():
-    print("=" * 60)
-    print("  UWED Smart Campus Sync Agent v1.0")
-    print("  Автономный агент синхронизации расписания для кампуса УМЭД")
-    print("=" * 60)
-    prevent_windows_sleep()
-    setup_windows_autostart()
-
-    fetcher = CampusFetcher()
-
-    while True:
+def perform_sync(fetcher: CampusFetcher, reason: str = "scheduled") -> bool:
+    with sync_lock:
         try:
             snapshot = fetcher.fetch_full_snapshot()
             if snapshot.get("rooms") and snapshot.get("slots"):
-                # Сохраняем локальную копию
-                local_file = Path(__file__).resolve().parent / "last_snapshot.json"
-                local_file.write_text(json.dumps(snapshot, ensure_ascii=False), encoding="utf-8")
-                upload_snapshot_to_vercel(snapshot)
+                # Save local backup
+                try:
+                    local_f = Path(__file__).resolve().parent / "last_snapshot.json"
+                    local_f.write_text(json.dumps(snapshot, ensure_ascii=False), encoding="utf-8")
+                except Exception:
+                    pass
+                return upload_snapshot_to_vercel(snapshot, trigger_source=f"office_pc_{reason}")
             else:
-                print("⚠️ Получены пустые данные, возможно, временный сбой сети UWED. Повтор через 2 минуты.")
-                time.sleep(120)
-                continue
+                print(f"[!] Warning: Received empty data from UWED network. Will retry.")
         except Exception as e:
-            print(f"⚠️ Ошибка в цикле синхронизации: {e}")
-            time.sleep(60)
-            continue
+            print(f"[!] Sync exception: {e}")
+        return False
 
-        next_time = dt.datetime.now() + dt.timedelta(minutes=SYNC_INTERVAL_MINUTES)
-        print(f"\n⏳ Ожидание {SYNC_INTERVAL_MINUTES} мин. Следующая синхронизация в {next_time.strftime('%H:%M:%S')}...\n")
-        time.sleep(SYNC_INTERVAL_MINUTES * 60)
+def keyboard_listener():
+    """Слушатель нажатия ENTER для мгновенной ручной синхронизации."""
+    while True:
+        try:
+            input()
+            print("\n[Input] Key pressed! Triggering immediate sync right now...")
+            manual_trigger_event.set()
+        except (EOFError, KeyboardInterrupt):
+            break
+
+def remote_poll_worker(fetcher: CampusFetcher):
+    """Слушатель удаленных команд из Telegram (/sync) и Mini App."""
+    while True:
+        time.sleep(REMOTE_POLL_INTERVAL_SECONDS)
+        try:
+            if check_remote_sync_request():
+                print("\n[Remote Trigger] Received /sync command from Telegram / Mini App! Syncing...")
+                perform_sync(fetcher, reason="remote_trigger")
+        except Exception:
+            pass
+
+def main():
+    print("=" * 65)
+    print("   UWED Smart Campus Sync Agent v2.0")
+    print("   University of World Economy and Diplomacy")
+    print("=" * 65)
+    print(" * Real-time sync available ON-DEMAND anytime:")
+    print("   - Press [ENTER] in this window at any second to sync")
+    print("   - Send /sync to @uwedhelpdesk_bot in Telegram to sync remotely")
+    print("   - Tap 'Sync' inside UWED Mini App")
+    print("   - Auto-sync running every 30 minutes")
+    print("=" * 65)
+
+    prevent_windows_sleep()
+
+    fetcher = CampusFetcher()
+
+    # Запускаем фоновые слушатели
+    t_key = threading.Thread(target=keyboard_listener, daemon=True)
+    t_key.start()
+
+    t_remote = threading.Thread(target=remote_poll_worker, args=(fetcher,), daemon=True)
+    t_remote.start()
+
+    # Первая немедленная синхронизация при запуске
+    perform_sync(fetcher, reason="startup")
+
+    # Главный цикл таймера
+    last_sync_time = time.time()
+    interval_seconds = DEFAULT_INTERVAL_MINUTES * 60
+
+    while True:
+        try:
+            # Ждём либо нажатия кнопки, либо истечения таймера
+            triggered = manual_trigger_event.wait(timeout=10)
+            if triggered:
+                manual_trigger_event.clear()
+                perform_sync(fetcher, reason="manual_enter")
+                last_sync_time = time.time()
+            elif (time.time() - last_sync_time) >= interval_seconds:
+                perform_sync(fetcher, reason="timer")
+                last_sync_time = time.time()
+        except KeyboardInterrupt:
+            print("\nExiting agent.")
+            break
+        except Exception as e:
+            time.sleep(5)
 
 if __name__ == "__main__":
     main()

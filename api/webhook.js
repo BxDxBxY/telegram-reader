@@ -1207,7 +1207,10 @@ module.exports = async (req, res) => {
         text.startsWith("/channels") ||
         text.startsWith("/maintenance") ||
         text.startsWith("/maint") ||
-        text.startsWith("/tech")
+        text.startsWith("/tech") ||
+        text.startsWith("/sync") ||
+        text.startsWith("/update") ||
+        text.startsWith("/refresh")
       ) {
         if (!isAdminUser(from)) {
           return res.status(200).json({ ok: true });
@@ -1259,6 +1262,31 @@ module.exports = async (req, res) => {
             });
             return res.status(200).json({ ok: true });
           }
+        }
+
+        if (text.startsWith("/sync") || text.startsWith("/update") || text.startsWith("/refresh")) {
+          const curDb = await loadDb(true);
+          curDb.pending_sync_request = {
+            requested_at: Date.now(),
+            requested_by: from.username || from.id || "admin",
+          };
+          await saveDb(curDb, true);
+          const meta = curDb.campus_snapshot_meta || {};
+          const lastTime = meta.updated_at
+            ? new Date(meta.updated_at + 5 * 3600 * 1000).toISOString().replace("T", " ").slice(0, 19)
+            : "avvalroq";
+
+          await tgApi("sendMessage", {
+            chat_id: chatId,
+            text:
+              `📡 <b>Sinxronizatsiya buyrug'i qabul qilindi!</b>\n\n` +
+              `🖥 Kampusdagi ofis kompyuteri signalni oldi va universitet ichki tarmog'idan (Wi-Fi) yangi ma'lumotlarni yuklab olmoqda.\n\n` +
+              `⏳ <i>Odatda bu 5-15 soniya davom etadi. So'ngra barcha talabalar uchun yangilanadi!</i>\n\n` +
+              `🕒 Oxirgi yangilanish: <code>${lastTime}</code> (${meta.source || "ofis PC"})\n` +
+              `📊 Auditoriyalar: <b>${meta.rooms_count || 231}</b> | Ustozlar: <b>${meta.teachers_count || 477}</b>`,
+            parse_mode: "HTML",
+          });
+          return res.status(200).json({ ok: true });
         }
 
         if (text.startsWith("/addchannel ") || text.startsWith("/delchannel ") || text.startsWith("/channels")) {
