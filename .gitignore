@@ -21,3 +21,8 @@ venv/
 .mypy_cache/
 build/
 dist/
+
+.vercel
+**/.vercel
+node_modules/
+**/node_modules/

@@ -179,7 +179,10 @@ def detect_language(texts: Iterable[str]) -> str:
     cyrillic = latin = 0
     for text in texts:
         for char in text or "":
-            code = ord(char.lower())
+            lowered = char.lower()
+            if len(lowered) != 1:
+                continue
+            code = ord(lowered)
             if 0x0430 <= code <= 0x044F or code == 0x0451:
                 cyrillic += 1
             elif 0x61 <= code <= 0x7A:

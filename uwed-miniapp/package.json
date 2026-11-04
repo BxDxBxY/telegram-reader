@@ -1,0 +1,9 @@
+{
+  "name": "uwed-schedule-miniapp",
+  "version": "1.0.0",
+  "private": true,
+  "description": "UWED (УМЭД) Empty Classrooms & Live Timetable Telegram Mini App + 24/7 Cloud Webhook Bot",
+  "engines": {
+    "node": ">=18.x"
+  }
+}
