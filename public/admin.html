@@ -1,0 +1,735 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>UWED Helpdesk • Admin</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #050811;
+      --card: #11192c;
+      --border: rgba(148, 163, 184, 0.16);
+      --text: #f8fafc;
+      --muted: #94a3b8;
+      --emerald: #10b981;
+      --rose: #f43f5e;
+      --blue: #3b82f6;
+      --cyan: #06b6d4;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: "Plus Jakarta Sans", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      padding: 20px 14px 70px;
+      max-width: 1080px;
+      margin: 0 auto;
+    }
+    #adminRoot { display: none; }
+    .top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 18px;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .title { font-size: 20px; font-weight: 800; }
+    .btn {
+      background: linear-gradient(135deg, #3b82f6, #06b6d4);
+      color: #fff;
+      border: none;
+      padding: 8px 14px;
+      border-radius: 10px;
+      font-weight: 700;
+      font-size: 12.5px;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .btn-sm {
+      padding: 5px 10px;
+      font-size: 11.5px;
+      border-radius: 8px;
+      font-weight: 700;
+      border: 1px solid var(--border);
+      cursor: pointer;
+      font-family: inherit;
+      color: #fff;
+      background: rgba(59, 130, 246, 0.2);
+    }
+    .btn-danger {
+      background: rgba(244, 63, 94, 0.22);
+      border-color: rgba(244, 63, 94, 0.45);
+      color: #fda4af;
+    }
+    .btn-success {
+      background: rgba(16, 185, 129, 0.22);
+      border-color: rgba(16, 185, 129, 0.45);
+      color: #6ee7b7;
+    }
+    .kpis {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 10px;
+      margin-bottom: 18px;
+    }
+    .kpi {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 14px;
+    }
+    .kpi-num { font-size: 26px; font-weight: 800; color: #38bdf8; }
+    .kpi-lbl { font-size: 11.5px; color: var(--muted); margin-top: 3px; }
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 14px;
+      margin-bottom: 18px;
+    }
+    .panel {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 15px;
+      margin-bottom: 16px;
+      overflow-x: auto;
+    }
+    .panel h3 {
+      font-size: 12.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: var(--muted);
+      margin-bottom: 12px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12.5px;
+    }
+    th, td {
+      text-align: left;
+      padding: 9px 9px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: middle;
+    }
+    th { color: var(--muted); font-weight: 700; font-size: 11px; text-transform: uppercase; }
+    .pill {
+      display: inline-block;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 700;
+      background: rgba(56, 189, 248, 0.15);
+      color: #38bdf8;
+      margin: 2px;
+    }
+    .status-ok {
+      background: rgba(16, 185, 129, 0.18);
+      color: #34d399;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 800;
+    }
+    .status-blk {
+      background: rgba(244, 63, 94, 0.22);
+      color: #fb7185;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 800;
+    }
+    .input {
+      background: #080d1a;
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 10px;
+      padding: 9px 12px;
+      font-family: inherit;
+      font-size: 13px;
+      width: 100%;
+      outline: none;
+    }
+    .input:focus { border-color: #38bdf8; }
+
+    /* User Inspector Modal */
+    .modal-bg {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.76);
+      backdrop-filter: blur(5px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 90;
+      padding: 14px;
+    }
+    .modal-bg.open { display: flex; }
+    .modal-card {
+      background: #0f172a;
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      border-radius: 20px;
+      width: 100%;
+      max-width: 680px;
+      max-height: 88vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .modal-hdr {
+      padding: 15px 18px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .modal-bdy {
+      padding: 16px 18px;
+      overflow-y: auto;
+    }
+  </style>
+</head>
+<body>
+  <div id="adminRoot">
+    <div class="top">
+      <div style="display:flex; align-items:center; gap:12px;">
+        <img src="/logo.jpg" alt="UWED Helpdesk" style="width:48px; height:48px; border-radius:12px; object-fit:cover; border:1px solid rgba(56,189,248,0.4);" />
+        <div>
+          <div class="title">🔒 UWED Helpdesk • User Control Center (@bxdxbxy)</div>
+          <div style="font-size:12px; color:var(--muted);">Inspect User Actions, Allow/Block Users, Track Event Channels & Send Direct Messages</div>
+        </div>
+      </div>
+      <button class="btn" onclick="loadData()">🔄 Refresh Live</button>
+    </div>
+
+    <div class="kpis">
+      <div class="kpi"><div class="kpi-num" id="kpiUsers">-</div><div class="kpi-lbl">Total Users</div></div>
+      <div class="kpi"><div class="kpi-num" id="kpiBlocked" style="color:#fb7185;">0</div><div class="kpi-lbl">Blocked Users</div></div>
+      <div class="kpi"><div class="kpi-num" id="kpiSubs" style="color:#34d399;">0</div><div class="kpi-lbl">Subscribed (/my)</div></div>
+      <div class="kpi"><div class="kpi-num" id="kpiEvents">-</div><div class="kpi-lbl">Logged Actions</div></div>
+      <div class="kpi"><div class="kpi-num" id="kpiFeedbacks">-</div><div class="kpi-lbl">Feedbacks</div></div>
+    </div>
+
+    <!-- Maintenance / Technical Mode Panel -->
+    <div class="panel" style="border: 1px solid rgba(244, 63, 94, 0.4); background: rgba(244, 63, 94, 0.05);">
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+        <div>
+          <h3 style="margin-bottom:4px;">🛠 Maintenance Mode (Технические работы / Доступ только админу)</h3>
+          <div style="font-size:12px; color:var(--muted);">
+            Когда включено: бот <b>не отвечает другим пользователям</b> и отправляет им вежливое уведомление о тех. работах. Бот отвечает <b>только вам (@bxdxbxy)</b>.
+          </div>
+        </div>
+        <div style="display:flex; align-items:center; gap:10px;">
+          <span id="maintStatusBadge" class="pill" style="font-weight:800; font-size:12.5px;">Проверка...</span>
+          <button id="maintToggleBtn" class="btn" onclick="toggleMaintenanceMode()">Загрузка...</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Broadcast Message to All Users -->
+    <div class="panel">
+      <h3>📢 Broadcast Message to All Bot Users (UWED Helpdesk)</h3>
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <input type="text" class="input" id="broadcastInput" style="flex:1; min-width:220px;" placeholder="Write an announcement to send to all users via @uwedhelpdesk_bot..." />
+        <button class="btn" onclick="sendBroadcast()">🚀 Send to Everyone</button>
+      </div>
+      <div id="broadcastStatus" style="font-size:12px; color:#34d399; margin-top:8px; display:none;"></div>
+    </div>
+
+    <!-- Tracked Telegram Channels for Events & News -->
+    <div class="panel">
+      <h3>📡 Tracked Telegram Channels (Auto-Scrape Campus Events & News)</h3>
+      <div style="font-size:12px; color:var(--muted); margin-bottom:10px;">
+        Add any public Telegram channel (e.g. <code>@uwed_official</code>, <code>@uwed_youth</code>) — the bot and Mini App will automatically pull its latest announcements into the <b>🗓 Events</b> tab!
+      </div>
+      <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;">
+        <input type="text" class="input" id="channelInput" style="flex:1; min-width:200px;" placeholder="@channel_username or https://t.me/channel_name" />
+        <button class="btn" onclick="addTrackedChannel()">➕ Add Channel</button>
+        <button class="btn-sm" onclick="syncTrackedChannelsNow()">🔄 Sync Posts Now</button>
+      </div>
+      <div id="trackedChannelsList" style="display:flex; gap:8px; flex-wrap:wrap;"></div>
+      <div id="channelSyncStatus" style="font-size:12px; color:#34d399; margin-top:8px; display:none;"></div>
+    </div>
+
+    <!-- Users Control Table -->
+    <div class="panel">
+      <h3>👥 User Control & Management (Click "Inspect / Msg" to view all actions or message user)</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Status</th>
+            <th>User & ID</th>
+            <th>@Username / Phone</th>
+            <th>Actions</th>
+            <th>Last Seen</th>
+            <th>Recent Activity</th>
+            <th>Control</th>
+          </tr>
+        </thead>
+        <tbody id="usersTable"></tbody>
+      </table>
+    </div>
+
+    <div class="grid-2">
+      <div class="panel">
+        <h3>🔥 Most Clicked Classrooms</h3>
+        <div id="topRooms">...</div>
+      </div>
+      <div class="panel">
+        <h3>🔎 Top Search Queries</h3>
+        <div id="topSearches">...</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h3>💬 User Feedback & Feature Requests</h3>
+      <table>
+        <thead>
+          <tr><th>Time</th><th>User</th><th>Contact / Phone</th><th>Rating</th><th>Message</th><th>Reply</th></tr>
+        </thead>
+        <tbody id="fbTable"></tbody>
+      </table>
+    </div>
+
+    <div class="panel">
+      <h3>⚡ Live Event Stream (Latest 120 Actions)</h3>
+      <table>
+        <thead>
+          <tr><th>Time</th><th>User</th><th>Source</th><th>Action</th><th>Detail</th></tr>
+        </thead>
+        <tbody id="eventsTable"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- USER INSPECTOR & DIRECT MESSAGE MODAL -->
+  <div class="modal-bg" id="userModal" onclick="if(event.target===this) closeUserModal()">
+    <div class="modal-card">
+      <div class="modal-hdr">
+        <div>
+          <div style="font-size:16px; font-weight:800;" id="umName">User</div>
+          <div style="font-size:12px; color:var(--muted);" id="umMeta"></div>
+        </div>
+        <button class="btn-sm" onclick="closeUserModal()">✕ Close</button>
+      </div>
+      <div class="modal-bdy">
+        <!-- Allow / Block & Note Controls -->
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:14px; padding:12px; background:#080d1a; border-radius:12px; border:1px solid var(--border);">
+          <div>
+            <div style="font-size:12px; color:var(--muted);">Access Permission</div>
+            <div id="umStatusBadge" style="margin-top:4px;"></div>
+          </div>
+          <button class="btn" id="umToggleBlockBtn" onclick="toggleCurrentModalUserBlock()"></button>
+        </div>
+
+        <!-- Direct Message via Bot -->
+        <div style="margin-bottom:14px; padding:12px; background:#080d1a; border-radius:12px; border:1px solid var(--border);">
+          <div style="font-size:12px; font-weight:700; color:#38bdf8; margin-bottom:6px;">✉️ Send Direct Message via UWED Helpdesk Bot</div>
+          <div style="display:flex; gap:8px;">
+            <input type="text" class="input" id="umMsgInput" placeholder="Type message to send directly to this user in Telegram..." />
+            <button class="btn" onclick="sendDirectMsgToModalUser()">Send</button>
+          </div>
+          <div id="umMsgStatus" style="font-size:12px; color:#34d399; margin-top:6px; display:none;"></div>
+        </div>
+
+        <!-- Admin Note -->
+        <div style="margin-bottom:14px; display:flex; gap:8px;">
+          <input type="text" class="input" id="umNoteInput" placeholder="Private admin note about this user..." />
+          <button class="btn-sm" onclick="saveModalUserNote()">💾 Save Note</button>
+        </div>
+
+        <!-- Top Actions Summary -->
+        <div style="margin-bottom:12px;">
+          <div style="font-size:11.5px; font-weight:700; color:var(--muted); text-transform:uppercase; margin-bottom:6px;">Top Actions Breakdown</div>
+          <div id="umTopActions"></div>
+        </div>
+
+        <!-- Full Action History -->
+        <div>
+          <div style="font-size:11.5px; font-weight:700; color:var(--muted); text-transform:uppercase; margin-bottom:6px;">Full Action History (Searches, Clicks, Rooms)</div>
+          <table>
+            <thead>
+              <tr><th>Timestamp</th><th>Action</th><th>Detail / Query</th></tr>
+            </thead>
+            <tbody id="umActionsList"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
+    if (tg) { tg.ready(); tg.expand(); }
+
+    let ADMIN_DATA = { users: [] };
+    let SELECTED_UID = null;
+    let currentMaintMode = true;
+
+    function updateMaintUI(isMaint) {
+      currentMaintMode = Boolean(isMaint);
+      const badge = document.getElementById("maintStatusBadge");
+      const btn = document.getElementById("maintToggleBtn");
+      if (!badge || !btn) return;
+      if (currentMaintMode) {
+        badge.style.background = "rgba(244,63,94,0.18)";
+        badge.style.color = "#fb7185";
+        badge.style.borderColor = "rgba(244,63,94,0.4)";
+        badge.textContent = "🔴 ТЕХ. РАБОТЫ ВКЛЮЧЕНЫ (Только админ)";
+        btn.style.background = "linear-gradient(135deg, #10b981, #06b6d4)";
+        btn.textContent = "🟢 Открыть для всех пользователей";
+      } else {
+        badge.style.background = "rgba(16,185,129,0.18)";
+        badge.style.color = "#34d399";
+        badge.style.borderColor = "rgba(16,185,129,0.4)";
+        badge.textContent = "🟢 БОТ ОТКРЫТ ДЛЯ ВСЕХ";
+        btn.style.background = "linear-gradient(135deg, #f43f5e, #fb7185)";
+        btn.textContent = "🛠 Включить тех. работы (Остановить для других)";
+      }
+    }
+
+    async function toggleMaintenanceMode() {
+      const newTarget = !currentMaintMode;
+      const btn = document.getElementById("maintToggleBtn");
+      if (btn) btn.disabled = true;
+      try {
+        const res = await fetch("/api/telemetry", {
+          method: "POST",
+          headers: getAuthHeaders(),
+          body: JSON.stringify({ action: "admin_toggle_maintenance", enabled: newTarget }),
+        }).then((r) => r.json());
+        if (res && res.success) {
+          updateMaintUI(res.maintenance_mode);
+        }
+      } catch (_) {}
+      if (btn) btn.disabled = false;
+    }
+
+    function getAuthHeaders() {
+      const params = new URLSearchParams(window.location.search);
+      const key = params.get("key") || "";
+      const initData = tg && tg.initData ? tg.initData : "";
+      return {
+        "Content-Type": "application/json",
+        "X-Admin-Key": key,
+        "X-Tg-Init-Data": initData,
+      };
+    }
+
+    function renderCounterPills(obj) {
+      const entries = Object.entries(obj || {}).sort((a, b) => b[1] - a[1]).slice(0, 20);
+      if (!entries.length) return "<span style='color:var(--muted);font-size:13px;'>No data yet</span>";
+      return entries.map(([k, v]) => `<span class="pill">${k}: <b>${v}</b></span>`).join(" ");
+    }
+
+    async function loadData() {
+      const params = new URLSearchParams(window.location.search);
+      const key = params.get("key") || "";
+      try {
+        const res = await fetch(`/api/telemetry?key=${encodeURIComponent(key)}`, {
+          headers: getAuthHeaders(),
+        });
+        if (!res.ok) {
+          document.body.innerHTML = "";
+          return;
+        }
+        const d = await res.json();
+        ADMIN_DATA = d;
+        document.getElementById("adminRoot").style.display = "block";
+        updateMaintUI(d.summary ? d.summary.maintenance_mode : true);
+        document.getElementById("kpiUsers").textContent = (d.users || []).length;
+        document.getElementById("kpiBlocked").textContent = (d.users || []).filter((u) => u.blocked).length;
+        document.getElementById("kpiSubs").textContent = Object.keys(d.subscriptions || {}).length;
+        document.getElementById("kpiEvents").textContent = (d.events || []).length;
+        document.getElementById("kpiFeedbacks").textContent = (d.feedbacks || []).length;
+
+        document.getElementById("topRooms").innerHTML = renderCounterPills(d.counters && d.counters.rooms);
+        document.getElementById("topSearches").innerHTML = renderCounterPills(d.counters && d.counters.searches);
+
+        document.getElementById("fbTable").innerHTML =
+          (d.feedbacks || [])
+            .map(
+              (f) => `
+            <tr>
+              <td>${f.ts}</td>
+              <td><b>${f.name}</b> ${f.username || ""} (<code>${f.uid || ""}</code>)</td>
+              <td>${f.phone || "—"}</td>
+              <td style="color:#fbbf24;">${"★".repeat(f.rating || 5)}</td>
+              <td>${f.message}</td>
+              <td>${f.uid ? `<button class="btn-sm" onclick="openUserModal('${f.uid}')">✉️ Reply</button>` : "—"}</td>
+            </tr>`
+            )
+            .join("") || "<tr><td colspan='6' style='color:var(--muted);'>No feedback yet</td></tr>";
+
+        renderUsersTable();
+        renderTrackedChannels(d.tracked_channels || ["uwed_official"], (d.channel_posts || []).length);
+
+        document.getElementById("eventsTable").innerHTML =
+          (d.events || [])
+            .map(
+              (e) => `
+            <tr>
+              <td>${e.ts}</td>
+              <td><a href="javascript:void(0)" style="color:#38bdf8;text-decoration:none;font-weight:700;" onclick="openUserModal('${e.uid}')">${e.name}</a> ${e.username || ""}</td>
+              <td><span class="pill">${e.source}</span></td>
+              <td><b>${e.action}</b></td>
+              <td>${e.detail || ""}</td>
+            </tr>`
+            )
+            .join("") || "<tr><td colspan='5' style='color:var(--muted);'>No events yet</td></tr>";
+      } catch (_) {
+        document.body.innerHTML = "";
+      }
+    }
+
+    function renderUsersTable() {
+      const list = ADMIN_DATA.users || [];
+      document.getElementById("usersTable").innerHTML =
+        list
+          .map((u) => {
+            const recent = (u.last_actions || [])
+              .slice(0, 3)
+              .map((a) => `${a.action}${a.detail ? "(" + a.detail + ")" : ""}`)
+              .join(", ");
+            const statusHtml = u.blocked
+              ? `<span class="status-blk">🚫 BLOCKED</span>`
+              : `<span class="status-ok">✅ ALLOWED</span>`;
+            const noteHtml = u.admin_note ? `<div style="font-size:11px;color:#fbbf24;margin-top:2px;">📝 ${u.admin_note}</div>` : "";
+            const blockBtn = u.blocked
+              ? `<button class="btn-sm btn-success" onclick="quickToggleBlock('${u.id}', false)">✅ Allow</button>`
+              : `<button class="btn-sm btn-danger" onclick="quickToggleBlock('${u.id}', true)">🚫 Block</button>`;
+            return `
+            <tr>
+              <td>${statusHtml}</td>
+              <td>
+                <b>${[u.first_name, u.last_name].filter(Boolean).join(" ") || "Guest"}</b>
+                <div style="font-size:11px;color:var(--muted);">ID: <code>${u.id}</code> · ${u.language_code || "uz"}</div>
+                ${noteHtml}
+              </td>
+              <td>
+                <div>${u.username ? "@" + u.username : "—"}</div>
+                <div style="font-size:11.5px;color:#34d399;font-weight:700;">${u.phone || ""}</div>
+              </td>
+              <td><b>${u.actions_count || 0}</b></td>
+              <td style="font-size:11.5px;">${u.last_seen || ""}</td>
+              <td style="color:var(--muted);font-size:11.5px;max-width:220px;">${recent}</td>
+              <td>
+                <div style="display:flex; gap:5px; flex-wrap:wrap;">
+                  <button class="btn-sm" onclick="openUserModal('${u.id}')">📜 Inspect / ✉️ Msg</button>
+                  ${blockBtn}
+                </div>
+              </td>
+            </tr>`;
+          })
+          .join("") || "<tr><td colspan='7' style='color:var(--muted);'>No users yet</td></tr>";
+    }
+
+    async function quickToggleBlock(uid, setBlocked) {
+      await fetch("/api/telemetry", {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          action: "admin_toggle_block",
+          target_uid: uid,
+          blocked: setBlocked,
+        }),
+      });
+      await loadData();
+      if (SELECTED_UID === uid) openUserModal(uid);
+    }
+
+    function openUserModal(uid) {
+      SELECTED_UID = String(uid);
+      const u = (ADMIN_DATA.users || []).find((x) => String(x.id) === SELECTED_UID);
+      if (!u) return;
+
+      document.getElementById("umName").textContent =
+        [u.first_name, u.last_name].filter(Boolean).join(" ") || "User";
+      document.getElementById("umMeta").textContent = `ID: ${u.id} · ${u.username ? "@" + u.username : "no username"} · Phone: ${u.phone || "—"} · First seen: ${u.first_seen || "—"}`;
+      document.getElementById("umNoteInput").value = u.admin_note || "";
+
+      const badge = document.getElementById("umStatusBadge");
+      const btn = document.getElementById("umToggleBlockBtn");
+      if (u.blocked) {
+        badge.innerHTML = `<span class="status-blk">🚫 BLOCKED FROM BOT & MINI APP</span>`;
+        btn.textContent = "✅ Allow / Unblock User";
+        btn.className = "btn btn-success";
+      } else {
+        badge.innerHTML = `<span class="status-ok">✅ ALLOWED (ACTIVE ACCESS)</span>`;
+        btn.textContent = "🚫 Block User";
+        btn.className = "btn btn-danger";
+      }
+
+      document.getElementById("umTopActions").innerHTML = renderCounterPills(u.top_actions || {});
+      document.getElementById("umActionsList").innerHTML =
+        (u.last_actions || [])
+          .map(
+            (a) => `
+          <tr>
+            <td style="font-size:11.5px; color:var(--muted);">${a.ts}</td>
+            <td><b>${a.action}</b></td>
+            <td><code>${a.detail || "—"}</code></td>
+          </tr>`
+          )
+          .join("") || "<tr><td colspan='3' style='color:var(--muted);'>No actions recorded</td></tr>";
+
+      document.getElementById("userModal").classList.add("open");
+    }
+
+    function closeUserModal() {
+      document.getElementById("userModal").classList.remove("open");
+      SELECTED_UID = null;
+    }
+
+    async function toggleCurrentModalUserBlock() {
+      if (!SELECTED_UID) return;
+      const u = (ADMIN_DATA.users || []).find((x) => String(x.id) === SELECTED_UID);
+      if (!u) return;
+      await quickToggleBlock(SELECTED_UID, !u.blocked);
+    }
+
+    async function saveModalUserNote() {
+      if (!SELECTED_UID) return;
+      const note = document.getElementById("umNoteInput").value;
+      await fetch("/api/telemetry", {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          action: "admin_set_note",
+          target_uid: SELECTED_UID,
+          note,
+        }),
+      });
+      await loadData();
+      openUserModal(SELECTED_UID);
+    }
+
+    async function sendDirectMsgToModalUser() {
+      if (!SELECTED_UID) return;
+      const input = document.getElementById("umMsgInput");
+      const text = (input.value || "").trim();
+      if (!text) return;
+
+      const st = document.getElementById("umMsgStatus");
+      st.style.display = "block";
+      st.textContent = "Sending via Telegram Bot...";
+
+      const res = await fetch("/api/telemetry", {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          action: "admin_send_message",
+          target_uid: SELECTED_UID,
+          text,
+        }),
+      }).then((r) => r.json());
+
+      if (res && res.success) {
+        input.value = "";
+        st.style.color = "#34d399";
+        st.textContent = "✅ Message delivered to user's Telegram chat!";
+      } else {
+        st.style.color = "#fb7185";
+        st.textContent = "⚠️ Could not deliver (user may be a web guest or hasn't started the new bot yet).";
+      }
+      setTimeout(() => (st.style.display = "none"), 4500);
+    }
+
+    async function sendBroadcast() {
+      const input = document.getElementById("broadcastInput");
+      const text = (input.value || "").trim();
+      if (!text) return;
+
+      const st = document.getElementById("broadcastStatus");
+      st.style.display = "block";
+      st.textContent = "Broadcasting to all Telegram users...";
+
+      const res = await fetch("/api/telemetry", {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          action: "admin_send_message",
+          target_uid: "ALL",
+          text,
+        }),
+      }).then((r) => r.json());
+
+      if (res && res.success) {
+        input.value = "";
+        st.textContent = `✅ Broadcast sent! Delivered to ${res.delivered} of ${res.total} users.`;
+      } else {
+        st.textContent = "⚠️ Error sending broadcast.";
+      }
+      setTimeout(() => (st.style.display = "none"), 5000);
+    }
+
+    function renderTrackedChannels(channels, postCount) {
+      const box = document.getElementById("trackedChannelsList");
+      if (!box) return;
+      box.innerHTML =
+        (channels || [])
+          .map(
+            (ch) => `
+          <span class="pill" style="display:inline-flex;align-items:center;gap:8px;padding:6px 11px;">
+            <a href="https://t.me/${ch}" target="_blank" style="color:#38bdf8;text-decoration:none;font-weight:800;">@${ch}</a>
+            <button class="btn-sm btn-danger" style="padding:2px 6px;font-size:10px;" onclick="removeTrackedChannel('${ch}')">✕</button>
+          </span>`
+          )
+          .join("") +
+        `<span class="pill" style="background:rgba(16,185,129,0.12);border-color:rgba(16,185,129,0.35);color:#34d399;">📰 ${postCount || 0} live posts cached</span>`;
+    }
+
+    async function addTrackedChannel() {
+      const inp = document.getElementById("channelInput");
+      const val = (inp.value || "").trim();
+      if (!val) return;
+      const st = document.getElementById("channelSyncStatus");
+      st.style.display = "block";
+      st.textContent = "Adding channel & scraping latest Telegram posts...";
+      const res = await fetch("/api/telemetry", {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ action: "admin_add_channel", channel: val }),
+      }).then((r) => r.json());
+      inp.value = "";
+      if (res && res.success) {
+        renderTrackedChannels(res.tracked_channels, (res.channel_posts || []).length);
+        st.textContent = `✅ Added channel! Pulled ${(res.channel_posts || []).length} live posts.`;
+      }
+      setTimeout(() => (st.style.display = "none"), 4000);
+    }
+
+    async function removeTrackedChannel(ch) {
+      const res = await fetch("/api/telemetry", {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ action: "admin_remove_channel", channel: ch }),
+      }).then((r) => r.json());
+      if (res && res.success) {
+        renderTrackedChannels(res.tracked_channels, (res.channel_posts || []).length);
+      }
+    }
+
+    async function syncTrackedChannelsNow() {
+      const st = document.getElementById("channelSyncStatus");
+      st.style.display = "block";
+      st.textContent = "Syncing live posts from all tracked Telegram channels...";
+      const res = await fetch("/api/telemetry", {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ action: "admin_sync_channels" }),
+      }).then((r) => r.json());
+      if (res && res.success) {
+        renderTrackedChannels(res.tracked_channels, (res.channel_posts || []).length);
+        st.textContent = `✅ Synced ${(res.channel_posts || []).length} live posts across ${(res.tracked_channels || []).length} channels!`;
+      }
+      setTimeout(() => (st.style.display = "none"), 4000);
+    }
+
+    loadData();
+  </script>
+</body>
+</html>
