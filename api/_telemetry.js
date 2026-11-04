@@ -775,6 +775,82 @@ async function adminSetMaintenance({ enabled }) {
   return db;
 }
 
+let memSnapshot = null;
+let lastSnapshotFetchTs = 0;
+
+async function loadSnapshotFromDb(force = false) {
+  if (!force && memSnapshot && Date.now() - lastSnapshotFetchTs < 60000) {
+    return memSnapshot;
+  }
+  try {
+    const gist = await ghRequest("GET", `/gists/${GIST_ID}`);
+    if (gist && gist.files && gist.files["campus_snapshot.json"] && gist.files["campus_snapshot.json"].content) {
+      const parsed = JSON.parse(gist.files["campus_snapshot.json"].content);
+      if (parsed && (parsed.slots || parsed.rooms || parsed.teachers)) {
+        memSnapshot = parsed;
+        lastSnapshotFetchTs = Date.now();
+        return memSnapshot;
+      }
+    }
+  } catch (_) {}
+
+  // Fallback to local snapshot file on disk
+  if (!memSnapshot) {
+    try {
+      memSnapshot = require("../public/snapshot.json");
+      lastSnapshotFetchTs = Date.now();
+    } catch (_) {
+      memSnapshot = { slots: [], rooms: [], teachers: [], events: {} };
+    }
+  }
+  return memSnapshot;
+}
+
+async function saveSnapshotToDb(snapshotData, source = "office_pc") {
+  if (!snapshotData || typeof snapshotData !== "object") return null;
+
+  const now = Date.now();
+  const validSnapshot = {
+    updated_at: snapshotData.updated_at || now,
+    source,
+    week_monday:
+      snapshotData.week_monday ||
+      new Date(now + 5 * 3600 * 1000).toISOString().split("T")[0],
+    slots: Array.isArray(snapshotData.slots) ? snapshotData.slots : [],
+    rooms: Array.isArray(snapshotData.rooms) ? snapshotData.rooms : [],
+    teachers: Array.isArray(snapshotData.teachers) ? snapshotData.teachers : [],
+    events:
+      snapshotData.events && typeof snapshotData.events === "object"
+        ? snapshotData.events
+        : {},
+  };
+
+  memSnapshot = validSnapshot;
+  lastSnapshotFetchTs = now;
+
+  const db = await loadDb(true);
+  db.campus_snapshot_meta = {
+    updated_at: now,
+    source,
+    slots_count: validSnapshot.slots.length,
+    rooms_count: validSnapshot.rooms.length,
+    teachers_count: validSnapshot.teachers.length,
+    events_count: Object.keys(validSnapshot.events).length,
+  };
+  await saveDb(db, true);
+
+  // Save into GitHub Gist file campus_snapshot.json
+  await ghRequest("PATCH", `/gists/${GIST_ID}`, {
+    files: {
+      "campus_snapshot.json": {
+        content: JSON.stringify(validSnapshot),
+      },
+    },
+  });
+
+  return validSnapshot;
+}
+
 module.exports = {
   loadDb,
   saveDb,
@@ -783,4 +859,6 @@ module.exports = {
   adminManageChannels,
   syncTrackedChannels,
   adminSetMaintenance,
+  loadSnapshotFromDb,
+  saveSnapshotToDb,
 };

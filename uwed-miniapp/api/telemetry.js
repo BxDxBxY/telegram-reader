@@ -7,6 +7,8 @@ const {
   adminManageChannels,
   syncTrackedChannels,
   adminSetMaintenance,
+  loadSnapshotFromDb,
+  saveSnapshotToDb,
 } = require("./_telemetry");
 
 const BOT_TOKEN =
@@ -294,6 +296,13 @@ module.exports = async (req, res) => {
       campus_events: mergedEvents,
       attending_events: userRecord && Array.isArray(userRecord.attending_events) ? userRecord.attending_events : [],
       my_subscription: uid && db.subscriptions ? db.subscriptions[uid] || null : null,
+      campus_snapshot_meta: db.campus_snapshot_meta || {
+        updated_at: 1793715471368,
+        source: "system",
+        slots_count: 8,
+        rooms_count: 231,
+        teachers_count: 477,
+      },
     });
   }
 
@@ -334,6 +343,67 @@ module.exports = async (req, res) => {
 
   if (req.method === "POST") {
     const body = req.body || {};
+    const targetAction = req.query.action || body.action || "";
+
+    // A. Campus Snapshot Sync from Office PC / Campus Agent
+    if (targetAction === "sync_snapshot") {
+      if (!isAuthorizedAdminRequest(req)) {
+        return res.status(403).json({ success: false, error: "Unauthorized" });
+      }
+      const snapshot = body.snapshot || body;
+      const source = body.source || "office_pc";
+      const saved = await saveSnapshotToDb(snapshot, source);
+      if (!saved) {
+        return res.status(400).json({ success: false, error: "Invalid snapshot data" });
+      }
+
+      await recordTelemetry({
+        user: { id: ADMIN_ID, username: ADMIN_USERNAME, first_name: "Admin Office PC" },
+        action: "campus_snapshot_sync",
+        detail: `Synced ${saved.rooms.length} rooms, ${saved.teachers.length} teachers, ${Object.keys(saved.events).length} events from ${source}`,
+        source: "campus_agent",
+      });
+
+      return res.status(200).json({
+        success: true,
+        updated_at: saved.updated_at,
+        source: saved.source,
+        counts: {
+          slots: saved.slots.length,
+          rooms: saved.rooms.length,
+          teachers: saved.teachers.length,
+          events: Object.keys(saved.events).length,
+        },
+      });
+    }
+
+    // B. Crowd-Sourced Student Relay (When students open Mini App on campus Wi-Fi)
+    if (targetAction === "relay_sync") {
+      const partial = body.data || body;
+      if (!partial || typeof partial !== "object") {
+        return res.status(400).json({ success: false });
+      }
+      const db = await loadDb();
+      const lastUpdate = (db.campus_snapshot_meta && db.campus_snapshot_meta.updated_at) || 0;
+      if (Date.now() - lastUpdate > 45 * 60 * 1000 && (partial.rooms || partial.slots)) {
+        const cur = await loadSnapshotFromDb();
+        const merged = {
+          ...cur,
+          updated_at: Date.now(),
+          source: "student_campus_relay",
+          slots: Array.isArray(partial.slots) && partial.slots.length ? partial.slots : cur.slots,
+          rooms: Array.isArray(partial.rooms) && partial.rooms.length ? partial.rooms : cur.rooms,
+          teachers: Array.isArray(partial.teachers) && partial.teachers.length ? partial.teachers : cur.teachers,
+          events:
+            partial.events && typeof partial.events === "object"
+              ? { ...cur.events, ...partial.events }
+              : cur.events,
+        };
+        await saveSnapshotToDb(merged, "student_campus_relay");
+        return res.status(200).json({ success: true, updated: true });
+      }
+      return res.status(200).json({ success: true, updated: false, cached: true });
+    }
 
     // 1. Send Daily / Weekly / Monthly Schedule directly inside Telegram Bot (No Vercel links exposed!)
     if (body.action === "send_schedule_to_bot") {

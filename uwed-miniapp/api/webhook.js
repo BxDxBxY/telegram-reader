@@ -6,6 +6,7 @@ const {
   adminManageChannels,
   syncTrackedChannels,
   adminSetMaintenance,
+  loadSnapshotFromDb,
 } = require("./_telemetry");
 const { getAdminSecretKey, ADMIN_ID, ADMIN_USERNAME } = require("./telemetry");
 
@@ -1093,7 +1094,7 @@ module.exports = async (req, res) => {
     return res.status(200).json({ ok: true, status: "UWED Helpdesk Webhook is active 24/7" });
   }
 
-  const snap = SNAPSHOT;
+  const snap = await loadSnapshotFromDb();
   const host = req.headers["x-forwarded-host"] || req.headers.host || "uwed-miniapp.vercel.app";
   const baseWebappUrl = `https://${host}/`;
   const upd = req.body || {};

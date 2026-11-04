@@ -1546,7 +1546,10 @@
       <div class="brand" onclick="switchTab('home')">
         <img src="/logo.jpg" alt="UWED Helpdesk" class="brand-logo" style="object-fit: cover; padding: 0; border: 1px solid rgba(56, 189, 248, 0.45);" />
         <div style="min-width: 0;">
-          <div class="brand-title" id="hdrTitle">UWED Helpdesk</div>
+          <div style="display:flex; align-items:center; gap:5px;">
+            <div class="brand-title" id="hdrTitle">UWED Helpdesk</div>
+            <span id="campusWifiBadge" style="display:none; font-size:9.5px; font-weight:700; color:#10b981; background:rgba(16,185,129,0.16); border:1px solid rgba(16,185,129,0.35); padding:1px 6px; border-radius:8px;">📡 UWED Wi-Fi</span>
+          </div>
           <div class="brand-sub" id="clockStatus">...</div>
         </div>
       </div>
@@ -3511,6 +3514,8 @@
             ? data.tracked_channels
             : ["uwed_official"];
           STATE.attendingEvents = Array.isArray(data.attending_events) ? data.attending_events : [];
+          STATE.snapshotMeta = data.campus_snapshot_meta || null;
+          checkCampusWifiConnectivity();
 
           const bBadge = document.getElementById("bentoEventsBadge");
           if (bBadge) bBadge.textContent = `${STATE.campusEvents.length} LIVE`;

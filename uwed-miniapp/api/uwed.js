@@ -1,5 +1,5 @@
 const https = require("https");
-const SNAPSHOT = require("../public/snapshot.json");
+const { loadSnapshotFromDb } = require("./_telemetry");
 
 const UWED_HOST = "manage.uwed.uz";
 
@@ -102,22 +102,23 @@ async function uwedGet(pathWithDoubleSlash, query = {}, lang = "uz", host = UWED
         return cached.data;
       }
       // Autonomous snapshot fallback if upstream university API restricts or blocks external IP
+      const snap = await loadSnapshotFromDb();
       if (pathWithDoubleSlash.includes("/slots")) {
-        return { success: true, data: SNAPSHOT.slots || [] };
+        return { success: true, data: snap.slots || [] };
       }
       if (pathWithDoubleSlash.includes("/search/teachers")) {
         const q = String(query.search || "").toLowerCase();
-        const matches = (SNAPSHOT.teachers || []).filter((t) => (t.full_name || "").toLowerCase().includes(q));
+        const matches = (snap.teachers || []).filter((t) => (t.full_name || "").toLowerCase().includes(q));
         return { success: true, data: matches };
       }
       if (pathWithDoubleSlash.includes("/search/rooms")) {
         const q = String(query.search || "").toLowerCase();
-        const matches = (SNAPSHOT.rooms || []).filter((r) => (r.name || "").toLowerCase().includes(q));
+        const matches = (snap.rooms || []).filter((r) => (r.name || "").toLowerCase().includes(q));
         return { success: true, data: matches };
       }
       if (pathWithDoubleSlash.includes("/events") && query.request_id) {
         const rid = query.request_id;
-        const evs = (SNAPSHOT.events && SNAPSHOT.events[rid]) || [];
+        const evs = (snap.events && snap.events[rid]) || [];
         return { success: true, data: evs };
       }
       return { success: true, data: [], fallback: true, warning: String(err.message || err) };
