@@ -1,7 +1,7 @@
 """Слой Telegram: классификация сущностей и преобразование объектов."""
 
 import unittest
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 
 from tests.helpers import (
     NOW,
@@ -39,7 +39,7 @@ class ClassifyTests(unittest.TestCase):
 class MuteTests(unittest.TestCase):
     def test_future_mute_until_means_muted(self):
         dialog = type("D", (), {})()
-        dialog.dialog = FakeRawDialog(FakeNotifySettings(mute_until=NOW + timedelta(days=365)))
+        dialog.dialog = FakeRawDialog(FakeNotifySettings(mute_until=datetime.now(timezone.utc) + timedelta(days=365)))
         self.assertTrue(is_muted(dialog))
 
     def test_no_notify_settings_means_not_muted(self):

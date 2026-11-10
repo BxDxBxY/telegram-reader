@@ -114,7 +114,9 @@ class FakeDialog:
         self.archived = archived
         self.date = date or NOW
         self.message = message or FakeMessage(1, "последний пост", self.date)
-        mute_until = NOW + timedelta(days=30) if muted else None
+        # mute_until сравнивается с реальным utcnow(), а не с фиксированным NOW —
+        # иначе тест «протухает», когда NOW + 30 дней остаётся в прошлом.
+        mute_until = datetime.now(timezone.utc) + timedelta(days=30) if muted else None
         self.dialog = FakeRawDialog(FakeNotifySettings(mute_until=mute_until))
 
 
