@@ -263,7 +263,7 @@ class UwedScheduleService:
 
             def fetch_one(room_id: str) -> tuple[str, list[dict[str, Any]]]:
                 ev_res = self._api_get(
-                    "/timetable/public/v1/events",
+                    "/timetable/public/v1/events/list",
                     {
                         "request_id": room_id,
                         "type": "ROOM",

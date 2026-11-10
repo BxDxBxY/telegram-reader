@@ -836,7 +836,32 @@ async function formatRoomDetailView(snap, rm, day, lang, baseWebappUrl) {
   const cur = detectCurrentSlotAndDay(snap.slots, lang);
   const db = await loadDb();
   const rep = db.room_reports && db.room_reports[rm.name];
-  const dayMap = getRoomDayEvents(snap, rm.id, day);
+  let dayMap = getRoomDayEvents(snap, rm.id, day);
+
+  if (!dayMap || Object.keys(dayMap).length === 0) {
+    try {
+      const liveRes = await uwedGet(
+        "/timetable/public/v1/events/list",
+        { request_id: rm.id, type: "ROOM", start_time: getTashkentMonday() },
+        lang
+      );
+      if (Array.isArray(liveRes.data) && liveRes.data.length > 0) {
+        dayMap = {};
+        for (const ev of liveRes.data) {
+          if (Number(ev.week_day) === Number(day) && ev.slot_id) {
+            dayMap[Number(ev.slot_id)] = {
+              d: ev.week_day,
+              s: ev.slot_id,
+              t: ev.title,
+              i: ev.instructor,
+              g: ev.groups,
+              r: ev.room_number,
+            };
+          }
+        }
+      }
+    } catch (_) {}
+  }
 
   const lines = [
     tr.roomTitle(rm.name, rm.building, rm.floor || "?"),
@@ -901,7 +926,7 @@ async function formatPersonScheduleView(snap, pCode, id, day, lang, baseWebappUr
     : `${tr.studentWord} (${id.slice(0, 8)})`;
 
   const evRes = await uwedGet(
-    "/timetable/public/v1/events",
+    "/timetable/public/v1/events/list",
     {
       request_id: id,
       type,
@@ -1914,7 +1939,7 @@ module.exports = async (req, res) => {
         const label = tMatch ? tMatch.full_name : `${type} ${id.slice(0, 8)}`;
         const mondayStr = getTashkentMonday();
         const evRes = await uwedGet(
-          "/timetable/public/v1/events",
+          "/timetable/public/v1/events/list",
           { request_id: id, type, start_time: mondayStr },
           lang
         );

@@ -128,19 +128,27 @@ class CampusFetcher:
         rooms = list(rooms_dict.values())
         print(f"  [+] Rooms found: {len(rooms)}")
 
-        # 3. Teachers
+        # 3. Teachers (harvest by common 2-letter syllables)
         teachers_dict = {}
-        alphabet = "abcdefghijklmnopqrstuvwxyz"
-        for letter in alphabet:
-            res = self.api_get("/timetable/public/v1/search/teachers", {"search": letter})
-            for t in res.get("data") or []:
-                tid = str(t.get("id") or "")
-                if tid and tid not in teachers_dict:
-                    teachers_dict[tid] = t
+        prefixes = [
+            "al", "ab", "ax", "az", "ba", "be", "bo", "da", "di", "ga", "gu",
+            "ha", "ho", "ib", "ik", "il", "im", "in", "ir", "is", "ja", "jo",
+            "ka", "ko", "ma", "me", "mi", "mu", "na", "no", "nu", "ol", "om",
+            "or", "os", "ot", "pa", "pu", "qa", "qu", "ra", "re", "ri", "ro",
+            "ru", "sa", "se", "si", "so", "su", "sh", "ch", "ta", "ti", "to",
+            "tu", "ul", "um", "ur", "us", "va", "xa", "xo", "xu", "ya", "yo",
+            "yu", "za", "zo", "zu"
+        ]
+        with ThreadPoolExecutor(max_workers=16) as pool:
+            for tlist in pool.map(lambda p: self.api_get("/timetable/public/v1/search/teachers", {"search": p}).get("data") or [], prefixes):
+                for t in tlist:
+                    tid = str(t.get("id") or "")
+                    if tid and tid not in teachers_dict:
+                        teachers_dict[tid] = t
         teachers = list(teachers_dict.values())
         print(f"  [+] Teachers found: {len(teachers)}")
 
-        # 4. Timetable events for active rooms
+        # 4. Timetable events for active rooms (using NEW /events/list route)
         rooms_to_fetch = [
             r["id"]
             for r in rooms
@@ -151,11 +159,23 @@ class CampusFetcher:
 
         def fetch_events_for_room(rid: str) -> tuple[str, list[dict[str, Any]]]:
             res = self.api_get(
-                "/timetable/public/v1/events",
+                "/timetable/public/v1/events/list",
                 {"request_id": rid, "type": "ROOM", "start_time": monday},
             )
             evs = res.get("data")
-            return rid, (evs if isinstance(evs, list) else [])
+            if not isinstance(evs, list):
+                return rid, []
+            cleaned = []
+            for e in evs:
+                cleaned.append({
+                    "d": e.get("week_day"),
+                    "s": e.get("slot_id"),
+                    "t": e.get("title"),
+                    "i": e.get("instructor"),
+                    "g": e.get("groups"),
+                    "r": e.get("room_number"),
+                })
+            return rid, cleaned
 
         print(f"  [+] Fetching schedules for {len(rooms_to_fetch)} classrooms (concurrent)...")
         with ThreadPoolExecutor(max_workers=20) as pool:

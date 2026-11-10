@@ -246,7 +246,7 @@ module.exports = async (req, res) => {
       const type = (req.query.type || "ROOM").trim().toUpperCase();
       if (!id) return res.status(400).json({ success: false, error: "Missing id" });
       const data = await uwedGet(
-        "/timetable/public/v1/events",
+        "/timetable/public/v1/events/list",
         {
           request_id: id,
           type,
@@ -292,7 +292,7 @@ module.exports = async (req, res) => {
         );
       } else if (id) {
         const evRes = await uwedGet(
-          "/timetable/public/v1/events",
+          "/timetable/public/v1/events/list",
           {
             request_id: id,
             type,
@@ -358,7 +358,7 @@ module.exports = async (req, res) => {
         ids.map(async (rid) => {
           try {
             const evRes = await uwedGet(
-              "/timetable/public/v1/events",
+              "/timetable/public/v1/events/list",
               {
                 request_id: rid,
                 type: "ROOM",
