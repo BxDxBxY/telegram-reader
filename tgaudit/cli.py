@@ -17,6 +17,11 @@ import sys
 from pathlib import Path
 from typing import Any, Awaitable, Callable
 
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
 from . import __version__
 from .config import Settings
 from .demo import seed_demo
