@@ -123,7 +123,20 @@ class CampusFetcher:
             for r in res.get("data") or []:
                 rid = str(r.get("id") or "")
                 if rid and rid not in rooms_dict:
+                    name = str(r.get("name") or r.get("room_name") or "").strip()
+                    num = str(r.get("number") or r.get("room_number") or "").strip()
+                    rtype = str(r.get("type") or r.get("room_type") or "PRACTICE")
+                    bld = str(r.get("building") or (name[0].upper() if name else "A"))
+                    r["name"] = name
+                    r["room_name"] = name
+                    r["number"] = num
+                    r["room_number"] = num
+                    r["type"] = rtype
+                    r["room_type"] = rtype
+                    r["building"] = bld
                     r["floor"] = extract_floor(r)
+                    if "capacity" not in r or r["capacity"] is None:
+                        r["capacity"] = 30
                     rooms_dict[rid] = r
         rooms = list(rooms_dict.values())
         print(f"  [+] Rooms found: {len(rooms)}")

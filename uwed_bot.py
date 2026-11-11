@@ -248,7 +248,18 @@ class UwedScheduleService:
                 for r in res.get("data") or []:
                     b = str(r.get("building", "")).upper().strip()
                     if b in ("A", "B", "D"):
+                        name = str(r.get("name") or r.get("room_name") or "").strip()
+                        num = str(r.get("number") or r.get("room_number") or "").strip()
+                        rtype = str(r.get("type") or r.get("room_type") or "PRACTICE")
+                        r["name"] = name
+                        r["room_name"] = name
+                        r["number"] = num
+                        r["room_number"] = num
+                        r["type"] = rtype
+                        r["room_type"] = rtype
                         r["floor"] = extract_floor(r)
+                        if "capacity" not in r or r["capacity"] is None:
+                            r["capacity"] = 30
                         rooms[r["id"]] = r
 
             # 3. Параллельно загружаем расписание для учебных аудиторий (офисы пропускаем кроме A-210)

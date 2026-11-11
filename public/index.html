@@ -3296,10 +3296,10 @@
       if (STATE.building !== "ALL") renderFloorPills();
       renderDayAndSlotChips();
       renderSavedProfileBanner();
-      renderHomeDashboard();
-      renderRoomsTab();
-      renderEventsTab();
-      renderOverlapOutput();
+      try { renderHomeDashboard(); } catch (e) { console.error("renderHomeDashboard error:", e); }
+      try { renderRoomsTab(); } catch (e) { console.error("renderRoomsTab error:", e); }
+      try { renderEventsTab(); } catch (e) { console.error("renderEventsTab error:", e); }
+      try { renderOverlapOutput(); } catch (e) { console.error("renderOverlapOutput error:", e); }
       const tInput = document.getElementById("teacherSearchInput");
       if (tInput) renderTeachersList(tInput.value || "");
       const sInput = document.getElementById("studentSearchInput");
@@ -3533,8 +3533,9 @@
             );
             renderSavedProfileBanner();
           }
-          renderRoomsTab();
-          renderEventsTab();
+          try { renderHomeDashboard(); } catch (_) {}
+          try { renderRoomsTab(); } catch (_) {}
+          try { renderEventsTab(); } catch (_) {}
         }
       } catch (_) {}
     }
@@ -3565,7 +3566,28 @@
           fetch("/campus_data.json").then((r) => r.json()).catch(() => ({})),
         ]);
         if (snapRes.slots && snapRes.slots.length) STATE.slots = snapRes.slots;
-        STATE.rooms = snapRes.rooms || [];
+        STATE.rooms = (snapRes.rooms || []).map((r) => {
+          const name = r.name || r.room_name || "";
+          const number = r.number || r.room_number || "";
+          const type = r.type || r.room_type || "PRACTICE";
+          let fl = r.floor !== undefined && r.floor !== null ? Number(r.floor) : null;
+          if (fl === null && number && /^\d/.test(number)) {
+            fl = parseInt(number.charAt(0), 10);
+          }
+          const building = r.building || (name ? name.charAt(0).toUpperCase() : "A");
+          return {
+            ...r,
+            name,
+            room_name: name,
+            number,
+            room_number: number,
+            type,
+            room_type: type,
+            building,
+            floor: fl,
+            capacity: r.capacity || 30,
+          };
+        });
         STATE.eventsByRoom = snapRes.events || {};
         STATE.teachers = snapRes.teachers || [];
         STATE.campusData = campusRes || {};
@@ -3576,7 +3598,11 @@
       const cur = detectCurrentSlotAndDay();
       STATE.day = cur.day;
       STATE.slot = cur.slot;
-      applyTranslations();
+      try {
+        applyTranslations();
+      } catch (e) {
+        console.error("applyTranslations error:", e);
+      }
       await loadPublicCampusState();
       if (STATE.isMaintenanceBlocked) {
         return;
@@ -3586,6 +3612,8 @@
       const qTab = urlParams.get("tab");
       if (qTab && ["rooms", "events", "teachers", "students", "overlap", "feedback", "map", "moodle", "gpa", "opps", "docs", "lf", "profile"].includes(qTab)) {
         switchTab(qTab);
+      } else {
+        renderHomeDashboard();
       }
     }
 
@@ -3643,6 +3671,8 @@
         const nav = document.getElementById(`nav-${k}`);
         if (nav) nav.classList.toggle("active", k === tab || (tab === "map" && k === "rooms"));
       });
+      if (tab === "home") renderHomeDashboard();
+      if (tab === "rooms") renderRoomsTab();
       if (tab === "map") {
         renderMapTab();
         initMap3D();
@@ -4846,7 +4876,9 @@
     }
 
     function isTeachingRoom(r) {
-      if (CLASSROOM_TYPES.has(r.type)) return true;
+      if (!r) return false;
+      const rType = r.type || r.room_type || "";
+      if (CLASSROOM_TYPES.has(rType)) return true;
       const evs = STATE.eventsByRoom[r.id];
       return Array.isArray(evs) && evs.length > 0;
     }
@@ -4888,10 +4920,13 @@
 
       if (q) {
         candidates = candidates.filter((r) => {
-          const typeStr = (t.types[r.type] || "").toUpperCase();
+          const rName = (r.name || r.room_name || "").toUpperCase();
+          const rNum = (r.number || r.room_number || "").toUpperCase();
+          const rType = r.type || r.room_type || "";
+          const typeStr = (t.types[rType] || rType || "").toUpperCase();
           return (
-            r.name.toUpperCase().includes(q) ||
-            r.number.toUpperCase().includes(q) ||
+            rName.includes(q) ||
+            rNum.includes(q) ||
             typeStr.includes(q)
           );
         });
@@ -4942,7 +4977,7 @@
         }
       }
 
-      freeItems.sort((a, b) => b.score - a.score || a.r.name.localeCompare(b.r.name));
+      freeItems.sort((a, b) => b.score - a.score || (a.r.name || a.r.room_name || "").localeCompare(b.r.name || b.r.room_name || ""));
       const items = [...freeItems, ...busyItems];
 
       const grid = document.getElementById("roomsGrid");
@@ -5611,7 +5646,7 @@
             ? "background:rgba(16,185,129,0.22); border:1px solid rgba(16,185,129,0.5); color:#34d399;"
             : "background:rgba(56,189,248,0.16); border:1px solid rgba(56,189,248,0.38); color:#38bdf8;";
           const notifyBtnText = isAttending ? t.evNotifiedBtn : t.evNotifyBtn;
-          const safeLink = String(ev.tg_link || "https://t.me/uwed_official").replace(/'/g, "\'");
+          const safeLink = encodeURI(String(ev.tg_link || "https://t.me/uwed_official")).replace(/'/g, "%27");
 
           return `
             <div class="event-card">
