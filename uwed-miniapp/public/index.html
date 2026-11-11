@@ -33,10 +33,10 @@
 
     html[data-theme="light"] {
       --bg: #f8fafc;
-      --bg-card: rgba(255, 255, 255, 0.94);
+      --bg-card: rgba(255, 255, 255, 0.96);
       --bg-card-solid: #ffffff;
       --bg-elevated: #f1f5f9;
-      --border: rgba(148, 163, 184, 0.28);
+      --border: rgba(148, 163, 184, 0.32);
       --border-glow: rgba(2, 132, 199, 0.45);
       --text: #0f172a;
       --text-sec: #334155;
@@ -45,9 +45,9 @@
       --blue: #2563eb;
       --indigo: #4f46e5;
       --emerald: #059669;
-      --emerald-glow: rgba(5, 150, 105, 0.14);
+      --emerald-glow: rgba(5, 150, 105, 0.12);
       --rose: #e11d48;
-      --rose-glow: rgba(225, 29, 72, 0.14);
+      --rose-glow: rgba(225, 29, 72, 0.12);
       --amber: #d97706;
     }
 
@@ -57,47 +57,95 @@
         radial-gradient(at 10% 0%, rgba(37, 99, 235, 0.08) 0px, transparent 55%),
         radial-gradient(at 90% 10%, rgba(2, 132, 199, 0.07) 0px, transparent 50%),
         radial-gradient(at 50% 100%, rgba(5, 150, 105, 0.05) 0px, transparent 55%);
+      color: var(--text);
     }
 
     html[data-theme="light"] .header {
-      background: rgba(255, 255, 255, 0.9);
+      background: rgba(255, 255, 255, 0.94);
       border-bottom-color: var(--border);
+      box-shadow: 0 2px 14px rgba(0, 0, 0, 0.04);
     }
     html[data-theme="light"] .bottom-nav {
       background: rgba(255, 255, 255, 0.96);
       border-color: rgba(148, 163, 184, 0.35);
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.09);
+    }
+    html[data-theme="light"] .nav-item {
+      color: #64748b;
     }
     html[data-theme="light"] .nav-item.active {
       color: #0f172a;
       background: rgba(37, 99, 235, 0.12);
     }
+    html[data-theme="light"] .nav-item.active svg {
+      stroke: #2563eb;
+    }
     html[data-theme="light"] .modal-sheet {
       background: #ffffff;
       border-top-color: var(--border);
+      box-shadow: 0 -12px 36px rgba(0, 0, 0, 0.12);
+    }
+    html[data-theme="light"] .modal-close {
+      background: #f1f5f9;
+      color: #0f172a;
+      border-color: rgba(148, 163, 184, 0.35);
     }
     html[data-theme="light"] .search-input,
-    html[data-theme="light"] .fb-textarea {
-      background: #f8fafc;
-      border-color: rgba(148, 163, 184, 0.35);
+    html[data-theme="light"] .fb-textarea,
+    html[data-theme="light"] input[type="text"],
+    html[data-theme="light"] input[type="password"],
+    html[data-theme="light"] input[type="tel"],
+    html[data-theme="light"] input[type="date"],
+    html[data-theme="light"] input[type="number"],
+    html[data-theme="light"] select,
+    html[data-theme="light"] textarea {
+      background: #ffffff;
+      border-color: rgba(148, 163, 184, 0.38);
       color: var(--text);
     }
     html[data-theme="light"] .pill {
       background: #f1f5f9;
+      border-color: rgba(148, 163, 184, 0.32);
       color: var(--text-sec);
     }
+    html[data-theme="light"] .pill.active {
+      background: linear-gradient(135deg, #2563eb, #0284c7);
+      color: #fff;
+      border-color: transparent;
+      box-shadow: 0 3px 10px rgba(2, 132, 199, 0.3);
+    }
+    html[data-theme="light"] .hero-card {
+      background-image:
+        linear-gradient(180deg, rgba(248, 250, 252, 0.45) 0%, rgba(241, 245, 249, 0.88) 55%, rgba(255, 255, 255, 0.98) 100%),
+        url("/hero.jpg");
+      border-color: rgba(148, 163, 184, 0.35);
+      box-shadow: 0 14px 34px -10px rgba(0, 0, 0, 0.1);
+    }
+    html[data-theme="light"] .hero-greet {
+      color: #0f172a;
+      text-shadow: none;
+    }
+    html[data-theme="light"] .hero-quote {
+      color: #0284c7;
+    }
     html[data-theme="light"] .hero-radar-box {
-      background: rgba(255, 255, 255, 0.92);
-      border-color: rgba(16, 185, 129, 0.45);
-      box-shadow: 0 4px 18px rgba(16, 185, 129, 0.14);
+      background: rgba(255, 255, 255, 0.95);
+      border-color: rgba(5, 150, 105, 0.35);
+      box-shadow: 0 4px 18px rgba(5, 150, 105, 0.12);
+    }
+    html[data-theme="light"] .hero-pill {
+      background: rgba(5, 150, 105, 0.12);
+      border-color: rgba(5, 150, 105, 0.3);
+      color: #047857;
     }
     html[data-theme="light"] .hero-search-input {
-      background: rgba(255, 255, 255, 0.9);
+      background: rgba(255, 255, 255, 0.95);
       color: #0f172a;
-      border-color: rgba(0, 0, 0, 0.15);
+      border-color: rgba(148, 163, 184, 0.4);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
     }
     html[data-theme="light"] .hero-search-input::placeholder {
-      color: rgba(100, 116, 139, 0.85);
+      color: #94a3b8;
     }
     html[data-theme="light"] .hero-search-results {
       background: #ffffff;
@@ -111,12 +159,166 @@
     }
     html[data-theme="light"] .crowd-box {
       background: #f8fafc;
+      border-color: var(--border);
+    }
+    html[data-theme="light"] .crowd-btn {
+      background: #ffffff;
+      border-color: rgba(148, 163, 184, 0.35);
+      color: #334155;
+    }
+    html[data-theme="light"] .crowd-btn.active-open {
+      background: rgba(5, 150, 105, 0.12);
+      border-color: #059669;
+      color: #047857;
+    }
+    html[data-theme="light"] .crowd-btn.active-busy {
+      background: rgba(217, 119, 6, 0.12);
+      border-color: #d97706;
+      color: #b45309;
+    }
+    html[data-theme="light"] .crowd-btn.active-locked {
+      background: rgba(225, 29, 72, 0.12);
+      border-color: #e11d48;
+      color: #be123c;
+    }
+    html[data-theme="light"] .crowd-open {
+      background: rgba(5, 150, 105, 0.12);
+      color: #047857;
+      border-color: rgba(5, 150, 105, 0.3);
+    }
+    html[data-theme="light"] .crowd-busy {
+      background: rgba(217, 119, 6, 0.12);
+      color: #b45309;
+      border-color: rgba(217, 119, 6, 0.3);
+    }
+    html[data-theme="light"] .crowd-locked {
+      background: rgba(225, 29, 72, 0.12);
+      color: #be123c;
+      border-color: rgba(225, 29, 72, 0.3);
+    }
+    html[data-theme="light"] .badge-free {
+      background: rgba(5, 150, 105, 0.12);
+      color: #047857;
+    }
+    html[data-theme="light"] .badge-busy {
+      background: rgba(225, 29, 72, 0.12);
+      color: #be123c;
+    }
+    html[data-theme="light"] .badge-warn {
+      background: rgba(217, 119, 6, 0.12);
+      color: #b45309;
+    }
+    html[data-theme="light"] .room-foot.free-note {
+      color: #059669;
+      font-weight: 700;
+    }
+    html[data-theme="light"] .b-free-num {
+      color: #059669;
+      font-weight: 800;
+    }
+    html[data-theme="light"] .b-bar {
+      background: rgba(0, 0, 0, 0.08);
+    }
+    html[data-theme="light"] .bento-tag {
+      background: rgba(2, 132, 199, 0.12);
+      color: #0284c7;
+      border-color: rgba(2, 132, 199, 0.25);
+    }
+    html[data-theme="light"] .row-link {
+      background: rgba(2, 132, 199, 0.1);
+      color: #0284c7;
+      border-color: rgba(2, 132, 199, 0.25);
+    }
+    html[data-theme="light"] .cell.free {
+      background: rgba(5, 150, 105, 0.12);
+      color: #047857;
+      border-color: rgba(5, 150, 105, 0.3);
+    }
+    html[data-theme="light"] .cell.busy {
+      background: rgba(225, 29, 72, 0.12);
+      color: #be123c;
+      border-color: rgba(225, 29, 72, 0.3);
     }
     html[data-theme="light"] .slot-row {
       background: #ffffff;
+      border-color: var(--border);
     }
     html[data-theme="light"] .lang-bar {
       background: #f1f5f9;
+      border-color: rgba(148, 163, 184, 0.35);
+    }
+    html[data-theme="light"] .lang-btn {
+      color: #64748b;
+    }
+    html[data-theme="light"] .lang-btn.active {
+      background: linear-gradient(135deg, #2563eb, #0284c7);
+      color: #fff;
+    }
+    html[data-theme="light"] .star-btn {
+      background: #f1f5f9;
+      border-color: rgba(148, 163, 184, 0.3);
+      color: #334155;
+    }
+    html[data-theme="light"] .live-sync-btn {
+      background: rgba(5, 150, 105, 0.12);
+      color: #047857;
+      border-color: rgba(5, 150, 105, 0.3);
+    }
+    html[data-theme="light"] .back-pill {
+      background: #f1f5f9;
+      color: var(--text);
+      border-color: rgba(148, 163, 184, 0.35);
+    }
+    html[data-theme="light"] .radar-banner.free {
+      background: rgba(5, 150, 105, 0.1);
+      color: #047857;
+      border-color: rgba(5, 150, 105, 0.3);
+    }
+    html[data-theme="light"] .radar-banner.busy {
+      background: rgba(225, 29, 72, 0.1);
+      color: #be123c;
+      border-color: rgba(225, 29, 72, 0.3);
+    }
+    html[data-theme="light"] .event-cat-badge {
+      background: rgba(37, 99, 235, 0.1);
+      color: #2563eb;
+      border-color: rgba(37, 99, 235, 0.25);
+    }
+    html[data-theme="light"] .event-ch-badge {
+      background: rgba(2, 132, 199, 0.1);
+      color: #0284c7;
+      border-color: rgba(2, 132, 199, 0.25);
+    }
+    html[data-theme="light"] .event-time-bar {
+      color: #059669;
+    }
+    html[data-theme="light"] .event-card,
+    html[data-theme="light"] .room-card,
+    html[data-theme="light"] .panel,
+    html[data-theme="light"] .bento-item,
+    html[data-theme="light"] .sq-tile,
+    html[data-theme="light"] .b-card,
+    html[data-theme="light"] .list-item {
+      background: #ffffff;
+      border-color: rgba(148, 163, 184, 0.28);
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
+    }
+    html[data-theme="light"] .gpa-ring-card {
+      background: linear-gradient(135deg, rgba(5, 150, 105, 0.08), rgba(2, 132, 199, 0.08));
+      border-color: rgba(5, 150, 105, 0.25);
+    }
+    html[data-theme="light"] #walkDirectionsContent {
+      background: #f8fafc !important;
+      border-color: rgba(148, 163, 184, 0.35) !important;
+      color: #334155 !important;
+    }
+    html[data-theme="light"] .map3d-wrap {
+      background: #e2e8f0;
+      border-color: rgba(148, 163, 184, 0.35);
+    }
+    html[data-theme="light"] .profile-hero-card {
+      background: linear-gradient(135deg, rgba(37, 99, 235, 0.08) 0%, rgba(6, 182, 212, 0.08) 100%);
+      border-color: rgba(37, 99, 235, 0.25);
     }
 
     * {
@@ -1940,10 +2142,10 @@
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px;">
           <input type="text" class="search-input" id="evLocInput" style="padding-left:12px;" placeholder="Xona (masalan: B-201)" />
           <select class="search-input" id="evCatInput" style="padding-left:12px;">
-            <option value="diplomacy">🎓 Diplomatiya / Ma’ruza</option>
-            <option value="clubs">🏆 Klublar / Zakovat / MUN</option>
-            <option value="career">💼 Karyera / Grantlar</option>
-            <option value="campus">🎉 Kampus hayoti</option>
+            <option value="diplomacy" id="evOptDip">🎓 Diplomatiya / Ma’ruza</option>
+            <option value="clubs" id="evOptClubs">🏆 Klublar / Zakovat / MUN</option>
+            <option value="career" id="evOptCareer">💼 Karyera / Grantlar</option>
+            <option value="campus" id="evOptCampus">🎉 Kampus hayoti</option>
           </select>
         </div>
         <input type="text" class="search-input" id="evLinkInput" style="padding-left:14px; margin-bottom:8px;" placeholder="Telegram post havolasi (https://t.me/uwed_official/...)" />
@@ -2012,9 +2214,9 @@
         <div class="row-head">
           <span class="row-label" id="lblIsoTitle">🏢 3D-Срез этажей (Поэтажный срез)</span>
           <div class="chips-scroll" id="isoBlockChips">
-            <div class="pill pill-sm active" id="isoBlkBtnB" onclick="selectIsoBlock('B')">B-blok (7 эт.)</div>
-            <div class="pill pill-sm" id="isoBlkBtnA" onclick="selectIsoBlock('A')">A-blok (4 эт.)</div>
-            <div class="pill pill-sm" id="isoBlkBtnD" onclick="selectIsoBlock('D')">D-blok (4 эт.)</div>
+            <div class="pill pill-sm active" id="isoBlkBtnB" onclick="selectIsoBlock('B')">B-blok (7 qavat)</div>
+            <div class="pill pill-sm" id="isoBlkBtnA" onclick="selectIsoBlock('A')">A-blok (4 qavat)</div>
+            <div class="pill pill-sm" id="isoBlkBtnD" onclick="selectIsoBlock('D')">D-blok (4 qavat)</div>
           </div>
         </div>
         <div id="isoFloorStackContainer" class="iso-floor-wrap"></div>
@@ -2024,14 +2226,14 @@
       <!-- Campus Walking Directions ("🧭 Qanday boriladi? / Как пройти") -->
       <div class="panel" id="map3dDirectionsSection" style="margin-bottom: 12px;">
         <div class="row-head">
-          <span class="row-label" id="lblWalkTitle">🧭 Как пройти от входа (КПП)</span>
+          <span class="row-label" id="lblWalkTitle">🧭 Qanday boriladi (Asosiy kirish - KPP)</span>
         </div>
         <div class="chips-scroll" style="margin-bottom:8px;">
-          <div class="pill pill-sm active" id="walkChipA" onclick="showWalkingRoute('A')">Блок А (1 мин)</div>
-          <div class="pill pill-sm" id="walkChipB" onclick="showWalkingRoute('B')">Блок Б (2 мин)</div>
-          <div class="pill pill-sm" id="walkChipD" onclick="showWalkingRoute('D')">Блок Д (3 мин)</div>
-          <div class="pill pill-sm" id="walkChipEco" onclick="showWalkingRoute('ECO')">Эко-библиотека</div>
-          <div class="pill pill-sm" id="walkChipSok" onclick="showWalkingRoute('SOK')">Спортзал / Бассейн</div>
+          <div class="pill pill-sm active" id="walkChipA" onclick="showWalkingRoute('A')">A bino (1 daq.)</div>
+          <div class="pill pill-sm" id="walkChipB" onclick="showWalkingRoute('B')">B bino (2 daq.)</div>
+          <div class="pill pill-sm" id="walkChipD" onclick="showWalkingRoute('D')">D bino (3 daq.)</div>
+          <div class="pill pill-sm" id="walkChipEco" onclick="showWalkingRoute('ECO')">Eko-kutubxona</div>
+          <div class="pill pill-sm" id="walkChipSok" onclick="showWalkingRoute('SOK')">Sportzal / Basseyn</div>
         </div>
         <div id="walkDirectionsContent" style="font-size:12px; color:var(--text-sec); line-height:1.5; background:rgba(15,23,42,0.65); border:1px solid var(--border); border-radius:12px; padding:10px 12px;"></div>
       </div>
@@ -2133,14 +2335,14 @@
         <button class="back-pill" onclick="switchTab('home')" id="backFromGpa">← Asosiy</button>
         <div style="display:flex; gap:6px;">
           <button class="row-link" onclick="loadOfficialGpaFromSchedule()" id="btnGpaSyncSched">📌 Jadvaldan yuklash</button>
-          <button class="row-link" onclick="toggleHemisImportBox()">📥 HEMIS</button>
+          <button class="row-link" onclick="toggleHemisImportBox()" id="btnGpaHemis">📥 HEMIS</button>
         </div>
       </div>
 
       <!-- HEMIS Direct Login Box -->
       <div class="panel" id="hemisImportBox" style="display:none; border-color:rgba(59,130,246,0.45);">
-        <div style="font-size:14.5px; font-weight:800; margin-bottom:4px;">📥 HEMIS (student.uwed.uz) baholarni avtomatik yuklash</div>
-        <div style="font-size:11.5px; color:var(--text-muted); margin-bottom:10px;">
+        <div style="font-size:14.5px; font-weight:800; margin-bottom:4px;" id="hemisBannerTitle">📥 HEMIS (student.uwed.uz) baholarni avtomatik yuklash</div>
+        <div style="font-size:11.5px; color:var(--text-muted); margin-bottom:10px;" id="hemisBannerSub">
           🔒 Telefoningiz student.uwed.uz ga bevosita ulanadi — parol saqlanmaydi. Rasmiy fanlar, kreditlar va GPA avtomatik yuklanadi!
         </div>
         <input type="text" class="search-input" id="hemisLoginInp" style="padding-left:14px; margin-bottom:8px;" placeholder="student.uwed.uz Login (Talaba ID)" />
@@ -2152,7 +2354,7 @@
       <div class="gpa-ring-card">
         <div>
           <div style="font-size:11.5px; font-weight:700; text-transform:uppercase; color:#6ee7b7;" id="gpaMainLbl">Rasmiy JIDU GPA ko'rsatkichi</div>
-          <div style="font-size:42px; font-weight:800; letter-spacing:-1px; color:#fff;" id="gpaCalculatedVal">0.00</div>
+          <div style="font-size:42px; font-weight:800; letter-spacing:-1px; color:var(--text);" id="gpaCalculatedVal">0.00</div>
           <div style="font-size:12px; color:var(--text-sec);" id="gpaSummaryMeta">Jami kredit: 0 · O'rtacha ball: 0</div>
           <div id="gpaHonorBadgeWrap"></div>
         </div>
@@ -2208,15 +2410,15 @@
     <section id="tab-lf" style="display: none;">
       <div class="sub-bar">
         <button class="back-pill" onclick="switchTab('home')" id="backFromLf">← Asosiy</button>
-        <button class="row-link" onclick="toggleLfPostForm()">➕ E’lon joylash</button>
+        <button class="row-link" onclick="toggleLfPostForm()" id="btnLfNewPost">➕ E’lon joylash</button>
       </div>
 
       <div class="panel" id="lfPostFormPanel" style="display:none; border-color:rgba(245,158,11,0.45);">
-        <div style="font-size:14.5px; font-weight:800; margin-bottom:8px;">📦 Yangi e’lon (Lost&Found yoki Kitob/Buyum almashish)</div>
+        <div style="font-size:14.5px; font-weight:800; margin-bottom:8px;" id="lfNewPostTitle">📦 Yangi e’lon (Lost&Found yoki Kitob/Buyum almashish)</div>
         <select class="search-input" id="lfKindInput" style="padding-left:12px; margin-bottom:8px;">
-          <option value="lost">🔍 Yo'qotdim (Потерял)</option>
-          <option value="found">🎉 Topib oldim (Нашёл)</option>
-          <option value="exchange">📚 Kitob / Buyum almashish yoki tekin berish (Обмен / Даром)</option>
+          <option value="lost" id="lfOptLost">🔍 Yo'qotdim (Потерял)</option>
+          <option value="found" id="lfOptFound">🎉 Topib oldim (Нашёл)</option>
+          <option value="exchange" id="lfOptEx">📚 Kitob / Buyum almashish yoki tekin berish (Обмен / Даром)</option>
         </select>
         <input type="text" class="search-input" id="lfTitleInput" style="padding-left:14px; margin-bottom:8px;" placeholder="Narsa yoki kitob nomi (masalan: AirPods Pro / Xalqaro huquq darsligi)" />
         <input type="text" class="search-input" id="lfPlaceInput" style="padding-left:14px; margin-bottom:8px;" placeholder="Qayerda? (masalan: B-bino, 2-qavat)" />
@@ -2245,7 +2447,7 @@
         <div style="display:flex; align-items:center; gap:14px; margin-bottom:12px;">
           <div class="profile-avatar" id="profAvatar">UW</div>
           <div style="min-width:0; flex:1;">
-            <div style="font-size:17px; font-weight:800; color:#fff;" id="profFullName">Talaba</div>
+            <div style="font-size:17px; font-weight:800; color:var(--text);" id="profFullName">Talaba</div>
             <div style="font-size:12px; color:#38bdf8; font-weight:700;" id="profUsername">@username</div>
             <div style="font-size:11px; color:var(--text-muted); margin-top:2px;" id="profTgId">TG-ID: —</div>
           </div>
@@ -2649,6 +2851,132 @@
           SPORT_CENTER: "Sport zali",
           UNIMPORTANT: "Xona",
         },
+        // Map 3D and walking
+        lblIsoTitle: "🏢 3D Qavatlar kesimi (Isometric)",
+        lblWalkTitle: "🧭 Qanday boriladi (Asosiy kirish - KPP)",
+        btnSatToggle: "🛰 Sputnik",
+        isoBlkBtnB: "B-blok (7 qavat)",
+        isoBlkBtnA: "A-blok (4 qavat)",
+        isoBlkBtnD: "D-blok (4 qavat)",
+        walkChipA: "A bino (1 daq.)",
+        walkChipB: "B bino (2 daq.)",
+        walkChipD: "D bino (3 daq.)",
+        walkChipEco: "Eko-kutubxona",
+        walkChipSok: "Sportzal / Basseyn",
+        isoFloorLabel: (fl, b) => `🏢 ${fl}-qavat (${b}-blok)`,
+        isoFreeCount: (f, t) => `🟢 ${f} / ${t} bõş`,
+        isoEmpty: "Bu qavatda xonalar topilmadi.",
+        roomSeats: (c, b, f) => `${c || "?"} o'rin · ${b}-${f}`,
+
+        // Events
+        evAutoSyncNote: "🔄 Auto-sync: 10 daq",
+        lblEventSort: "Saralash tartibi",
+        evSortDate: "🔥 Yaqindagi",
+        evSortNew: "🆕 Yangilar",
+        evSortAttending: "⭐ Tanlanganlar",
+        btnEventsMore: "Ko'proq ko'rsatish (+10)",
+        evOptDip: "🎓 Diplomatiya / Ma’ruza",
+        evOptClubs: "🏆 Klublar / Zakovat / MUN",
+        evOptCareer: "💼 Karyera / Grantlar",
+        evOptCampus: "🎉 Kampus hayoti",
+
+        // Feedback
+        shareTgContactBtn: "📱 Telegram",
+
+        // Moodle
+        btnMoodleLogout: "🚪 Chiqish",
+        mdlLoginTitle: "Moodle JIDU (moodle.uwed.uz)",
+        mdlLoginSub: "Dedlaynlar, topshiriqlar, kurslar va baholarni bir joyda ko'ring",
+        mdlPrivacyNote: "🔒 Parolingiz hech qayerda saqlanmaydi. Rasmiy Moodle Mobile API orqali faqat shaxsiy kirish tokeni telefoningizda saqlanadi.",
+        mdlConnectBtn: "🔗 Moodle’ga ulanish",
+        btnMoodleRefresh: "🔄 Yangilash",
+        mdlTabDeadlines: "⏰ Dedlaynlar",
+        mdlTabGrades: "📊 Baholar",
+        mdlTabCourses: "📚 Kurslar",
+        mdlUserInp: "Talaba login / ID",
+        mdlPassInp: "Moodle paroli",
+        mdlOverdue: "Muddati o'tgan",
+        mdlToday: "🔥 Bugun!",
+        mdlDaysLeft: (d) => `${d} kun qoldi`,
+        mdlNoDeadlines: "🎉 Yaqin kunlarda topshiriladigan dedlaynlar yo'q!",
+        mdlNoGrades: "Baholar hali kiritilmagan.",
+        mdlNoCourses: "Kurslar topilmadi.",
+
+        // GPA
+        btnGpaSyncSched: "📌 Jadvaldan yuklash",
+        btnGpaHemis: "📥 HEMIS",
+        hemisBannerTitle: "📥 HEMIS (student.uwed.uz) baholarni avtomatik yuklash",
+        hemisBannerSub: "🔒 Telefoningiz student.uwed.uz ga bevosita ulanadi — parol saqlanmaydi. Rasmiy fanlar, kreditlar va GPA avtomatik yuklanadi!",
+        hemisFetchBtn: "⚡ Baholar va GPA’ni yuklash",
+        gpaMainLbl: "Rasmiy JIDU GPA ko'rsatkichi",
+        btnGpaRefreshCourses: "🔄 Fanlarni yangilash",
+        btnGpaHemisImport: "📥 HEMIS Import",
+        gpaCurriculumTitle: "Rasmiy o'quv dasturi fanlari",
+        gpaCurriculumSub: "Shaxsiy jadval va HEMIS bazasidagi rasmiy kreditlar",
+        gpaFormulaTitle: "JIDU Rasmiy GPA formulasi:",
+        gpaScaleAlo: "5.0 (A'lo) — 86–100 ball",
+        gpaScaleGood: "4.0 (Yaxshi) — 71–85 ball",
+        gpaScaleWarn: "3.0 (Qoniqarli) — 60–70 ball",
+        gpaScaleFail: "0 (Akademik qarz) — <60 ball",
+        gpaCoursesCount: (n) => `${n} ta fan`,
+        gpaCreditLbl: "Kredit:",
+        gpaScoreLbl: "Ball:",
+        gpaGradeText: (sc) => sc >= 90 ? "5 (A'lo)" : sc >= 70 ? "4 (Yaxshi)" : sc >= 60 ? "3 (Qoniqarli)" : "0 (Qarz)",
+        gpaSummaryMetaText: (tot, avg) => `Jami kredit: ${tot} · O'rtacha ball: ${avg.toFixed(1)}`,
+
+        // Opportunities
+        oppsHdrTitle: "🚀 Xalqaro Grantlar, Almashinuv va Stajirovkalar",
+        oppsHdrSub: "JIDU talabalari uchun faol dasturlar va dedlaynlar",
+        oppsApply: "🚀 Ariza topshirish / Batafsil →",
+        oppsClosed: "Yopilgan",
+        oppsDaysLeft: (d) => `⏳ ${d} kun qoldi`,
+        oppsEmpty: "Hozircha faol dasturlar yo'q.",
+
+        // Documents & Leadership
+        docsSubLead: "👔 Universitet Rahbariyati",
+        docsSubRules: "📄 Nizomlar va Hujjatlar",
+        docsReception: "🕒 Qabul:",
+        docsPages: (p) => `📑 ${p || ""} sahifa`,
+
+        // Lost & Found
+        btnLfNewPost: "➕ E’lon joylash",
+        lfNewPostTitle: "📦 Yangi e’lon (Lost&Found yoki Kitob/Buyum almashish)",
+        lfOptLost: "🔍 Yo'qotdim (Потерял)",
+        lfOptFound: "🎉 Topib oldim (Нашёл)",
+        lfOptEx: "📚 Kitob / Buyum almashish yoki tekin berish (Обмен / Даром)",
+        lfNewPostSubmit: "📢 E’lonni chiqarish",
+        lfFltAll: "Barçasi",
+        lfFltLost: "🔍 Yo'qotilgan",
+        lfFltFound: "🎉 Topilgan",
+        lfFltEx: "📚 Kitob / Almashinuv",
+        lfBadgeFound: "🎉 TOPILDI",
+        lfBadgeEx: "📚 ALMASHINUV / TEKIN",
+        lfBadgeLost: "🔍 YO'QOTILDI",
+        lfEmpty: "Bu bo'limda hozircha e’lonlar yo'q.",
+        lfContactBtn: (u) => `💬 Bog'lanish (@${u})`,
+
+        // Profile
+        profLblPinned: "Shaxsiy jadval",
+        profLblGpa: "Rasmiy GPA",
+        profPrefsTitle: "⚙️ Ilova sozlamalari",
+        profThemeTitle: "Mavzu (Theme)",
+        profThemeSub: "Qorong'u yoki yorug' rejim",
+        profThemeDark: "🌙 Dark",
+        profThemeLight: "☀️ Light",
+        profLangTitle: "Til (Language)",
+        profLangSub: "UZ / RU / EN",
+        profSecTitle: "Xavfsizlik & Anti-Scraping",
+        profSecSub: "VRIO va shaxsiy ma'lumotlar himoyasi",
+        profSecActiveBadge: "FAOL 🛡️",
+        profSavedEvTitle: "⭐ Mening saqlangan tadbirlarim",
+        profResetBtn: "🗑 Keshni tozalash va qayta yuklash",
+        profRoleStudent: "TALABA 🎓",
+        profRoleAdmin: "ADMIN ⚡",
+        profDefaultStudent: "UWED Talaba",
+        profNotPinned: "Belgilanmagan (Tanlash →)",
+        profEmptySaved: "Siz hali birorta tadbirga obuna bo'lmadingiz.",
+        eventsCountUnit: "ta",
+
       },
       ru: {
         hdrTitle: "UWED Helpdesk • УМЭД",
@@ -2823,6 +3151,132 @@
           SPORT_CENTER: "Спортзал",
           UNIMPORTANT: "Помещение",
         },
+        // Map 3D and walking
+        lblIsoTitle: "🏢 3D-Срез этажей (Поэтажный срез)",
+        lblWalkTitle: "🧭 Как пройти от входа (КПП)",
+        btnSatToggle: "🛰 Спутник",
+        isoBlkBtnB: "Блок Б (7 эт.)",
+        isoBlkBtnA: "Блок А (4 эт.)",
+        isoBlkBtnD: "Блок Д (4 эт.)",
+        walkChipA: "Блок А (1 мин)",
+        walkChipB: "Блок Б (2 мин)",
+        walkChipD: "Блок Д (3 мин)",
+        walkChipEco: "Эко-библиотека",
+        walkChipSok: "Спортзал / Бассейн",
+        isoFloorLabel: (fl, b) => `🏢 ${fl}-й этаж (Блок ${b})`,
+        isoFreeCount: (f, t) => `🟢 ${f} / ${t} своб.`,
+        isoEmpty: "На этом этаже кабинеты не найдены.",
+        roomSeats: (c, b, f) => `${c || "?"} мест · ${b}-${f}`,
+
+        // Events
+        evAutoSyncNote: "🔄 Авто-синхронизация: 10 мин",
+        lblEventSort: "Сортировка анонсов",
+        evSortDate: "🔥 Ближайшие",
+        evSortNew: "🆕 Новые",
+        evSortAttending: "⭐ Мои выбранные",
+        btnEventsMore: "Показать ещё (+10)",
+        evOptDip: "🎓 Дипломатия / Лекции",
+        evOptClubs: "🏆 Клубы / Zakovat / MUN",
+        evOptCareer: "💼 Карьера / Гранты",
+        evOptCampus: "🎉 Жизнь кампуса",
+
+        // Feedback
+        shareTgContactBtn: "📱 Telegram",
+
+        // Moodle
+        btnMoodleLogout: "🚪 Выйти",
+        mdlLoginTitle: "Moodle УМЭД (moodle.uwed.uz)",
+        mdlLoginSub: "Дедлайны, задания, курсы и оценки в едином центре",
+        mdlPrivacyNote: "🔒 Ваш пароль не сохраняется на серверах. Официальный токен Moodle Mobile API хранится только на вашем устройстве.",
+        mdlConnectBtn: "🔗 Подключиться к Moodle",
+        btnMoodleRefresh: "🔄 Обновить",
+        mdlTabDeadlines: "⏰ Дедлайны",
+        mdlTabGrades: "📊 Оценки",
+        mdlTabCourses: "📚 Курсы",
+        mdlUserInp: "Логин или ID студента",
+        mdlPassInp: "Пароль от Moodle",
+        mdlOverdue: "Просрочено",
+        mdlToday: "🔥 Сегодня!",
+        mdlDaysLeft: (d) => `Осталось ${d} дн.`,
+        mdlNoDeadlines: "🎉 Нет ближайших дедлайнов!",
+        mdlNoGrades: "Оценки ещё не выставлены.",
+        mdlNoCourses: "Курсы не найдены.",
+
+        // GPA
+        btnGpaSyncSched: "📌 Из расписания",
+        btnGpaHemis: "📥 HEMIS",
+        hemisBannerTitle: "📥 Автоматический импорт оценок из HEMIS (student.uwed.uz)",
+        hemisBannerSub: "🔒 Телефон подключается напрямую к student.uwed.uz — пароль не сохраняется. Оценки, кредиты и GPA загружаются автоматически!",
+        hemisFetchBtn: "⚡ Загрузить оценки и GPA",
+        gpaMainLbl: "Официальный показатель GPA УМЭД",
+        btnGpaRefreshCourses: "🔄 Обновить предметы",
+        btnGpaHemisImport: "📥 Импорт из HEMIS",
+        gpaCurriculumTitle: "Дисциплины официального учебного плана",
+        gpaCurriculumSub: "Дисциплины из личного расписания и базы HEMIS",
+        gpaFormulaTitle: "Официальная формула GPA УМЭД:",
+        gpaScaleAlo: "5.0 (Отлично) — 86–100 баллов",
+        gpaScaleGood: "4.0 (Хорошо) — 71–85 баллов",
+        gpaScaleWarn: "3.0 (Удовл.) — 60–70 баллов",
+        gpaScaleFail: "0 (Академ. задолженность) — <60 баллов",
+        gpaCoursesCount: (n) => `${n} предметов`,
+        gpaCreditLbl: "Кредит:",
+        gpaScoreLbl: "Балл:",
+        gpaGradeText: (sc) => sc >= 90 ? "5 (Отлично)" : sc >= 70 ? "4 (Хорошо)" : sc >= 60 ? "3 (Удовл.)" : "0 (Задолж.)",
+        gpaSummaryMetaText: (tot, avg) => `Всего кредитов: ${tot} · Средний балл: ${avg.toFixed(1)}`,
+
+        // Opportunities
+        oppsHdrTitle: "🚀 Международные гранты, программы обмена и стажировки",
+        oppsHdrSub: "Актуальные программы и дедлайны для студентов УМЭД",
+        oppsApply: "🚀 Подать заявку / Подробнее →",
+        oppsClosed: "Завершено",
+        oppsDaysLeft: (d) => `⏳ Осталось ${d} дн.`,
+        oppsEmpty: "В настоящее время нет активных программ.",
+
+        // Documents & Leadership
+        docsSubLead: "👔 Руководство университета",
+        docsSubRules: "📄 Уставы и документы",
+        docsReception: "🕒 Приём:",
+        docsPages: (p) => `📑 ${p || ""} стр.`,
+
+        // Lost & Found
+        btnLfNewPost: "➕ Опубликовать объявление",
+        lfNewPostTitle: "📦 Новое объявление (Бюро находок или Обмен книгами)",
+        lfOptLost: "🔍 Потерял (Lost)",
+        lfOptFound: "🎉 Нашёл (Found)",
+        lfOptEx: "📚 Обмен книгами / вещами или даром",
+        lfNewPostSubmit: "📢 Опубликовать",
+        lfFltAll: "Все",
+        lfFltLost: "🔍 Потерянные",
+        lfFltFound: "🎉 Найденные",
+        lfFltEx: "📚 Обмен книгами",
+        lfBadgeFound: "🎉 НАЙДЕНО",
+        lfBadgeEx: "📚 ОБМЕН / ДАРОМ",
+        lfBadgeLost: "🔍 ПОТЕРЯНО",
+        lfEmpty: "В этом разделе пока нет объявлений.",
+        lfContactBtn: (u) => `💬 Связаться (@${u})`,
+
+        // Profile
+        profLblPinned: "Моё расписание",
+        profLblGpa: "Официальный GPA",
+        profPrefsTitle: "⚙️ Настройки приложения",
+        profThemeTitle: "Тема оформления",
+        profThemeSub: "Тёмный или светлый режим",
+        profThemeDark: "🌙 Тёмная",
+        profThemeLight: "☀️ Светлая",
+        profLangTitle: "Язык интерфейса",
+        profLangSub: "UZ / RU / EN",
+        profSecTitle: "Безопасность и защита API",
+        profSecSub: "Шифрование данных и защита от копирования",
+        profSecActiveBadge: "АКТИВНО 🛡️",
+        profSavedEvTitle: "⭐ Мои выбранные мероприятия",
+        profResetBtn: "🗑 Очистить кэш и обновить",
+        profRoleStudent: "СТУДЕНТ 🎓",
+        profRoleAdmin: "АДМИНИСТРАТОР ⚡",
+        profDefaultStudent: "Студент УМЭД",
+        profNotPinned: "Не выбрано (Выбрать →)",
+        profEmptySaved: "Вы ещё не добавили ни одного мероприятия в избранное.",
+        eventsCountUnit: "событий",
+
       },
       en: {
         hdrTitle: "UWED Helpdesk • Campus",
@@ -2997,6 +3451,132 @@
           SPORT_CENTER: "Sports Hall",
           UNIMPORTANT: "Utility",
         },
+        // Map 3D and walking
+        lblIsoTitle: "🏢 3D Floor Slicer (Isometric)",
+        lblWalkTitle: "🧭 Walking directions from Gate (KPP)",
+        btnSatToggle: "🛰 Satellite",
+        isoBlkBtnB: "Block B (7 fl.)",
+        isoBlkBtnA: "Block A (4 fl.)",
+        isoBlkBtnD: "Block D (4 fl.)",
+        walkChipA: "Block A (1 min)",
+        walkChipB: "Block B (2 min)",
+        walkChipD: "Block D (3 min)",
+        walkChipEco: "Eco-Library",
+        walkChipSok: "Sports Complex / Pool",
+        isoFloorLabel: (fl, b) => `🏢 Floor ${fl} (Block ${b})`,
+        isoFreeCount: (f, t) => `🟢 ${f} / ${t} free`,
+        isoEmpty: "No classrooms found on this floor.",
+        roomSeats: (c, b, f) => `${c || "?"} seats · ${b}-${f}`,
+
+        // Events
+        evAutoSyncNote: "🔄 Auto-sync: 10 min",
+        lblEventSort: "Event sorting",
+        evSortDate: "🔥 Upcoming",
+        evSortNew: "🆕 Latest",
+        evSortAttending: "⭐ Saved",
+        btnEventsMore: "Show more (+10)",
+        evOptDip: "🎓 Diplomacy / Lectures",
+        evOptClubs: "🏆 Clubs / Zakovat / MUN",
+        evOptCareer: "💼 Career / Grants",
+        evOptCampus: "🎉 Campus Life",
+
+        // Feedback
+        shareTgContactBtn: "📱 Telegram",
+
+        // Moodle
+        btnMoodleLogout: "🚪 Log out",
+        mdlLoginTitle: "Moodle UWED (moodle.uwed.uz)",
+        mdlLoginSub: "Deadlines, assignments, courses & grades in one place",
+        mdlPrivacyNote: "🔒 Your password is never stored. Official Moodle Mobile API session token remains on your device only.",
+        mdlConnectBtn: "🔗 Connect to Moodle",
+        btnMoodleRefresh: "🔄 Refresh",
+        mdlTabDeadlines: "⏰ Deadlines",
+        mdlTabGrades: "📊 Grades",
+        mdlTabCourses: "📚 Courses",
+        mdlUserInp: "Student login / ID",
+        mdlPassInp: "Moodle password",
+        mdlOverdue: "Overdue",
+        mdlToday: "🔥 Today!",
+        mdlDaysLeft: (d) => `${d} days left`,
+        mdlNoDeadlines: "🎉 No upcoming deadlines!",
+        mdlNoGrades: "No grades posted yet.",
+        mdlNoCourses: "No courses found.",
+
+        // GPA
+        btnGpaSyncSched: "📌 Load from Schedule",
+        btnGpaHemis: "📥 HEMIS",
+        hemisBannerTitle: "📥 Automatic grade import from HEMIS (student.uwed.uz)",
+        hemisBannerSub: "🔒 Direct phone connection to student.uwed.uz — password is never stored. Official courses, credits & GPA load automatically!",
+        hemisFetchBtn: "⚡ Fetch Grades & GPA",
+        gpaMainLbl: "Official UWED GPA Indicator",
+        btnGpaRefreshCourses: "🔄 Refresh courses",
+        btnGpaHemisImport: "📥 HEMIS Import",
+        gpaCurriculumTitle: "Official Curriculum Courses",
+        gpaCurriculumSub: "Courses from your Timetable & HEMIS registry",
+        gpaFormulaTitle: "Official UWED GPA Formula:",
+        gpaScaleAlo: "5.0 (Excellent) — 86–100 pts",
+        gpaScaleGood: "4.0 (Good) — 71–85 pts",
+        gpaScaleWarn: "3.0 (Satisfactory) — 60–70 pts",
+        gpaScaleFail: "0 (Academic Debt) — <60 pts",
+        gpaCoursesCount: (n) => `${n} courses`,
+        gpaCreditLbl: "Credits:",
+        gpaScoreLbl: "Score:",
+        gpaGradeText: (sc) => sc >= 90 ? "5 (Excellent)" : sc >= 70 ? "4 (Good)" : sc >= 60 ? "3 (Satisfactory)" : "0 (Debt)",
+        gpaSummaryMetaText: (tot, avg) => `Total credits: ${tot} · Average score: ${avg.toFixed(1)}`,
+
+        // Opportunities
+        oppsHdrTitle: "🚀 International Grants, Exchange Programs & Internships",
+        oppsHdrSub: "Active opportunities and deadlines for UWED students",
+        oppsApply: "🚀 Apply / Learn more →",
+        oppsClosed: "Closed",
+        oppsDaysLeft: (d) => `⏳ ${d} days left`,
+        oppsEmpty: "No active opportunities available right now.",
+
+        // Documents & Leadership
+        docsSubLead: "👔 University Leadership",
+        docsSubRules: "📄 Regulations & Official Documents",
+        docsReception: "🕒 Office hours:",
+        docsPages: (p) => `📑 ${p || ""} pages`,
+
+        // Lost & Found
+        btnLfNewPost: "➕ Post Listing",
+        lfNewPostTitle: "📦 New Listing (Lost & Found or Book Swap)",
+        lfOptLost: "🔍 Lost item",
+        lfOptFound: "🎉 Found item",
+        lfOptEx: "📚 Book / Item swap or giveaway",
+        lfNewPostSubmit: "📢 Publish Listing",
+        lfFltAll: "All",
+        lfFltLost: "🔍 Lost",
+        lfFltFound: "🎉 Found",
+        lfFltEx: "📚 Book Swap",
+        lfBadgeFound: "🎉 FOUND",
+        lfBadgeEx: "📚 EXCHANGE / FREE",
+        lfBadgeLost: "🔍 LOST",
+        lfEmpty: "No announcements in this category yet.",
+        lfContactBtn: (u) => `💬 Contact (@${u})`,
+
+        // Profile
+        profLblPinned: "Pinned timetable",
+        profLblGpa: "Official GPA",
+        profPrefsTitle: "⚙️ App Preferences",
+        profThemeTitle: "Appearance Theme",
+        profThemeSub: "Dark or Light mode",
+        profThemeDark: "🌙 Dark",
+        profThemeLight: "☀️ Light",
+        profLangTitle: "Interface Language",
+        profLangSub: "UZ / RU / EN",
+        profSecTitle: "Security & Anti-Scraping",
+        profSecSub: "Encrypted data & automated scraping protection",
+        profSecActiveBadge: "ACTIVE 🛡️",
+        profSavedEvTitle: "⭐ My Saved Events",
+        profResetBtn: "🗑 Reset Cache & Reload",
+        profRoleStudent: "STUDENT 🎓",
+        profRoleAdmin: "ADMIN ⚡",
+        profDefaultStudent: "UWED Student",
+        profNotPinned: "Not selected (Choose →)",
+        profEmptySaved: "You haven't saved any events yet.",
+        eventsCountUnit: "events",
+
       },
     };
 
@@ -3289,6 +3869,101 @@
       setPh("fbMessageInput", t.fbMsgPh);
       setTxt("fbSubmitBtn", t.fbSubmit);
 
+      // Map 3D and Walking
+      setTxt("lblIsoTitle", t.lblIsoTitle);
+      setTxt("isoBlkBtnB", t.isoBlkBtnB);
+      setTxt("isoBlkBtnA", t.isoBlkBtnA);
+      setTxt("isoBlkBtnD", t.isoBlkBtnD);
+      setTxt("lblWalkTitle", t.lblWalkTitle);
+      setTxt("walkChipA", t.walkChipA);
+      setTxt("walkChipB", t.walkChipB);
+      setTxt("walkChipD", t.walkChipD);
+      setTxt("walkChipEco", t.walkChipEco);
+      setTxt("walkChipSok", t.walkChipSok);
+      setTxt("btnSatToggle", t.btnSatToggle);
+
+      // Events
+      setTxt("lblEventSort", t.lblEventSort);
+      setTxt("evSortDate", t.evSortDate);
+      setTxt("evSortNew", t.evSortNew);
+      setTxt("evSortAttending", t.evSortAttending);
+      setTxt("btnEventsMore", t.btnEventsMore);
+      setTxt("evAutoSyncNote", t.evAutoSyncNote);
+      setTxt("evOptDip", t.evOptDip);
+      setTxt("evOptClubs", t.evOptClubs);
+      setTxt("evOptCareer", t.evOptCareer);
+      setTxt("evOptCampus", t.evOptCampus);
+
+      // Feedback
+      setTxt("shareTgContactBtn", t.shareTgContactBtn);
+
+      // Moodle
+      setTxt("btnMoodleLogout", t.btnMoodleLogout);
+      setTxt("mdlLoginTitle", t.mdlLoginTitle);
+      setTxt("mdlLoginSub", t.mdlLoginSub);
+      setTxt("mdlPrivacyNote", t.mdlPrivacyNote);
+      setTxt("mdlConnectBtn", t.mdlConnectBtn);
+      setTxt("btnMoodleRefresh", t.btnMoodleRefresh);
+      setTxt("mdlTabDeadlines", t.mdlTabDeadlines);
+      setTxt("mdlTabGrades", t.mdlTabGrades);
+      setTxt("mdlTabCourses", t.mdlTabCourses);
+      setPh("mdlUserInp", t.mdlUserInp);
+      setPh("mdlPassInp", t.mdlPassInp);
+
+      // GPA
+      setTxt("btnGpaSyncSched", t.btnGpaSyncSched);
+      setTxt("btnGpaHemis", t.btnGpaHemis);
+      setTxt("hemisBannerTitle", t.hemisBannerTitle);
+      setTxt("hemisBannerSub", t.hemisBannerSub);
+      setTxt("hemisFetchBtn", t.hemisFetchBtn);
+      setTxt("gpaMainLbl", t.gpaMainLbl);
+      setTxt("btnGpaRefreshCourses", t.btnGpaRefreshCourses);
+      setTxt("btnGpaHemisImport", t.btnGpaHemisImport);
+      setTxt("gpaCurriculumTitle", t.gpaCurriculumTitle);
+      setTxt("gpaCurriculumSub", t.gpaCurriculumSub);
+      setTxt("gpaFormulaTitle", t.gpaFormulaTitle);
+      setTxt("gpaScaleAlo", t.gpaScaleAlo);
+      setTxt("gpaScaleGood", t.gpaScaleGood);
+      setTxt("gpaScaleWarn", t.gpaScaleWarn);
+      setTxt("gpaScaleFail", t.gpaScaleFail);
+
+      // Opportunities
+      setTxt("oppsHdrTitle", t.oppsHdrTitle);
+      setTxt("oppsHdrSub", t.oppsHdrSub);
+
+      // Documents
+      setTxt("docsSubLead", t.docsSubLead);
+      setTxt("docsSubRules", t.docsSubRules);
+
+      // Lost & Found
+      setTxt("btnLfNewPost", t.btnLfNewPost);
+      setTxt("lfNewPostTitle", t.lfNewPostTitle);
+      setTxt("lfOptLost", t.lfOptLost);
+      setTxt("lfOptFound", t.lfOptFound);
+      setTxt("lfOptEx", t.lfOptEx);
+      setTxt("lfNewPostSubmit", t.lfNewPostSubmit);
+      setTxt("lfFltAll", t.lfFltAll);
+      setTxt("lfFltLost", t.lfFltLost);
+      setTxt("lfFltFound", t.lfFltFound);
+      setTxt("lfFltEx", t.lfFltEx);
+
+      // Profile
+      setTxt("profLblPinned", t.profLblPinned);
+      setTxt("profLblGpa", t.profLblGpa);
+      setTxt("profPrefsTitle", t.profPrefsTitle);
+      setTxt("profThemeTitle", t.profThemeTitle);
+      setTxt("profThemeSub", t.profThemeSub);
+      setTxt("profThemeDark", t.profThemeDark);
+      setTxt("profThemeLight", t.profThemeLight);
+      setTxt("profLangTitle", t.profLangTitle);
+      setTxt("profLangSub", t.profLangSub);
+      setTxt("profSecTitle", t.profSecTitle);
+      setTxt("profSecSub", t.profSecSub);
+      setTxt("profSecActiveBadge", t.profSecActiveBadge);
+      setTxt("profSavedEvTitle", t.profSavedEvTitle);
+      setTxt("profResetBtn", t.profResetBtn);
+
+
       const cur = detectCurrentSlotAndDay();
       setTxt("clockStatus", cur.label);
       setTxt("heroTimeBadge", `LIVE • ${cur.label}`);
@@ -3306,11 +3981,25 @@
       if (sInput && !(sInput.value || "").trim()) {
         renderStudentsDefault();
       }
-      if (STATE.tab === "map") renderMapTab();
+      if (STATE.tab === "map") {
+        renderMapTab();
+        renderIsometricFloorExplorer();
+        showWalkingRoute(STATE.walkingTarget || "A");
+      }
       if (STATE.tab === "opps") renderOppsTab();
       if (STATE.tab === "docs") renderDocsTab();
       if (STATE.tab === "gpa") renderGpaTab();
       if (STATE.tab === "profile") renderProfileTab();
+      if (STATE.tab === "lf") renderLfItems();
+      if (STATE.tab === "moodle") {
+        const saved = localStorage.getItem("uwed_moodle_cache");
+        if (saved) {
+          try {
+            const parsed = JSON.parse(saved);
+            if (parsed && parsed.ok) renderMoodleDashboard(parsed);
+          } catch (_) {}
+        }
+      }
       const detModal = document.getElementById("detailModal");
       if (detModal && detModal.classList.contains("open")) {
         renderModalContent();
@@ -3798,7 +4487,7 @@
           <div onclick="window.__heroHits[${idx}].act()" style="display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:11px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,0.06);">
             <span style="font-size:18px;">${h.icon}</span>
             <div style="min-width:0;flex:1;">
-              <div style="font-size:13px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${h.title}</div>
+              <div style="font-size:13px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${h.title}</div>
               <div style="font-size:11px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${h.sub}</div>
             </div>
             <span style="color:#38bdf8;font-size:12px;font-weight:800;">→</span>
@@ -3999,7 +4688,7 @@
       detailBox.innerHTML = `
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
           <div>
-            <div style="font-size:16px;font-weight:800;color:#fff;">🏢 ${bTitle}</div>
+            <div style="font-size:16px;font-weight:800;color:var(--text);">🏢 ${bTitle}</div>
             <div style="font-size:11.5px;color:var(--text-muted);">${b.hours ? `🕒 ${b.hours}` : "JIDU Kampusi"}</div>
           </div>
           ${
@@ -4059,6 +4748,7 @@
     }
 
     function renderIsometricFloorExplorer() {
+      const t = T();
       const box = document.getElementById("isoFloorStackContainer");
       const roomsBox = document.getElementById("isoFloorRoomsOutput");
       if (!box || !roomsBox) return;
@@ -4076,14 +4766,16 @@
             if (!dayMap[cur.slot]) freeCount++;
           });
           const isSel = STATE.isoFloor === fl;
+          const flLabel = t.isoFloorLabel ? t.isoFloorLabel(fl, STATE.isoBlock) : `🏢 ${fl}-qavat (${STATE.isoBlock}-blok)`;
+          const flFreeTxt = t.isoFreeCount ? t.isoFreeCount(freeCount, flRooms.length) : `🟢 ${freeCount} / ${flRooms.length} bõş`;
           return `
             <div class="iso-plate ${isSel ? "selected" : ""}" onclick="selectIsoFloor(${fl})">
               <div class="iso-plate-head">
                 <span style="font-size:13px; font-weight:800; color:${isSel ? "#34d399" : "var(--text)"};">
-                  🏢 ${fl}-qavat (${STATE.isoBlock}-blok)
+                  ${flLabel}
                 </span>
                 <span style="font-size:11.5px; font-weight:800; background:rgba(16,185,129,0.18); color:#34d399; padding:2px 8px; border-radius:99px;">
-                  🟢 ${freeCount} / ${flRooms.length} bõş
+                  ${flFreeTxt}
                 </span>
               </div>
             </div>`;
@@ -4094,7 +4786,7 @@
       // Render Selected Floor Rooms
       const selRooms = STATE.rooms.filter((r) => r.building === STATE.isoBlock && Number(r.floor) === STATE.isoFloor && (STATE.includeOffices || isTeachingRoom(r)));
       if (!selRooms.length) {
-        roomsBox.innerHTML = `<div class="empty-msg" style="grid-column: 1 / -1;">Bu qavatda xonalar topilmadi.</div>`;
+        roomsBox.innerHTML = `<div class="empty-msg" style="grid-column: 1 / -1;">${t.isoEmpty || "Bu qavatda xonalar topilmadi."}</div>`;
         return;
       }
       roomsBox.innerHTML = selRooms
@@ -4102,14 +4794,15 @@
           const dayMap = getRoomDayEvents(r.id, cur.day);
           const isFree = !dayMap[cur.slot];
           const badgeClass = isFree ? "badge-free" : "badge-busy";
-          const badgeTxt = isFree ? "Bõş" : "Band";
+          const badgeTxt = isFree ? (t.free || "Bõş") : (t.busy || "Band");
+          const specsTxt = t.roomSeats ? t.roomSeats(r.capacity, STATE.isoBlock, STATE.isoFloor) : `${r.capacity || "?"} o'rin · ${STATE.isoBlock}-${STATE.isoFloor}`;
           return `
             <div class="room-card ${isFree ? "is-free" : "is-busy"}" onclick="openRoomModal('${r.id}')">
               <div class="room-head">
                 <span class="room-code">${r.name}</span>
                 <span class="badge ${badgeClass}">${badgeTxt}</span>
               </div>
-              <div class="room-specs">${r.capacity || "?"} o'rin · ${STATE.isoBlock}-${STATE.isoFloor}</div>
+              <div class="room-specs">${specsTxt}</div>
             </div>`;
         })
         .join("");
@@ -4254,10 +4947,11 @@
     }
 
     function renderMoodleDashboard(data) {
+      const t = T();
       document.getElementById("moodleLoginCard").style.display = "none";
       document.getElementById("moodleConnectedView").style.display = "block";
       document.getElementById("btnMoodleLogout").style.display = "inline-flex";
-      document.getElementById("mdlStudentName").textContent = (data.me && data.me.fullname) || "Talaba";
+      document.getElementById("mdlStudentName").textContent = (data.me && data.me.fullname) || (t.profDefaultStudent || "Talaba");
       document.getElementById("mdlSiteName").textContent = (data.me && data.me.site) || "moodle.uwed.uz";
 
       const dl = data.deadlines || [];
@@ -4266,7 +4960,8 @@
         ? dl
             .map((ev) => {
               const diffDays = Math.round((ev.time - nowSec) / 86400);
-              const dtStr = new Date(ev.time * 1000).toLocaleString(STATE.lang === "ru" ? "ru-RU" : "uz-UZ", {
+              const locale = STATE.lang === "ru" ? "ru-RU" : STATE.lang === "en" ? "en-US" : "uz-UZ";
+              const dtStr = new Date(ev.time * 1000).toLocaleString(locale, {
                 day: "2-digit",
                 month: "short",
                 hour: "2-digit",
@@ -4275,14 +4970,14 @@
               const badgeColor = ev.time < nowSec ? "#fb7185" : diffDays <= 2 ? "#fbbf24" : "#34d399";
               const badgeTxt =
                 ev.time < nowSec
-                  ? "Muddati õtgan"
+                  ? (t.mdlOverdue || "Muddati o'tgan")
                   : diffDays === 0
-                  ? "🔥 Bugun!"
-                  : `${diffDays} kun qoldi`;
+                  ? (t.mdlToday || "🔥 Bugun!")
+                  : t.mdlDaysLeft ? t.mdlDaysLeft(diffDays) : `${diffDays} kun qoldi`;
               return `
                 <div class="panel" style="margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:10px;">
                   <div style="min-width:0;flex:1;">
-                    <div style="font-size:13.5px;font-weight:800;color:#fff;">📌 ${ev.name}</div>
+                    <div style="font-size:13.5px;font-weight:800;color:var(--text);">📌 ${ev.name}</div>
                     <div style="font-size:11.5px;color:var(--text-muted);margin-top:2px;">📚 ${ev.course}</div>
                   </div>
                   <div style="text-align:right;flex-shrink:0;">
@@ -4292,7 +4987,7 @@
                 </div>`;
             })
             .join("")
-        : `<div class="empty-msg">🎉 Yaqin kunlarda topshiriladigan dedlaynlar yõq!</div>`;
+        : `<div class="empty-msg">${t.mdlNoDeadlines || "🎉 Yaqin kunlarda topshiriladigan dedlaynlar yo'q!"}</div>`;
 
       const gr = data.grades || [];
       document.getElementById("mdlPaneGrades").innerHTML = gr.length
@@ -4313,7 +5008,7 @@
               </div>`
             )
             .join("")
-        : `<div class="empty-msg">Baholar hali kiritilmagan.</div>`;
+        : `<div class="empty-msg">${t.mdlNoGrades || "Baholar hali kiritilmagan."}</div>`;
 
       const cs = data.courses || [];
       document.getElementById("mdlPaneCourses").innerHTML = cs.length
@@ -4321,12 +5016,12 @@
             .map(
               (c) => `
               <div class="panel" style="margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">
-                <div style="font-size:13px;font-weight:700;">🎓 ${c.name}</div>
+                <div style="font-size:13px;font-weight:700;color:var(--text);">🎓 ${c.name}</div>
                 ${c.progress != null ? `<span class="bento-tag">${c.progress}%</span>` : ""}
               </div>`
             )
             .join("")
-        : `<div class="empty-msg">Kurslar topilmadi.</div>`;
+        : `<div class="empty-msg">${t.mdlNoCourses || "Kurslar topilmadi."}</div>`;
     }
 
     function switchMoodleSubTab(sub) {
@@ -4404,24 +5099,24 @@
     }
 
     function renderGpaTab() {
+      const t = T();
       const box = document.getElementById("gpaRowsContainer");
       if (!box) return;
       const countEl = document.getElementById("gpaCourseCountBadge");
-      if (countEl) countEl.textContent = `${gpaSubjects.length} ta fan`;
+      if (countEl) countEl.textContent = t.gpaCoursesCount ? t.gpaCoursesCount(gpaSubjects.length) : `${gpaSubjects.length} ta fan`;
 
       box.innerHTML = gpaSubjects
         .map((r, i) => {
           const sc = Math.max(0, Math.min(100, Number(r.score) || 0));
-          const grade5 = sc >= 90 ? 5.0 : sc >= 70 ? 4.0 : sc >= 60 ? 3.0 : 0.0;
           const gradeBadgeColor = sc >= 90 ? "#34d399" : sc >= 70 ? "#38bdf8" : sc >= 60 ? "#fbbf24" : "#fb7185";
           const gradeBadgeBg = sc >= 90 ? "rgba(16,185,129,0.18)" : sc >= 70 ? "rgba(56,189,248,0.18)" : sc >= 60 ? "rgba(245,158,11,0.18)" : "rgba(244,63,94,0.18)";
-          const gradeText = sc >= 90 ? "5 (A'lo)" : sc >= 70 ? "4 (Yaxshi)" : sc >= 60 ? "3 (Qoniqarli)" : "0 (Qarz)";
+          const gradeText = t.gpaGradeText ? t.gpaGradeText(sc) : (sc >= 90 ? "5 (A'lo)" : sc >= 70 ? "4 (Yaxshi)" : sc >= 60 ? "3 (Qoniqarli)" : "0 (Qarz)");
 
           return `
             <div class="panel" style="margin-bottom:8px; padding:12px;">
               <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
                 <div style="min-width:0; flex:1;">
-                  <div style="font-size:13.5px; font-weight:800; color:#fff;">${toNewUz(r.name)}</div>
+                  <div style="font-size:13.5px; font-weight:800; color:var(--text);">${toNewUz(r.name)}</div>
                   ${r.code ? `<div style="font-size:10.5px; color:#38bdf8; font-weight:700; margin-top:2px;">${r.code}</div>` : ""}
                 </div>
                 <span style="font-size:11.5px; font-weight:800; padding:4px 9px; border-radius:8px; background:${gradeBadgeBg}; color:${gradeBadgeColor}; white-space:nowrap;">
@@ -4430,7 +5125,7 @@
               </div>
               <div style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
                 <div style="display:flex; gap:5px; align-items:center;">
-                  <span style="font-size:11px; color:var(--text-muted); margin-right:4px;">Kredit:</span>
+                  <span style="font-size:11px; color:var(--text-muted); margin-right:4px;">${t.gpaCreditLbl || "Kredit:"}</span>
                   ${[2, 4, 6]
                     .map(
                       (c) =>
@@ -4439,7 +5134,7 @@
                     .join("")}
                 </div>
                 <div style="display:flex; align-items:center; gap:6px;">
-                  <span style="font-size:11px; color:var(--text-muted);">Ball:</span>
+                  <span style="font-size:11px; color:var(--text-muted);">${t.gpaScoreLbl || "Ball:"}</span>
                   <input type="number" min="0" max="100" class="search-input" style="width:70px; padding:6px 8px; text-align:center; font-weight:800;" value="${r.score}" oninput="updateGpaRow(${i}, 'score', this.value)" />
                 </div>
               </div>
@@ -4475,7 +5170,7 @@
       const metaEl = document.getElementById("gpaSummaryMeta");
       const badgeWrap = document.getElementById("gpaHonorBadgeWrap");
       if (valEl) valEl.textContent = gpa;
-      if (metaEl) metaEl.textContent = `Jami kredit: ${sumK} · O'rtacha ball: ${avg} / 100`;
+      if (metaEl) metaEl.textContent = t.gpaSummaryMetaText ? t.gpaSummaryMetaText(sumK, Number(avg)) : `Jami kredit: ${sumK} · O'rtacha ball: ${avg} / 100`;
 
       if (badgeWrap) {
         if (gpaNum >= 4.90) {
@@ -4566,26 +5261,34 @@
 
     /* ─── GRANTS & OPPORTUNITIES MODULE ─── */
     function renderOppsTab() {
+      const t = T();
       const box = document.getElementById("oppsListContainer");
       if (!box) return;
       const list = (STATE.campusData && STATE.campusData.opportunities) || [];
       if (!list.length) {
-        box.innerHTML = `<div class="empty-msg">Hozircha faol dasturlar yõq.</div>`;
+        box.innerHTML = `<div class="empty-msg">${t.oppsEmpty || "Hozircha faol dasturlar yo'q."}</div>`;
         return;
       }
-      const isRu = STATE.lang === "ru";
       box.innerHTML = list
         .map((o) => {
-          const title = (isRu ? o.title_ru : o.title_uz) || o.title_uz || o.title_ru || "";
-          const body = ((isRu ? o.body_ru : o.body_uz) || o.body_uz || "").replace(/[#*_`]/g, "").slice(0, 260) + "...";
+          let title = o.title_uz || "";
+          let body = o.body_uz || "";
+          if (STATE.lang === "ru") {
+            title = o.title_ru || o.title_uz || "";
+            body = o.body_ru || o.body_uz || "";
+          } else if (STATE.lang === "en") {
+            title = o.title_en || o.title_uz || o.title_ru || "";
+            body = o.body_en || o.body_uz || o.body_ru || "";
+          }
+          body = body.replace(/[#*_`]/g, "").slice(0, 260) + "...";
           const dl = o.deadline ? new Date(o.deadline) : null;
           const daysLeft = dl ? Math.ceil((dl.getTime() - Date.now()) / 86400000) : null;
           const badge =
             daysLeft === null
               ? "OPEN"
               : daysLeft < 0
-              ? "Yopilgan"
-              : `⏳ ${daysLeft} kun qoldi`;
+              ? (t.oppsClosed || "Yopilgan")
+              : (t.oppsDaysLeft ? t.oppsDaysLeft(daysLeft) : `⏳ ${daysLeft} kun qoldi`);
           return `
             <div class="panel" style="margin-bottom:10px;">
               ${o.photo ? `<img src="${o.photo}" alt="" style="width:100%;height:150px;object-fit:cover;border-radius:12px;margin-bottom:10px;" loading="lazy" />` : ""}
@@ -4593,11 +5296,11 @@
                 <span class="bento-tag">${(o.category || "GRANT").toUpperCase()}</span>
                 <span style="font-size:11.5px;font-weight:800;color:${daysLeft !== null && daysLeft < 0 ? "#64748b" : "#34d399"};">${badge}</span>
               </div>
-              <div style="font-size:14.5px;font-weight:800;color:#fff;margin-bottom:6px;">${toNewUz(title)}</div>
+              <div style="font-size:14.5px;font-weight:800;color:var(--text);margin-bottom:6px;">${toNewUz(title)}</div>
               <div style="font-size:12px;color:var(--text-sec);line-height:1.45;margin-bottom:10px;">${toNewUz(body)}</div>
               ${
                 o.apply_url
-                  ? `<a href="${o.apply_url}" target="_blank" class="hero-cta" style="text-decoration:none;padding:10px;font-size:12.5px;">🚀 Ariza topshirish / Batafsil →</a>`
+                  ? `<a href="${o.apply_url}" target="_blank" class="hero-cta" style="text-decoration:none;padding:10px;font-size:12.5px;">${t.oppsApply || "🚀 Ariza topshirish / Batafsil →"}</a>`
                   : ""
               }
             </div>`;
@@ -4607,16 +5310,16 @@
 
     /* ─── LEADERSHIP (RECTORATE) & UNIVERSITY DOCUMENTS MODULE ─── */
     function renderDocsTab() {
+      const t = T();
       const leadBox = document.getElementById("leadershipContainer");
       const docsBox = document.getElementById("documentsContainer");
       if (!leadBox || !docsBox) return;
-      const isRu = STATE.lang === "ru";
       const leaders = (STATE.campusData && STATE.campusData.leadership) || [];
       leadBox.innerHTML = leaders
         .map((p) => {
-          const nm = (p.name && (isRu ? p.name.ru : p.name.uz)) || "";
-          const tl = (p.title && (isRu ? p.title.ru : p.title.uz)) || "";
-          const rc = (p.reception && (isRu ? p.reception.ru : p.reception.uz)) || "";
+          let nm = (p.name && (p.name[STATE.lang] || p.name.uz || p.name.ru)) || "";
+          let tl = (p.title && (p.title[STATE.lang] || p.title.uz || p.title.ru)) || "";
+          let rc = (p.reception && (p.reception[STATE.lang] || p.reception.uz || p.reception.ru)) || "";
           return `
             <div class="panel" style="margin-bottom:10px;display:flex;gap:12px;align-items:center;">
               ${
@@ -4625,9 +5328,9 @@
                   : `<div class="sq-ic c-blue" style="width:60px;height:60px;font-size:24px;flex-shrink:0;">👔</div>`
               }
               <div style="min-width:0;flex:1;">
-                <div style="font-size:14px;font-weight:800;color:#fff;">${toNewUz(nm)}</div>
+                <div style="font-size:14px;font-weight:800;color:var(--text);">${toNewUz(nm)}</div>
                 <div style="font-size:11.5px;color:#38bdf8;font-weight:600;margin-top:2px;">${toNewUz(tl)}</div>
-                ${rc ? `<div style="font-size:11px;color:var(--text-muted);margin-top:4px;">🕒 Qabul: ${toNewUz(rc)}</div>` : ""}
+                ${rc ? `<div style="font-size:11px;color:var(--text-muted);margin-top:4px;">${t.docsReception || "🕒 Qabul:"} ${toNewUz(rc)}</div>` : ""}
                 <div style="display:flex;gap:10px;margin-top:5px;font-size:11px;">
                   ${p.phone ? `<a href="tel:${p.phone}" style="color:#34d399;text-decoration:none;font-weight:700;">📞 ${p.phone}</a>` : ""}
                   ${p.email ? `<a href="mailto:${p.email}" style="color:var(--text-sec);text-decoration:none;">✉️ ${p.email}</a>` : ""}
@@ -4640,7 +5343,8 @@
       const docs = (STATE.campusData && STATE.campusData.documents) || [];
       docsBox.innerHTML = docs
         .map((d) => {
-          const tl = (d.title && (isRu ? d.title.ru : d.title.uz)) || "";
+          let tl = (d.title && (d.title[STATE.lang] || d.title.uz || d.title.ru)) || "";
+          const pagesTxt = t.docsPages ? t.docsPages(d.pages) : `📑 ${d.pages || ""} sahifa`;
           return `
             <div class="panel" style="margin-bottom:10px;display:flex;gap:12px;align-items:center;">
               ${
@@ -4649,8 +5353,8 @@
                   : `<div class="sq-ic c-purple">📄</div>`
               }
               <div style="min-width:0;flex:1;">
-                <div style="font-size:13.5px;font-weight:800;color:#fff;">${toNewUz(tl)}</div>
-                <div style="font-size:11px;color:var(--text-muted);margin-top:3px;">📑 ${d.pages || ""} sahifa · PDF ${d.pdf_mb || ""} MB</div>
+                <div style="font-size:13.5px;font-weight:800;color:var(--text);">${toNewUz(tl)}</div>
+                <div style="font-size:11px;color:var(--text-muted);margin-top:3px;">${pagesTxt} · PDF ${d.pdf_mb || ""} MB</div>
               </div>
               ${
                 d.pdf
@@ -4694,34 +5398,36 @@
     }
 
     function renderLfItems() {
+      const t = T();
       const box = document.getElementById("lfListContainer");
       if (!box) return;
       const list = lfCurFilter === "all" ? lfAllItems : lfAllItems.filter((x) => x.kind === lfCurFilter);
       if (!list.length) {
-        box.innerHTML = `<div class="empty-msg">Bu bõlimda hozircha e’lonlar yõq.</div>`;
+        box.innerHTML = `<div class="empty-msg">${t.lfEmpty || "Bu bõlimda hozircha e’lonlar yõq."}</div>`;
         return;
       }
       box.innerHTML = list
         .map((it) => {
           const badge =
             it.kind === "found"
-              ? `<span style="background:rgba(16,185,129,0.2);color:#34d399;padding:2px 8px;border-radius:99px;font-size:10.5px;font-weight:800;">🎉 TOPILDI</span>`
+              ? `<span style="background:rgba(16,185,129,0.2);color:#34d399;padding:2px 8px;border-radius:99px;font-size:10.5px;font-weight:800;">${t.lfBadgeFound || "🎉 TOPILDI"}</span>`
               : it.kind === "exchange"
-              ? `<span style="background:rgba(56,189,248,0.2);color:#38bdf8;padding:2px 8px;border-radius:99px;font-size:10.5px;font-weight:800;">📚 ALMASHINUV / TEKIN</span>`
-              : `<span style="background:rgba(244,63,94,0.2);color:#fb7185;padding:2px 8px;border-radius:99px;font-size:10.5px;font-weight:800;">🔍 YO'QOTILDI</span>`;
+              ? `<span style="background:rgba(56,189,248,0.2);color:#38bdf8;padding:2px 8px;border-radius:99px;font-size:10.5px;font-weight:800;">${t.lfBadgeEx || "📚 ALMASHINUV / TEKIN"}</span>`
+              : `<span style="background:rgba(244,63,94,0.2);color:#fb7185;padding:2px 8px;border-radius:99px;font-size:10.5px;font-weight:800;">${t.lfBadgeLost || "🔍 YO'QOTILDI"}</span>`;
+          const contactTxt = t.lfContactBtn ? t.lfContactBtn(it.contact.replace(/^@/, "")) : `💬 Bog'lanish (@${it.contact.replace(/^@/, "")})`;
           return `
             <div class="panel" style="margin-bottom:9px;">
               <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
                 ${badge}
                 <span style="font-size:11px;color:var(--text-muted);">${it.created_at || ""}</span>
               </div>
-              <div style="font-size:14px;font-weight:800;color:#fff;margin-bottom:4px;">${toNewUz(it.title)}</div>
+              <div style="font-size:14px;font-weight:800;color:var(--text);margin-bottom:4px;">${toNewUz(it.title)}</div>
               <div style="font-size:12px;color:var(--text-sec);line-height:1.45;margin-bottom:8px;">${toNewUz(it.desc)}</div>
               <div style="display:flex;justify-content:space-between;align-items:center;font-size:11.5px;color:var(--text-muted);">
                 <span>📍 ${toNewUz(it.place || "JIDU")}</span>
                 ${
                   it.contact
-                    ? `<a href="https://t.me/${it.contact.replace(/^@/, "")}" target="_blank" class="btn-sm" style="text-decoration:none;padding:4px 10px;">💬 Bog'lanish (@${it.contact.replace(/^@/, "")})</a>`
+                    ? `<a href="https://t.me/${it.contact.replace(/^@/, "")}" target="_blank" class="btn-sm" style="text-decoration:none;padding:4px 10px;">${contactTxt}</a>`
                     : ""
                 }
               </div>
@@ -6239,6 +6945,7 @@
 
     /* ─── PERSONAL USER PROFILE MODULE ─── */
     function renderProfileTab() {
+      const t = T();
       const u = getCurrentUser();
       const av = document.getElementById("profAvatar");
       if (av) {
@@ -6246,13 +6953,13 @@
         av.textContent = init.toUpperCase() || "UW";
       }
       const fn = document.getElementById("profFullName");
-      if (fn) fn.textContent = [u.first_name, u.last_name].filter(Boolean).join(" ") || "UWED Talaba";
+      if (fn) fn.textContent = [u.first_name, u.last_name].filter(Boolean).join(" ") || (t.profDefaultStudent || "UWED Talaba");
       const un = document.getElementById("profUsername");
       if (un) un.textContent = u.username ? `@${u.username}` : (u.phone || "UWED User");
       const uid = document.getElementById("profTgId");
       if (uid) uid.textContent = `TG-ID: ${u.id}`;
       const rb = document.getElementById("profRoleBadge");
-      if (rb) rb.textContent = STATE.isAdmin ? "ADMIN ⚡" : "TALABA 🎓";
+      if (rb) rb.textContent = STATE.isAdmin ? (t.profRoleAdmin || "ADMIN ⚡") : (t.profRoleStudent || "TALABA 🎓");
 
       // Pinned Schedule
       const pinVal = document.getElementById("profPinnedVal");
@@ -6266,7 +6973,7 @@
             pinVal.textContent = "—";
           }
         } else {
-          pinVal.textContent = "Belgilanmagan (Tanlash →)";
+          pinVal.textContent = t.profNotPinned || "Belgilanmagan (Tanlash →)";
         }
       }
 
@@ -6288,18 +6995,18 @@
       const evList = document.getElementById("profSavedEvList");
       const evCnt = document.getElementById("profSavedEvCount");
       const evs = STATE.attendingEvents || [];
-      if (evCnt) evCnt.textContent = `${evs.length} ta`;
+      if (evCnt) evCnt.textContent = `${evs.length} ${t.eventsCountUnit || "ta"}`;
 
       if (evList) {
         if (!evs.length) {
-          evList.innerHTML = `<div class="empty-msg">Siz hali birorta tadbirga obuna bo'lmadingiz.</div>`;
+          evList.innerHTML = `<div class="empty-msg">${t.profEmptySaved || "Siz hali birorta tadbirga obuna bo'lmadingiz."}</div>`;
         } else {
           evList.innerHTML = evs
             .map(
               (ev) => `
               <div class="panel" style="margin-bottom:8px; display:flex; justify-content:space-between; align-items:center;">
                 <div style="min-width:0; flex:1;">
-                  <div style="font-size:13.5px; font-weight:800; color:#fff;">${toNewUz(ev.title)}</div>
+                  <div style="font-size:13.5px; font-weight:800; color:var(--text);">${toNewUz(ev.title)}</div>
                   <div style="font-size:11px; color:var(--text-muted); margin-top:2px;">📅 ${ev.date || ""} · ⏰ ${ev.time || ""} · 📍 ${toNewUz(ev.location || "UWED")}</div>
                 </div>
                 <button class="btn-sm" style="background:rgba(244,63,94,0.18); border-color:rgba(244,63,94,0.35); color:#fb7185;" onclick="toggleEventAttendance('${ev.id}')">✕</button>
