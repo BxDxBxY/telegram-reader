@@ -2976,6 +2976,20 @@
         profNotPinned: "Belgilanmagan (Tanlash →)",
         profEmptySaved: "Siz hali birorta tadbirga obuna bo'lmadingiz.",
         eventsCountUnit: "ta",
+        // Event Timetable Conflict & Link
+        evClashTitle: "Dars bilan to'qnashuv:",
+        evClashBadge: "TO'QNASHUV",
+        evClashNotice: "Dars va Tadbir bir vaqtda!",
+        evBookedBadge: "YOZILGAN TADBIR",
+        evConflictFree: "Bu vaqtda darsingiz yo'q (Bo'sh vaqt)",
+        evConflictClashModalTitle: "⚠️ Dars vaqti bilan to'qnashuv!",
+        evConflictClashModalSub: "Ushbu tadbir sizning dars jadvalingiz bilan bir vaqtga to'g'ri kelmoqda:",
+        evConflictAddAnyway: "✓ Baribir qo'shish",
+        evConflictCancel: "Bekor qilish",
+        evClashYourClass: "SIZNING DARSINGIZ",
+        evClashTargetEvent: "TANLANGAN TADBIR",
+        evPinHint: "💡 Darslar bilan to'qnashuvlarni ko'rish uchun shaxsiy jadvalingizni biriktiring",
+        evAfterClassesTitle: "🌙 Darsdan keyingi tadbirlar",
 
       },
       ru: {
@@ -3276,6 +3290,20 @@
         profNotPinned: "Не выбрано (Выбрать →)",
         profEmptySaved: "Вы ещё не добавили ни одного мероприятия в избранное.",
         eventsCountUnit: "событий",
+        // Event Timetable Conflict & Link
+        evClashTitle: "Накладка на пару:",
+        evClashBadge: "НАКЛАДКА НА ПАРУ",
+        evClashNotice: "Пара и мероприятие в одно время!",
+        evBookedBadge: "ЗАПИСЬ НА МЕРОПРИЯТИЕ",
+        evConflictFree: "В это время у вас нет пар (Окно / Свободное время)",
+        evConflictClashModalTitle: "⚠️ Накладка на время пары!",
+        evConflictClashModalSub: "Это мероприятие совпадает по времени с вашей парой в расписании:",
+        evConflictAddAnyway: "✓ Всё равно добавить",
+        evConflictCancel: "Отмена",
+        evClashYourClass: "ВАША ПАРА",
+        evClashTargetEvent: "ВЫБРАННОЕ МЕРОПРИЯТИЕ",
+        evPinHint: "💡 Закрепите своё расписание, чтобы автоматически видеть накладки на пары",
+        evAfterClassesTitle: "🌙 Мероприятия после пар",
 
       },
       en: {
@@ -3576,6 +3604,20 @@
         profNotPinned: "Not selected (Choose →)",
         profEmptySaved: "You haven't saved any events yet.",
         eventsCountUnit: "events",
+        // Event Timetable Conflict & Link
+        evClashTitle: "Class clash:",
+        evClashBadge: "TIMETABLE CLASH",
+        evClashNotice: "Class and Event at the same time!",
+        evBookedBadge: "SAVED EVENT",
+        evConflictFree: "You are free at this time (Window / No classes)",
+        evConflictClashModalTitle: "⚠️ Timetable Clash Detected!",
+        evConflictClashModalSub: "This event conflicts with one of your scheduled classes:",
+        evConflictAddAnyway: "✓ Add anyway",
+        evConflictCancel: "Cancel",
+        evClashYourClass: "YOUR CLASS",
+        evClashTargetEvent: "CHOSEN EVENT",
+        evPinHint: "💡 Pin your timetable to automatically detect class conflicts",
+        evAfterClassesTitle: "🌙 After-class events",
 
       },
     };
@@ -6147,27 +6189,240 @@
       }
     }
 
-    async function toggleEventAttendance(evId) {
+    async // ==========================================
+    // SMART EVENT & TIMETABLE CONFLICT ENGINE
+    // ==========================================
+    function normalizeDateStr(dStr) {
+      if (!dStr) return "";
+      const s = String(dStr).trim();
+      if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+      const m = s.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{4})$/);
+      if (m) {
+        const day = m[1].padStart(2, "0");
+        const month = m[2].padStart(2, "0");
+        const year = m[3];
+        return `${year}-${month}-${day}`;
+      }
+      return s;
+    }
+
+    function getWeekdayFromDate(dStr) {
+      const norm = normalizeDateStr(dStr);
+      if (!norm || norm.length < 10) return null;
+      const d = new Date(`${norm}T12:00:00Z`);
+      if (isNaN(d.getTime())) return null;
+      let w = d.getUTCDay();
+      return w === 0 ? 7 : w; // 1=Mon .. 7=Sun
+    }
+
+    function parseTimeToMinutes(tStr) {
+      if (!tStr) return null;
+      const m = String(tStr).match(/(\d{1,2}):(\d{2})/);
+      if (!m) return null;
+      return parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
+    }
+
+    function getEventTimeRange(timeStr) {
+      if (!timeStr) return { start: 14 * 60, end: 15 * 60 + 20 };
+      const parts = String(timeStr).split(/[–-]/);
+      const startMin = parseTimeToMinutes(parts[0]);
+      if (startMin === null) return { start: 14 * 60, end: 15 * 60 + 20 };
+      let endMin = parts[1] ? parseTimeToMinutes(parts[1]) : null;
+      if (endMin === null || endMin <= startMin) {
+        endMin = startMin + 75; // standard university pair length
+      }
+      return { start: startMin, end: endMin };
+    }
+
+    function doesEventOverlapSlot(event, slotObj) {
+      if (!event || !slotObj) return false;
+      const evRange = getEventTimeRange(event.time);
+      const slotStart = parseTimeToMinutes(slotObj.start_time);
+      const slotEnd = parseTimeToMinutes(slotObj.end_time);
+      if (slotStart === null || slotEnd === null) return false;
+      return Math.max(evRange.start, slotStart) < Math.min(evRange.end, slotEnd);
+    }
+
+    async function loadPinnedScheduleEvents() {
+      const raw = localStorage.getItem("uwed_pinned_profile");
+      if (!raw) {
+        STATE.pinnedScheduleEvents = [];
+        return [];
+      }
+      try {
+        const p = JSON.parse(raw);
+        const cacheKey = `uwed_sched_${p.kind}_${p.id}`;
+        const cached = localStorage.getItem(cacheKey);
+        if (cached) {
+          try {
+            const parsed = JSON.parse(cached);
+            if (Array.isArray(parsed) && parsed.length) {
+              STATE.pinnedScheduleEvents = parsed;
+            }
+          } catch (_) {}
+        }
+        const evs = await fetchPersonScheduleEvents(p.kind, p.id);
+        if (Array.isArray(evs) && evs.length) {
+          STATE.pinnedScheduleEvents = evs;
+          try { localStorage.setItem(cacheKey, JSON.stringify(evs)); } catch (_) {}
+        }
+        return STATE.pinnedScheduleEvents || [];
+      } catch (_) {
+        return [];
+      }
+    }
+
+    function checkEventTimetableConflict(event) {
+      if (!event) return null;
+      const evDate = normalizeDateStr(event.date);
+      const wday = getWeekdayFromDate(evDate);
+      if (!wday || wday === 7) {
+        return { hasConflict: false, isDayOff: true, wday: 7 };
+      }
+
+      const schedEvents = STATE.pinnedScheduleEvents || [];
+      if (!schedEvents.length) {
+        return null;
+      }
+
+      const dayClasses = schedEvents.filter((c) => Number(c.week_day) === wday);
+      if (!dayClasses.length) {
+        return { hasConflict: false, isFreeDay: true, wday };
+      }
+
+      for (const c of dayClasses) {
+        const slotObj = STATE.slots.find((s) => Number(s.id) === Number(c.slot_id));
+        if (slotObj && doesEventOverlapSlot(event, slotObj)) {
+          return {
+            hasConflict: true,
+            conflictingClass: c,
+            slot: slotObj,
+            wday,
+            date: evDate,
+            eventTime: event.time,
+          };
+        }
+      }
+
+      return { hasConflict: false, isFreeWindow: true, wday };
+    }
+
+    function openConflictModal(ev, conflict) {
+      const t = T();
+      const modal = document.getElementById("conflictModal");
+      const body = document.getElementById("conflictModalBody");
+      const btnConfirm = document.getElementById("btnConflictConfirm");
+      const titleEl = document.getElementById("conflictModalTitle");
+      const subEl = document.getElementById("conflictModalSub");
+      const btnCancel = document.getElementById("btnConflictCancel");
+      if (!modal || !body || !btnConfirm) return;
+
+      if (titleEl) titleEl.textContent = t.evConflictClashModalTitle || "⚠️ Dars vaqti bilan to'qnashuv!";
+      if (subEl) subEl.textContent = t.evConflictClashModalSub || "Ushbu tadbir dars jadvalingiz bilan bir vaqtga to'g'ri kelmoqda";
+      if (btnConfirm) btnConfirm.textContent = t.evConflictAddAnyway || "✓ Baribir qo'shish";
+      if (btnCancel) btnCancel.textContent = t.evConflictCancel || "Bekor qilish";
+
+      const title = toNewUz(ev[`title_${STATE.lang}`] || ev.title_uz || ev.title || "");
+      const classTitle = toNewUz(conflict.conflictingClass.title || conflict.conflictingClass.lesson_name || "Dars");
+      const room = conflict.conflictingClass.room_number || "JIDU";
+      const slotTime = `${conflict.slot.start_time}–${conflict.slot.end_time}`;
+      const slotName = t.pairLabel(conflict.slot.id);
+
+      body.innerHTML = `
+        <div style="background:rgba(244,63,94,0.12); border:1px solid rgba(244,63,94,0.35); border-radius:12px; padding:12px; margin-bottom:12px;">
+          <div style="font-size:12px; font-weight:800; color:#fb7185; text-transform:uppercase; margin-bottom:4px;">
+            ⚠️ ${t.evClashBadge || "DARS BILAN TO'QNASHUV"}
+          </div>
+          <div style="font-size:12.5px; color:var(--text); line-height:1.45;">
+            ${t.evConflictClashModalSub || "Ushbu tadbir sizning dars jadvalingiz bilan bir vaqtga to'g'ri kelmoqda:"}
+          </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns:1fr; gap:10px;">
+          <div class="panel" style="border-left:4px solid #f43f5e; background:var(--bg-elevated); padding:10px 12px;">
+            <div style="font-size:11px; font-weight:800; color:#fb7185; margin-bottom:3px;">
+              📚 ${t.evClashYourClass || "SIZNING DARSINGIZ"}:
+            </div>
+            <div style="font-size:13.5px; font-weight:800; color:var(--text);">${classTitle}</div>
+            <div style="font-size:11.5px; color:var(--text-sec); margin-top:3px;">
+              🕒 ${slotName} (${slotTime}) · 🚪 ${room}
+            </div>
+          </div>
+
+          <div class="panel" style="border-left:4px solid #38bdf8; background:var(--bg-elevated); padding:10px 12px;">
+            <div style="font-size:11px; font-weight:800; color:#38bdf8; margin-bottom:3px;">
+              🔔 ${t.evClashTargetEvent || "TANLANGAN TADBIR"}:
+            </div>
+            <div style="font-size:13.5px; font-weight:800; color:var(--text);">${title}</div>
+            <div style="font-size:11.5px; color:var(--text-sec); margin-top:3px;">
+              📅 ${ev.date || ""} · ⏰ ${ev.time || "14:00"} · 📍 ${toNewUz(ev.location || "JIDU")}
+            </div>
+          </div>
+        </div>
+      `;
+
+      btnConfirm.onclick = () => {
+        closeConflictModal();
+        confirmToggleEventAttendance(ev.id, false);
+      };
+
+      modal.classList.add("open");
+    }
+
+    function closeConflictModal() {
+      const modal = document.getElementById("conflictModal");
+      if (modal) modal.classList.remove("open");
+    }
+
+    function toggleEventAttendance(evId) {
       haptic("medium");
       const ev = (STATE.campusEvents || []).find((x) => x.id === evId);
       if (!ev) return;
       const isAlready = (STATE.attendingEvents || []).some((x) => x.id === evId);
+
+      if (isAlready) {
+        confirmToggleEventAttendance(evId, true);
+        return;
+      }
+
+      const conflict = checkEventTimetableConflict(ev);
+      if (conflict && conflict.hasConflict) {
+        openConflictModal(ev, conflict);
+        return;
+      }
+
+      confirmToggleEventAttendance(evId, false);
+    }
+
+    async function confirmToggleEventAttendance(evId, isAlready) {
+      const ev = (STATE.campusEvents || []).find((x) => x.id === evId);
+      if (!ev) return;
       const title = toNewUz(ev[`title_${STATE.lang}`] || ev.title_uz || ev.title || "");
 
       if (isAlready) {
-        STATE.attendingEvents = STATE.attendingEvents.filter((x) => x.id !== evId);
+        STATE.attendingEvents = (STATE.attendingEvents || []).filter((x) => x.id !== evId);
       } else {
+        if (!STATE.attendingEvents) STATE.attendingEvents = [];
         STATE.attendingEvents.unshift({
           id: ev.id,
           title,
-          date: ev.date || STATE.selectedDateStr,
+          date: normalizeDateStr(ev.date) || STATE.selectedDateStr,
           time: ev.time || "14:00",
           location: ev.location || "UWED",
           channel_name: ev.channel_name || "@uwed_official",
           tg_link: ev.tg_link || "https://t.me/uwed_official",
         });
       }
+
+      try {
+        localStorage.setItem("uwed_attending_events", JSON.stringify(STATE.attendingEvents));
+      } catch (_) {}
+
       renderEventsTab();
+      renderProfileTab();
+      if (document.getElementById("detailModal").classList.contains("open")) {
+        renderModalContent();
+      }
 
       try {
         const res = await fetch("/api/telemetry", {
@@ -6180,7 +6435,7 @@
               id: ev.id,
               remove: isAlready,
               title,
-              date: ev.date || STATE.selectedDateStr,
+              date: normalizeDateStr(ev.date) || STATE.selectedDateStr,
               time: ev.time || "14:00",
               location: ev.location || "UWED",
               channel_name: ev.channel_name || "@uwed_official",
@@ -6190,7 +6445,14 @@
         }).then((r) => r.json());
         if (res && Array.isArray(res.attending_events)) {
           STATE.attendingEvents = res.attending_events;
+          try {
+            localStorage.setItem("uwed_attending_events", JSON.stringify(STATE.attendingEvents));
+          } catch (_) {}
           renderEventsTab();
+          renderProfileTab();
+          if (document.getElementById("detailModal").classList.contains("open")) {
+            renderModalContent();
+          }
         }
       } catch (_) {}
     }
@@ -6322,8 +6584,16 @@
         list.sort((a, b) => Number(b.id || 0) - Number(a.id || 0));
       }
 
+      const hasPinned = Boolean(localStorage.getItem("uwed_pinned_profile"));
+      const pinPromptHtml = !hasPinned
+        ? `<div style="margin-bottom:12px; padding:10px 12px; border-radius:12px; background:rgba(56,189,248,0.1); border:1px dashed rgba(56,189,248,0.38); font-size:12px; color:#38bdf8; display:flex; justify-content:space-between; align-items:center; gap:8px;">
+             <span>${t.evPinHint || "💡 Darslar bilan to'qnashuvlarni ko'rish uchun shaxsiy jadvalingizni biriktiring"}</span>
+             <button class="btn-sm" style="padding:4px 10px; font-size:11px; flex-shrink:0;" onclick="switchTab('students')">${t.pinBtn || "📌 Tanlash"}</button>
+           </div>`
+        : "";
+
       if (!list.length) {
-        box.innerHTML = `<div class="empty-msg">${t.evEmpty}</div>`;
+        box.innerHTML = `${pinPromptHtml}<div class="empty-msg">${t.evEmpty}</div>`;
         if (pBox) pBox.style.display = "none";
         return;
       }
@@ -6340,7 +6610,7 @@
         campus: t.evCatCampus,
       };
 
-      box.innerHTML = paged
+      box.innerHTML = pinPromptHtml + paged
         .map((ev) => {
           const title = toNewUz(ev[`title_${STATE.lang}`] || ev.title_uz || ev.title || "");
           const rawDesc = toNewUz(ev[`desc_${STATE.lang}`] || ev.desc_uz || ev.description || "");
@@ -6353,6 +6623,30 @@
             : "background:rgba(56,189,248,0.16); border:1px solid rgba(56,189,248,0.38); color:#38bdf8;";
           const notifyBtnText = isAttending ? t.evNotifiedBtn : t.evNotifyBtn;
           const safeLink = encodeURI(String(ev.tg_link || "https://t.me/uwed_official")).replace(/'/g, "%27");
+
+          let conflictHtml = "";
+          const conflict = checkEventTimetableConflict(ev);
+          if (conflict && conflict.hasConflict) {
+            const classTitle = toNewUz(conflict.conflictingClass.title || conflict.conflictingClass.lesson_name || "Dars");
+            conflictHtml = `
+              <div class="event-conflict-badge conflict-busy">
+                <span style="font-size:13px;">⚠️</span>
+                <div style="min-width:0; flex:1;">
+                  <b>${t.evClashTitle || "Dars bilan to'qnashuv:"}</b> «${classTitle}»
+                  <div style="font-size:10.5px; opacity:0.85; margin-top:2px;">
+                    ${t.pairLabel(conflict.slot.id)} (${conflict.slot.start_time}–${conflict.slot.end_time}) · 🚪 ${conflict.conflictingClass.room_number || "JIDU"}
+                  </div>
+                </div>
+              </div>
+            `;
+          } else if (conflict && (conflict.isFreeWindow || conflict.isFreeDay || conflict.isDayOff)) {
+            conflictHtml = `
+              <div class="event-conflict-badge conflict-free">
+                <span style="font-size:12px;">🟢</span>
+                <span><b>${t.evConflictFree || "Bu vaqtda darsingiz yo'q (Bo'sh vaqt)"}</b></span>
+              </div>
+            `;
+          }
 
           return `
             <div class="event-card">
@@ -6376,6 +6670,7 @@
                      }`
                   : ""
               }
+              ${conflictHtml}
               <div class="event-meta" style="flex-wrap:wrap; gap:8px; margin-top:8px;">
                 <span style="font-size:12px; color:var(--text-sec); font-weight:700;">📍 ${toNewUz(ev.location || "UWED")}</span>
                 <div style="display:flex; gap:6px; flex-wrap:wrap;">
@@ -6821,23 +7116,8 @@
 
       // Check if user has registered to attend any Campus Events on this selected date (curDateStr)
       const dayAttendingEvents = (STATE.attendingEvents || []).filter(
-        (cev) => cev && cev.date === curDateStr
+        (cev) => cev && normalizeDateStr(cev.date) === normalizeDateStr(curDateStr)
       );
-      const attendingBannerHtml = dayAttendingEvents.length
-        ? dayAttendingEvents
-            .map(
-              (cev) => `
-              <div class="slot-row warn" style="border-left-color:#38bdf8; background:rgba(56,189,248,0.1);">
-                <div class="slot-time">🔔 EVENT<span>${cev.time || "14:00"}</span></div>
-                <div class="slot-info">
-                  <div class="slot-subj" style="color:#38bdf8;">📌 ${toNewUz(cev.title)}</div>
-                  <div class="slot-meta">📍 ${cev.location || "UWED"} · 📡 ${cev.channel_name || "@uwed_official"}</div>
-                </div>
-              </div>
-            `
-            )
-            .join("")
-        : "";
 
       const dayEvents = (ctx.events || []).filter((e) => Number(e.week_day) === Number(ctx.day));
       const bySlot = {};
@@ -6846,11 +7126,63 @@
         if (sid && !bySlot[sid]) bySlot[sid] = e;
       }
 
+      const assignedEventIds = new Set();
+
       const slotsHtml = STATE.slots
         .slice(0, 8)
         .map((s) => {
           const sid = Number(s.id);
           const ev = bySlot[sid];
+          const matchingEvent = dayAttendingEvents.find((cev) => doesEventOverlapSlot(cev, s));
+          if (matchingEvent) assignedEventIds.add(matchingEvent.id);
+
+          // CASE 1: CLASH between class and registered campus event!
+          if (ev && matchingEvent) {
+            const rm = ev.room_number || "?";
+            const midtermBadge = ev.study_type === "MIDTERM" ? `<span style="background:rgba(244,63,94,0.2);color:#fb7185;padding:1px 6px;border-radius:5px;font-size:10px;font-weight:800;margin-left:5px;">MIDTERM</span>` : "";
+            const meta = [`🚪 ${rm}`, toNewUz(ev.instructor), ev.code, ev.groups ? `👥 ${ev.groups}` : "", toNewUz(ev.speciality_names)].filter(Boolean).join(" · ");
+            const topic = ev.lesson_name && ev.lesson_name !== ev.title ? `<div style="font-size:11px; color:#38bdf8; margin-top:2px;">📖 ${toNewUz(ev.lesson_name)}</div>` : "";
+            return `
+              <div class="slot-row conflict">
+                <div class="slot-time" style="color:#fb7185;">${t.pairLabel(sid)}<span>${s.start_time}–${s.end_time}</span></div>
+                <div class="slot-info">
+                  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
+                    <span class="badge" style="background:#f43f5e; color:#fff; font-size:10px; font-weight:800; letter-spacing:0.3px;">⚠️ ${t.evClashBadge || "TO'QNASHUV"}</span>
+                    <span style="font-size:11px; color:#fb7185; font-weight:700;">${t.evClashNotice || "Dars va Tadbir bir vaqtda!"}</span>
+                  </div>
+                  <div class="slot-subj" style="color:var(--text); font-weight:800;">📚 ${toNewUz(ev.title || ev.lesson_name || "—")}${midtermBadge}</div>
+                  ${topic}
+                  <div class="slot-meta">${meta}</div>
+                  <div style="margin-top:7px; padding:7px 10px; border-radius:8px; background:rgba(56,189,248,0.14); border:1px solid rgba(56,189,248,0.32);">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                      <span style="font-size:11.5px; font-weight:800; color:#38bdf8;">🔔 ${toNewUz(matchingEvent.title)}</span>
+                      <button class="btn-sm" style="padding:2px 7px; font-size:10.5px; background:rgba(244,63,94,0.2); color:#fb7185;" onclick="toggleEventAttendance('${matchingEvent.id}')">✕</button>
+                    </div>
+                    <div style="font-size:11px; color:var(--text-sec); margin-top:2px;">⏰ ${matchingEvent.time || ""} · 📍 ${toNewUz(matchingEvent.location || "UWED")} · 📡 ${matchingEvent.channel_name || "@uwed_official"}</div>
+                  </div>
+                </div>
+              </div>
+            `;
+          }
+
+          // CASE 2: No class, but registered event in this free window
+          if (!ev && matchingEvent) {
+            return `
+              <div class="slot-row free" style="border-left: 4px solid #38bdf8; background: rgba(56,189,248,0.08);">
+                <div class="slot-time" style="color:#38bdf8;">${t.pairLabel(sid)}<span>${s.start_time}–${s.end_time}</span></div>
+                <div class="slot-info">
+                  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:3px;">
+                    <span class="badge" style="background:rgba(56,189,248,0.22); color:#38bdf8; font-size:10px; font-weight:800;">🔔 ${t.evBookedBadge || "YOZILGAN TADBIR"}</span>
+                    <button class="btn-sm" style="padding:2px 7px; font-size:10.5px; background:rgba(244,63,94,0.18); color:#fb7185;" onclick="toggleEventAttendance('${matchingEvent.id}')">✕</button>
+                  </div>
+                  <div class="slot-subj" style="color:#38bdf8; font-weight:800;">📌 ${toNewUz(matchingEvent.title)}</div>
+                  <div class="slot-meta" style="color:var(--text-sec);">⏰ ${matchingEvent.time || ""} · 📍 ${toNewUz(matchingEvent.location || "UWED")} · 📡 ${matchingEvent.channel_name || "@uwed_official"}</div>
+                </div>
+              </div>
+            `;
+          }
+
+          // CASE 3: Normal class
           if (ev) {
             const rm = ev.room_number || "?";
             const midtermBadge = ev.study_type === "MIDTERM" ? `<span style="background:rgba(244,63,94,0.2);color:#fb7185;padding:1px 6px;border-radius:5px;font-size:10px;font-weight:800;margin-left:5px;">MIDTERM</span>` : "";
@@ -6866,20 +7198,49 @@
                 </div>
               </div>
             `;
-          } else {
-            return `
-              <div class="slot-row free">
-                <div class="slot-time">${t.pairLabel(sid)}<span>${s.start_time}–${s.end_time}</span></div>
-                <div class="slot-info">
-                  <div class="slot-subj" style="color: var(--text-muted);">${t.personFreeSlot}</div>
-                </div>
-              </div>
-            `;
           }
+
+          // CASE 4: Normal free slot
+          return `
+            <div class="slot-row free">
+              <div class="slot-time">${t.pairLabel(sid)}<span>${s.start_time}–${s.end_time}</span></div>
+              <div class="slot-info">
+                <div class="slot-subj" style="color: var(--text-muted);">${t.personFreeSlot}</div>
+              </div>
+            </div>
+          `;
         })
         .join("");
 
-      body.innerHTML = radarHtml + attendingBannerHtml + slotsHtml;
+      // Render any evening / after-class events that did not overlap slots 1..8
+      const unassignedEvents = dayAttendingEvents.filter((cev) => !assignedEventIds.has(cev.id));
+      const afterClassHtml = unassignedEvents.length
+        ? `
+          <div style="margin-top:14px;">
+            <div style="font-size:12px; font-weight:800; color:#38bdf8; text-transform:uppercase; margin-bottom:6px;">
+              ${t.evAfterClassesTitle || "🌙 Darsdan keyingi tadbirlar"}
+            </div>
+            ${unassignedEvents
+              .map(
+                (cev) => `
+                <div class="slot-row warn" style="border-left-color:#38bdf8; background:rgba(56,189,248,0.1);">
+                  <div class="slot-time">🔔 EVENT<span>${cev.time || "14:00"}</span></div>
+                  <div class="slot-info">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                      <div class="slot-subj" style="color:#38bdf8;">📌 ${toNewUz(cev.title)}</div>
+                      <button class="btn-sm" style="padding:2px 7px; font-size:10.5px; background:rgba(244,63,94,0.18); color:#fb7185;" onclick="toggleEventAttendance('${cev.id}')">✕</button>
+                    </div>
+                    <div class="slot-meta">📍 ${cev.location || "UWED"} · 📡 ${cev.channel_name || "@uwed_official"}</div>
+                  </div>
+                </div>
+              `
+              )
+              .join("")}
+          </div>
+        `
+        : "";
+
+      body.innerHTML = radarHtml + slotsHtml + afterClassHtml;
     }
 
     function closeModal() {
@@ -6889,6 +7250,10 @@
     function savePinnedProfile(kind, id, title) {
       haptic("medium");
       localStorage.setItem("uwed_pinned_profile", JSON.stringify({ kind, id, title }));
+      loadPinnedScheduleEvents().then(() => {
+        renderEventsTab();
+        renderProfileTab();
+      });
       trackEvent(
         "pin_profile",
         `${kind}:${title}`,
@@ -6909,8 +7274,11 @@
 
     function removePinnedProfile() {
       localStorage.removeItem("uwed_pinned_profile");
+      STATE.pinnedScheduleEvents = [];
       trackEvent("unpin_profile", "", {}, { subscription: { target_id: "none", remove: true } });
       renderSavedProfileBanner();
+      renderEventsTab();
+      renderProfileTab();
     }
 
     function renderSavedProfileBanner() {
