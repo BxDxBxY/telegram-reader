@@ -1,3 +1,15 @@
+function cyrToLat(str) {
+  if (!str) return "";
+  const map = {
+    а: "a", б: "b", в: "v", г: "g", д: "d", е: "e", ё: "yo", ж: "j", з: "z",
+    и: "i", й: "y", к: "k", л: "l", м: "m", н: "n", о: "o", п: "p", р: "r",
+    с: "s", т: "t", у: "u", ф: "f", х: "x", ц: "ts", ч: "ch", ш: "sh", щ: "sh",
+    ъ: "", ы: "y", ь: "", э: "e", ю: "yu", я: "ya",
+    ў: "o'", ғ: "g'", ҳ: "h", қ: "q",
+  };
+  return String(str).toLowerCase().split("").map((c) => map[c] || c).join("");
+}
+
 const https = require("https");
 const { loadSnapshotFromDb } = require("./_telemetry");
 
@@ -53,13 +65,16 @@ function uwedRawGet(pathWithDoubleSlash, query = {}, lang = "uz", host = UWED_HO
         res.on("data", (d) => chunks.push(d));
         res.on("end", () => {
           const raw = Buffer.concat(chunks).toString("utf-8").trim();
+          if (res.statusCode >= 400) {
+            return reject(new Error(`UWED HTTP ${res.statusCode}: ${raw.slice(0, 100)}`));
+          }
           if (!raw) {
             return resolve({ success: true, data: [] });
           }
           try {
             resolve(JSON.parse(raw));
           } catch (_) {
-            resolve({ success: false, error: "Invalid JSON from UWED", data: [] });
+            reject(new Error("Invalid JSON from UWED"));
           }
         });
       }
@@ -88,38 +103,136 @@ async function uwedGet(pathWithDoubleSlash, query = {}, lang = "uz", host = UWED
   const p = (async () => {
     try {
       const data = await uwedRawGet(pathWithDoubleSlash, query, lang, host, doubleSlash);
-      if (data && data.success !== false) {
+      if (data && data.success !== false && !data.error) {
         if (RESPONSE_CACHE.size > 600) {
           const oldestKey = RESPONSE_CACHE.keys().next().value;
           RESPONSE_CACHE.delete(oldestKey);
         }
         RESPONSE_CACHE.set(cacheKey, { ts: Date.now(), data });
+        return data;
       }
-      return data;
+      throw new Error((data && data.error) || "UWED response unsuccessful");
     } catch (err) {
       // Stale-if-error auto-recovery: if manage.uwed.uz is down or overloaded, serve stale cache
-      if (cached && cached.data) {
+      if (cached && cached.data && cached.data.success !== false) {
         return cached.data;
       }
       // Autonomous snapshot fallback if upstream university API restricts or blocks external IP
       const snap = await loadSnapshotFromDb();
       if (pathWithDoubleSlash.includes("/slots")) {
-        return { success: true, data: snap.slots || [] };
+        return { success: true, data: snap.slots || [], fallback: true };
       }
       if (pathWithDoubleSlash.includes("/search/teachers")) {
-        const q = String(query.search || "").toLowerCase();
-        const matches = (snap.teachers || []).filter((t) => (t.full_name || "").toLowerCase().includes(q));
-        return { success: true, data: matches };
+        const q = String(query.search || "").toLowerCase().trim();
+        const qLat = cyrToLat(q);
+        const matches = (snap.teachers || []).filter((t) => {
+          const fn = (t.full_name || "").toLowerCase();
+          return fn.includes(q) || (qLat && fn.includes(qLat));
+        });
+        return { success: true, data: matches.slice(0, 25), fallback: true };
       }
       if (pathWithDoubleSlash.includes("/search/rooms")) {
-        const q = String(query.search || "").toLowerCase();
-        const matches = (snap.rooms || []).filter((r) => (r.name || "").toLowerCase().includes(q));
-        return { success: true, data: matches };
+        const q = String(query.search || "").toLowerCase().trim();
+        const qClean = q.replace(/[-\s]/g, "");
+        const matches = (snap.rooms || []).filter((r) => {
+          const name = (r.name || "").toLowerCase();
+          const num = (r.number || "").toLowerCase();
+          const bld = (r.building || "").toLowerCase();
+          const nameClean = name.replace(/[-\s]/g, "");
+          return (
+            name.includes(q) ||
+            num.includes(q) ||
+            bld === q ||
+            (qClean && nameClean.includes(qClean))
+          );
+        });
+        return { success: true, data: matches, fallback: true };
       }
-      if (pathWithDoubleSlash.includes("/events") && query.request_id) {
-        const rid = query.request_id;
-        const evs = (snap.events && snap.events[rid]) || [];
-        return { success: true, data: evs };
+      if (
+        pathWithDoubleSlash.includes("/student/search") ||
+        pathWithDoubleSlash.includes("/for-timetable")
+      ) {
+        const q = String(query.search || "").toLowerCase().trim();
+        const matches = [];
+        const seen = new Set();
+        if (snap.events) {
+          for (const elist of Object.values(snap.events)) {
+            for (const ev of elist) {
+              if (ev.g && ev.g.toLowerCase().includes(q) && !seen.has(ev.g)) {
+                seen.add(ev.g);
+                matches.push({ id: `grp_${seen.size}`, full_name: ev.g, is_group: true });
+              }
+            }
+          }
+        }
+        return { success: true, data: matches.slice(0, 20), fallback: true };
+      }
+      if (pathWithDoubleSlash.includes("/events")) {
+        const rid = query.request_id || query.id;
+        const qType = String(query.type || "ROOM").toUpperCase();
+
+        if (qType === "ROOM") {
+          const evs = (snap.events && snap.events[rid]) || [];
+          const normalized = evs.map((e, idx) => ({
+            id: `snap_${rid}_${idx}`,
+            week_day: e.d,
+            slot_id: e.s,
+            title: e.t,
+            instructor: e.i,
+            room_number: e.r,
+            groups: e.g,
+            type: "PRACTICE",
+            study_type: "LESSON",
+          }));
+          return { success: true, data: normalized, fallback: true };
+        }
+
+        if (qType === "TEACHER") {
+          const t = (snap.teachers || []).find((x) => x.id === rid);
+          const tName = t ? (t.full_name || "").toLowerCase() : "";
+          const matches = [];
+          if (tName && snap.events) {
+            for (const elist of Object.values(snap.events)) {
+              for (const e of elist) {
+                if (e.i && e.i.toLowerCase().includes(tName)) {
+                  matches.push({
+                    week_day: e.d,
+                    slot_id: e.s,
+                    title: e.t,
+                    instructor: e.i,
+                    room_number: e.r,
+                    groups: e.g,
+                    type: "PRACTICE",
+                    study_type: "LESSON",
+                  });
+                }
+              }
+            }
+          }
+          return { success: true, data: matches, fallback: true };
+        }
+
+        // Student / Group fallback
+        const matches = [];
+        if (snap.events) {
+          for (const elist of Object.values(snap.events)) {
+            for (const e of elist) {
+              if (e.g && rid && (e.g.includes(rid) || rid.includes(e.g))) {
+                matches.push({
+                  week_day: e.d,
+                  slot_id: e.s,
+                  title: e.t,
+                  instructor: e.i,
+                  room_number: e.r,
+                  groups: e.g,
+                  type: "PRACTICE",
+                  study_type: "LESSON",
+                });
+              }
+            }
+          }
+        }
+        return { success: true, data: matches, fallback: true };
       }
       return { success: true, data: [], fallback: true, warning: String(err.message || err) };
     } finally {
@@ -195,6 +308,24 @@ module.exports = async (req, res) => {
   const startTime = getMondayOfDate(req.query.date || req.query.start_time || null);
 
   try {
+    if (action === "system_fix" || action === "system_status") {
+      RESPONSE_CACHE.clear();
+      INFLIGHT_MAP.clear();
+      const freshSnap = await loadSnapshotFromDb(true);
+      return res.status(200).json({
+        success: true,
+        fixed: true,
+        mode: "autonomous_snapshot",
+        rooms_count: (freshSnap.rooms || []).length,
+        teachers_count: (freshSnap.teachers || []).length,
+        events_count: Object.keys(freshSnap.events || {}).length,
+        slots_count: (freshSnap.slots || []).length,
+        updated_at: freshSnap.updated_at,
+        source: freshSnap.source || "snapshot",
+        message: "System cache cleared, snapshot refreshed, autonomous mode active.",
+      });
+    }
+
     if (action === "slots") {
       const data = await uwedGet(
         "/timetable/public/v1/slots/by/academic/year",
@@ -392,6 +523,9 @@ module.exports = async (req, res) => {
             results[rid] = Object.values(byKey);
           } catch (_) {
             results[rid] = null;
+          }
+          if ((!results[rid] || results[rid].length === 0) && snap.events && snap.events[rid]) {
+            results[rid] = snap.events[rid];
           }
         })
       );

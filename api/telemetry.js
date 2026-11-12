@@ -10,6 +10,7 @@ const {
   adminSetMaintenance,
   loadSnapshotFromDb,
   saveSnapshotToDb,
+  checkAndDispatchAlerts,
 } = require("./_telemetry");
 
 const BOT_TOKEN =
@@ -243,6 +244,27 @@ module.exports = async (req, res) => {
 
   if (req.method === "OPTIONS") {
     return res.status(200).end();
+  }
+
+  // Proactive background alerts check (classes in 15-30 min, morning digest)
+  if (req.query.action === "cron_alerts" || (req.body && req.body.action === "cron_alerts")) {
+    const snap = await loadSnapshotFromDb();
+    const result = await checkAndDispatchAlerts(snap, (method, payload) => {
+      if (method === "sendMessage") {
+        return sendTelegramMessage(payload.chat_id, payload.text, payload.reply_markup);
+      }
+      return Promise.resolve({ ok: true });
+    });
+    return res.status(200).json({ success: true, alerts_dispatched: result.count });
+  }
+
+  // Moodle session & settings sync from Mini App
+  if (req.query.action === "sync_moodle" || (req.body && req.body.action === "sync_moodle")) {
+    const b = req.body || {};
+    const user = b.user || {};
+    const moodle = b.moodle || {};
+    await recordTelemetry({ user, action: "sync_moodle", moodle, source: "miniapp" });
+    return res.status(200).json({ success: true, synced: true });
   }
 
   // Polling endpoint for Campus Agent on Office PC

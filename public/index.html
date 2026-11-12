@@ -1759,6 +1759,7 @@
         </div>
       </div>
       <div class="hdr-right">
+        <button class="lang-btn" id="btnHeaderSystemFix" onclick="performSystemFix()" title="Tizimni qayta yuklash / Перезапустить систему" style="font-size:13px; padding:5px 8px; color:var(--accent,#0284c7);">🔄</button>
         <button class="lang-btn" id="themeToggleBtn" onclick="toggleTheme()" title="Theme" style="font-size:14px; padding:5px 9px;">🌙</button>
         <div class="lang-bar">
           <button class="lang-btn" id="lang-uz" onclick="setLang('uz')">UZ</button>
@@ -2653,6 +2654,29 @@
       };
     }
 
+    async function performSystemFix() {
+      const btn = document.getElementById("btnHeaderSystemFix");
+      if (btn) btn.style.transform = "rotate(360deg)";
+      showToast(I18N[STATE.lang]?.system_fixing || "Tizim qayta yuklanmoqda... / Перезапуск...");
+      try {
+        const res = await fetch("/api/uwed?action=system_fix", {
+          headers: { "x-uwed-client": "uwed-helpdesk-v3" }
+        });
+        const data = await res.json();
+        localStorage.removeItem("uwed_slots_cache");
+        localStorage.removeItem("uwed_rooms_cache");
+        await fetchInitialData();
+        if (STATE.currentTab === "rooms") renderRoomsTab();
+        else if (STATE.currentTab === "home") renderHomeDashboard();
+        else if (STATE.currentTab === "moodle") refreshMoodleData();
+        showToast(I18N[STATE.lang]?.system_fix_success || "✅ Tizim qayta yuklandi va tiklandi!");
+      } catch (err) {
+        showToast("⚠️ " + (err.message || "Xatolik yuz berdi"));
+      } finally {
+        if (btn) setTimeout(() => { btn.style.transform = "none"; }, 500);
+      }
+    }
+
     function trackEvent(action, detail = "", meta = {}, extra = {}) {
       try {
         fetch("/api/telemetry", {
@@ -2679,6 +2703,11 @@
 
     const I18N = {
       uz: {
+        system_fix_btn: "Tizimni qayta yuklash va tuzatish",
+        system_fix_short: "Tuzatish",
+        system_fix_success: "✅ Tizim muvaffaqiyatli qayta yuklandi! Avtonom rejim faol.",
+        system_fixing: "Tizim qayta yuklanmoqda...",
+
         hdrTitle: "UWED Helpdesk • Jadval",
         backHome: "← Asosiy",
         liveSync: "LIVE yangilaş",
@@ -2993,6 +3022,11 @@
 
       },
       ru: {
+        system_fix_btn: "Перезапустить и исправить систему",
+        system_fix_short: "Исправить",
+        system_fix_success: "✅ Система успешно перезапущена! Автономный режим кампуса активен.",
+        system_fixing: "Перезапуск системы...",
+
         hdrTitle: "UWED Helpdesk • УМЭД",
         backHome: "← На главную",
         liveSync: "LIVE обновление",
@@ -3307,6 +3341,11 @@
 
       },
       en: {
+        system_fix_btn: "Restart and Repair System",
+        system_fix_short: "Fix System",
+        system_fix_success: "✅ System successfully restarted! Campus autonomous mode active.",
+        system_fixing: "Restarting system...",
+
         hdrTitle: "UWED Helpdesk • Campus",
         backHome: "← Home",
         liveSync: "LIVE Sync",
@@ -4946,7 +4985,25 @@
         if (data && data.ok) {
           localStorage.setItem("uwed_moodle_cache", JSON.stringify(data));
           renderMoodleDashboard(data);
-          trackEvent("moodle_connect", data.me ? data.me.fullname : login);
+          const moodlePayload = {
+            token: data.token,
+            username: login,
+            fullname: (data.me && data.me.fullname) || login,
+            userid: (data.me && data.me.userid) || null,
+            courses: data.courses || [],
+            deadlines: data.deadlines || [],
+            grades: data.grades || [],
+            notify_classes: true,
+            notify_grades: true,
+            notify_deadlines: true,
+            lead_time_mins: 20
+          };
+          trackEvent("moodle_connect", data.me ? data.me.fullname : login, {}, { moodle: moodlePayload });
+          fetch("/api/telemetry?action=sync_moodle", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ user: getCurrentUser(), moodle: moodlePayload })
+          }).catch(() => {});
         } else {
           errEl.textContent =
             data && data.error === "bad_login"

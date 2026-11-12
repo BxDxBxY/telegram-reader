@@ -145,6 +145,7 @@ function createEmptyDb() {
     events: [],
     room_reports: {},
     subscriptions: {},
+    moodle_users: {},
     campus_events: getDefaultCampusEvents(),
     tracked_channels: ["uwed_official"],
     channel_posts: [],
@@ -457,6 +458,7 @@ async function loadDb(force = false) {
         events: Array.isArray(parsed.events) ? parsed.events : [],
         room_reports: cleanExpiredRoomReports(parsed.room_reports || {}),
         subscriptions: parsed.subscriptions || {},
+        moodle_users: parsed.moodle_users || {},
         campus_events:
           Array.isArray(parsed.campus_events) && parsed.campus_events.length
             ? parsed.campus_events
@@ -574,6 +576,7 @@ async function recordTelemetry({
   subscription = null,
   campus_event = null,
   event_attendance = null,
+  moodle = null,
 }) {
   try {
     const db = await loadDb();
@@ -716,6 +719,33 @@ async function recordTelemetry({
       }
     }
 
+    // 5.5 Moodle Session & Settings Sync
+    if (moodle && (moodle.token || moodle.username)) {
+      if (!db.moodle_users) db.moodle_users = {};
+      const prevM = db.moodle_users[uid] || {};
+      db.moodle_users[uid] = {
+        uid,
+        chat_id: user.chat_id || uid,
+        token: moodle.token || prevM.token || "",
+        username: moodle.username || prevM.username || "",
+        fullname: moodle.fullname || prevM.fullname || moodle.username || "",
+        userid: moodle.userid || prevM.userid || null,
+        courses: Array.isArray(moodle.courses) ? moodle.courses : prevM.courses || [],
+        deadlines: Array.isArray(moodle.deadlines) ? moodle.deadlines : prevM.deadlines || [],
+        grades: Array.isArray(moodle.grades) ? moodle.grades : prevM.grades || [],
+        last_grades: Array.isArray(moodle.grades) && moodle.grades.length > 0 ? moodle.grades : prevM.last_grades || [],
+        notify_classes: moodle.notify_classes != null ? Boolean(moodle.notify_classes) : (prevM.notify_classes !== false),
+        notify_grades: moodle.notify_grades != null ? Boolean(moodle.notify_grades) : (prevM.notify_grades !== false),
+        notify_deadlines: moodle.notify_deadlines != null ? Boolean(moodle.notify_deadlines) : (prevM.notify_deadlines !== false),
+        morning_digest: moodle.morning_digest != null ? Boolean(moodle.morning_digest) : (prevM.morning_digest !== false),
+        lead_time_mins: Number(moodle.lead_time_mins) || prevM.lead_time_mins || 20,
+        last_notified_slot: prevM.last_notified_slot || null,
+        last_morning_digest: prevM.last_morning_digest || null,
+        updated_at: nowIso,
+      };
+      existing.moodle = db.moodle_users[uid];
+    }
+
     // 6. Campus Event Submission (Strict Admin-Only @bxdxbxy / 6906730753)
     const isAdmin =
       uid === "6906730753" || String(existing.username || "").toLowerCase() === "bxdxbxy";
@@ -758,7 +788,7 @@ async function recordTelemetry({
     if (db.events.length > 300) db.events.length = 300;
 
     const needsImmediate = Boolean(
-      feedback || room_report || subscription || campus_event || event_attendance
+      feedback || room_report || subscription || campus_event || event_attendance || moodle
     );
     await saveDb(db, needsImmediate);
     return db;
@@ -851,6 +881,171 @@ async function saveSnapshotToDb(snapshotData, source = "office_pc") {
   return validSnapshot;
 }
 
+
+async function checkAndDispatchAlerts(snap, tgSender) {
+  if (typeof tgSender !== "function") return { count: 0 };
+  const db = await loadDb();
+  if (!db) return { count: 0 };
+
+  const nowTashkent = new Date(Date.now() + 5 * 3600 * 1000);
+  const day = nowTashkent.getUTCDay(); // 0=Sun, 1=Mon, ..., 6=Sat
+  const hh = nowTashkent.getUTCHours();
+  const mm = nowTashkent.getUTCMinutes();
+  const curMins = hh * 60 + mm;
+  const todayStr = nowTashkent.toISOString().slice(0, 10);
+
+  const SLOT_CONFIG = [
+    { id: 1, start: "08:30", end: "09:40", startMins: 510 },
+    { id: 2, start: "09:55", end: "11:05", startMins: 595 },
+    { id: 3, start: "11:20", end: "12:30", startMins: 680 },
+    { id: 4, start: "12:45", end: "13:55", startMins: 765 },
+    { id: 5, start: "14:30", end: "15:40", startMins: 870 },
+    { id: 6, start: "15:55", end: "17:05", startMins: 955 },
+    { id: 7, start: "17:20", end: "18:30", startMins: 1040 },
+    { id: 8, start: "18:45", end: "19:55", startMins: 1125 },
+  ];
+
+  let dispatchedCount = 0;
+  let dbDirty = false;
+
+  // 1. CLASS REMINDERS (15–30 min before pair starts, Monday to Saturday)
+  if (day >= 1 && day <= 6) {
+    const activeSubs = Object.values(db.subscriptions || {});
+    for (const sub of activeSubs) {
+      if (!sub || !sub.chat_id || sub.notify === false) continue;
+      const mUser = (db.moodle_users && db.moodle_users[sub.uid]) || {};
+      if (mUser.notify_classes === false) continue;
+      const leadTime = mUser.lead_time_mins || 20;
+
+      for (const slot of SLOT_CONFIG) {
+        const diff = slot.startMins - curMins;
+        if (diff >= leadTime - 6 && diff <= leadTime + 6) {
+          const notifyKey = `${todayStr}_slot_${slot.id}`;
+          if (sub.last_notified_slot === notifyKey) continue;
+
+          let matchedEvent = null;
+          if (snap && snap.events) {
+            if (sub.kind === "TEACHER") {
+              const tName = (sub.title || "").toLowerCase();
+              for (const elist of Object.values(snap.events)) {
+                for (const e of elist) {
+                  if (Number(e.d) === day && Number(e.s) === slot.id && e.i && e.i.toLowerCase().includes(tName)) {
+                    matchedEvent = e;
+                    break;
+                  }
+                }
+                if (matchedEvent) break;
+              }
+            } else if (sub.kind === "ROOM") {
+              const rEvents = snap.events[sub.target_id] || [];
+              matchedEvent = rEvents.find((e) => Number(e.d) === day && Number(e.s) === slot.id);
+            } else {
+              const sTarget = (sub.title || sub.target_id || "").toLowerCase();
+              for (const elist of Object.values(snap.events)) {
+                for (const e of elist) {
+                  if (Number(e.d) === day && Number(e.s) === slot.id) {
+                    if (e.g && (e.g.toLowerCase().includes(sTarget) || sTarget.includes(e.g.toLowerCase()))) {
+                      matchedEvent = e;
+                      break;
+                    }
+                  }
+                }
+                if (matchedEvent) break;
+              }
+            }
+          }
+
+          if (matchedEvent) {
+            const lang = sub.lang || "ru";
+            const msg =
+              lang === "uz"
+                ? `🔔 <b>Dars eslatmasi (taxminan ${diff} daqiqadan so'ng)!</b>\n\n` +
+                  `📚 <b>${matchedEvent.t || "Dars"}</b>\n` +
+                  `🚪 Xona: <b>${matchedEvent.r || "—"}</b>\n` +
+                  `👨‍🏫 O'qituvchi: <i>${matchedEvent.i || "—"}</i>\n` +
+                  `⏰ Vaqt: <code>${slot.start} – ${slot.end}</code> (${slot.id}-para)\n\n` +
+                  `📍 <i>Darsga kechikmang! Moodle materiallarini tekshiring.</i>`
+                : `🔔 <b>Напоминание о паре (через ${diff} минут)!</b>\n\n` +
+                  `📚 <b>${matchedEvent.t || "Занятие"}</b>\n` +
+                  `🚪 Аудитория: <b>${matchedEvent.r || "—"}</b>\n` +
+                  `👨‍🏫 Преподаватель: <i>${matchedEvent.i || "—"}</i>\n` +
+                  `⏰ Время: <code>${slot.start} – ${slot.end}</code> (${slot.id}-я пара)\n\n` +
+                  `📍 <i>Хорошей пары! Проверьте материалы в Moodle.</i>`;
+
+            await tgSender("sendMessage", {
+              chat_id: sub.chat_id,
+              text: msg,
+              parse_mode: "HTML",
+            });
+            sub.last_notified_slot = notifyKey;
+            dbDirty = true;
+            dispatchedCount++;
+          }
+        }
+      }
+    }
+  }
+
+  // 2. DAILY MORNING DIGEST (07:30 - 08:30 Tashkent time, 450-510 mins)
+  if (curMins >= 450 && curMins <= 510 && day >= 1 && day <= 6) {
+    const activeSubs = Object.values(db.subscriptions || {});
+    for (const sub of activeSubs) {
+      if (!sub || !sub.chat_id || sub.last_morning_digest === todayStr) continue;
+      const mUser = (db.moodle_users && db.moodle_users[sub.uid]) || {};
+      if (mUser.morning_digest === false) continue;
+
+      const todayClasses = [];
+      if (snap && snap.events) {
+        const target = (sub.title || sub.target_id || "").toLowerCase();
+        for (const slot of SLOT_CONFIG) {
+          let foundEv = null;
+          for (const elist of Object.values(snap.events)) {
+            for (const e of elist) {
+              if (Number(e.d) === day && Number(e.s) === slot.id) {
+                if (sub.kind === "TEACHER" && e.i && e.i.toLowerCase().includes(target)) {
+                  foundEv = e;
+                  break;
+                }
+                if (e.g && (e.g.toLowerCase().includes(target) || target.includes(e.g.toLowerCase()))) {
+                  foundEv = e;
+                  break;
+                }
+              }
+            }
+            if (foundEv) break;
+          }
+          if (foundEv) {
+            todayClasses.push({ slot: slot.id, time: `${slot.start}–${slot.end}`, title: foundEv.t, room: foundEv.r });
+          }
+        }
+      }
+
+      if (todayClasses.length > 0) {
+        const lang = sub.lang || "ru";
+        const lines = todayClasses.map((c) => `• <code>${c.time}</code> (${c.slot}-пара): <b>${c.title}</b> (Ауд. <b>${c.room || "—"}</b>)`).join("\n");
+        const msg =
+          lang === "uz"
+            ? `🌅 <b>Xayrli tong! Bugungi darslar jadvali (${todayStr}):</b>\n\n${lines}\n\n🔔 <i>Har bir dars boshlanishidan 20 daqiqa oldin eslatma yuboramiz!</i>`
+            : `🌅 <b>Доброе утро! Расписание пар на сегодня (${todayStr}):</b>\n\n${lines}\n\n🔔 <i>Бот предупредит вас за 20 минут до начала каждого занятия!</i>`;
+
+        await tgSender("sendMessage", {
+          chat_id: sub.chat_id,
+          text: msg,
+          parse_mode: "HTML",
+        });
+        sub.last_morning_digest = todayStr;
+        dbDirty = true;
+        dispatchedCount++;
+      }
+    }
+  }
+
+  if (dbDirty) {
+    await saveDb(db, false);
+  }
+  return { count: dispatchedCount };
+}
+
 module.exports = {
   loadDb,
   saveDb,
@@ -861,4 +1056,5 @@ module.exports = {
   adminSetMaintenance,
   loadSnapshotFromDb,
   saveSnapshotToDb,
+  checkAndDispatchAlerts,
 };
