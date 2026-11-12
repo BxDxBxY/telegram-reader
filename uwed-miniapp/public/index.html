@@ -6021,6 +6021,24 @@
       const matchedStreams = new Map();
       for (const r of STATE.rooms) {
         for (const ev of STATE.eventsByRoom[r.id] || []) {
+          if (ev.g) {
+            const parts = String(ev.g).match(/[A-Za-z0-9\-]+/g) || [];
+            for (const part of parts) {
+              const pClean = part.trim();
+              if (pClean.length >= 2 && pClean.toUpperCase().includes(qUp)) {
+                const grpKey = `grp:${pClean}`;
+                if (!matchedStreams.has(grpKey) && matchedStreams.size < 15) {
+                  matchedStreams.set(grpKey, {
+                    code: pClean,
+                    title: `Guruh ${pClean} (Группа ${pClean})`,
+                    spec: ev.t || "Dars jadvali",
+                    instr: ev.i || "",
+                    is_group: true,
+                  });
+                }
+              }
+            }
+          }
           if (
             (ev.c && ev.c.toUpperCase().includes(qUp)) ||
             (ev.t && ev.t.toUpperCase().includes(qUp)) ||
@@ -6028,7 +6046,7 @@
           ) {
             const key = ev.c || ev.t;
             if (key && !matchedStreams.has(key) && matchedStreams.size < 15) {
-              matchedStreams.set(key, { code: key, title: ev.t, spec: ev.sp, instr: ev.i });
+              matchedStreams.set(key, { code: key, title: ev.t, spec: ev.sp || ev.g, instr: ev.i });
             }
           }
         }
@@ -6036,10 +6054,15 @@
 
       for (const st of matchedStreams.values()) {
         const safeCode = (st.code || "").replace(/'/g, "\\'");
+        const clickCall = st.is_group
+          ? `openPersonModal('STUDENT', 'grp:${safeCode}', 'Guruh: ${safeCode}')`
+          : `openStreamModal('${safeCode}')`;
+        const icon = st.is_group ? "👥" : "📚";
+        const label = st.is_group ? `Guruh / Группа: <b>${st.code}</b>` : `${t.streamItem}: ${st.code} — ${toNewUz(st.title)}`;
         html += `
-          <div class="list-item" onclick="openStreamModal('${safeCode}')">
+          <div class="list-item" onclick="${clickCall}">
             <div class="list-main">
-              <div class="list-title">📚 ${t.streamItem}: ${st.code} — ${toNewUz(st.title)}</div>
+              <div class="list-title">${icon} ${label}</div>
               <div class="list-sub">${[toNewUz(st.spec), toNewUz(st.instr)].filter(Boolean).join(" · ")}</div>
             </div>
             <span style="color:var(--text-muted); font-size:18px;">›</span>
@@ -7001,7 +7024,27 @@
           `/api/uwed?action=events&type=${type}&id=${encodeURIComponent(id)}&date=${encodeURIComponent(dateForDay)}&lang=${encodeURIComponent(STATE.lang)}`
         );
         const data = await res.json();
-        const evList = Array.isArray(data.data) ? data.data : [];
+        let evList = Array.isArray(data.data) ? data.data : [];
+        if (evList.length === 0 && (id.startsWith("grp:") || type === "STUDENT")) {
+          // Instant client fallback: match group schedule from local snapshot
+          const targetGrp = id.replace(/^grp[:_]/, "").toUpperCase();
+          for (const r of STATE.rooms) {
+            for (const ev of STATE.eventsByRoom[r.id] || []) {
+              if (ev.g && ev.g.toUpperCase().includes(targetGrp)) {
+                evList.push({
+                  week_day: ev.d,
+                  slot_id: ev.s,
+                  title: ev.t,
+                  instructor: ev.i,
+                  room_number: r.name || r.room_name,
+                  groups: ev.g,
+                  type: "PRACTICE",
+                  study_type: "LESSON",
+                });
+              }
+            }
+          }
+        }
         STATE.modalContext.events = evList;
         STATE.modalContext.loading = false;
         document.getElementById("modalSubtitle").textContent = T().liveLoaded(evList.length);

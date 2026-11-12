@@ -409,21 +409,48 @@ function fallbackSnapshotForPath(apiPath, query = {}) {
     }));
     return { success: true, data: matches.slice(0, 20), fallback: true };
   }
-  if (cleanPath.includes("/student/search") || cleanPath.includes("/for-timetable")) {
+    if (cleanPath.includes("/student/search") || cleanPath.includes("/for-timetable")) {
     const q = String(query.search || "").toLowerCase().trim();
+    const qLat = cyrToLat(q);
     const matches = [];
     const seen = new Set();
+
+    if (Array.isArray(snap.students)) {
+      for (const s of snap.students) {
+        const fn = (s.full_name || "").toLowerCase();
+        const grp = (s.group || s.group_name || "").toLowerCase();
+        if (fn.includes(q) || (qLat && fn.includes(qLat)) || (grp && grp.includes(q))) {
+          matches.push(s);
+          if (matches.length >= 20) break;
+        }
+      }
+    }
+
     if (snap.events) {
       for (const elist of Object.values(snap.events)) {
         for (const ev of elist) {
-          if (ev.g && ev.g.toLowerCase().includes(q) && !seen.has(ev.g)) {
-            seen.add(ev.g);
-            matches.push({ id: `grp_${seen.size}`, full_name: ev.g, is_group: true });
+          if (ev.g) {
+            const parts = String(ev.g).match(/[A-Za-z0-9\-]+/g) || [];
+            for (const part of parts) {
+              const pClean = part.trim();
+              if (pClean.length >= 2 && pClean.toLowerCase().includes(q)) {
+                const pKey = pClean.toLowerCase();
+                if (!seen.has(pKey)) {
+                  seen.add(pKey);
+                  matches.push({
+                    id: `grp:${pClean}`,
+                    full_name: `Guruh ${pClean} (Группа ${pClean})`,
+                    group: pClean,
+                    is_group: true,
+                  });
+                }
+              }
+            }
           }
         }
       }
     }
-    return { success: true, data: matches.slice(0, 15), fallback: true };
+    return { success: true, data: matches.slice(0, 20), fallback: true };
   }
   if (cleanPath.includes("/events")) {
     const rid = query.request_id || query.id;

@@ -156,24 +156,51 @@ async function uwedGet(pathWithDoubleSlash, query = {}, lang = "uz", host = UWED
         }));
         return { success: true, data: matches, fallback: true };
       }
-      if (
+            if (
         pathWithDoubleSlash.includes("/student/search") ||
         pathWithDoubleSlash.includes("/for-timetable")
       ) {
         const q = String(query.search || "").toLowerCase().trim();
+        const qLat = cyrToLat(q);
         const matches = [];
         const seen = new Set();
+
+        if (Array.isArray(snap.students)) {
+          for (const s of snap.students) {
+            const fn = (s.full_name || "").toLowerCase();
+            const grp = (s.group || s.group_name || "").toLowerCase();
+            if (fn.includes(q) || (qLat && fn.includes(qLat)) || (grp && grp.includes(q))) {
+              matches.push(s);
+              if (matches.length >= 25) break;
+            }
+          }
+        }
+
         if (snap.events) {
           for (const elist of Object.values(snap.events)) {
             for (const ev of elist) {
-              if (ev.g && ev.g.toLowerCase().includes(q) && !seen.has(ev.g)) {
-                seen.add(ev.g);
-                matches.push({ id: `grp_${seen.size}`, full_name: ev.g, is_group: true });
+              if (ev.g) {
+                const parts = String(ev.g).match(/[A-Za-z0-9\-]+/g) || [];
+                for (const part of parts) {
+                  const pClean = part.trim();
+                  if (pClean.length >= 2 && pClean.toLowerCase().includes(q)) {
+                    const pKey = pClean.toLowerCase();
+                    if (!seen.has(pKey)) {
+                      seen.add(pKey);
+                      matches.push({
+                        id: `grp:${pClean}`,
+                        full_name: `Guruh ${pClean} (Группа ${pClean})`,
+                        group: pClean,
+                        is_group: true,
+                      });
+                    }
+                  }
+                }
               }
             }
           }
         }
-        return { success: true, data: matches.slice(0, 20), fallback: true };
+        return { success: true, data: matches.slice(0, 25), fallback: true };
       }
       if (pathWithDoubleSlash.includes("/events")) {
         const rid = query.request_id || query.id;
@@ -220,22 +247,40 @@ async function uwedGet(pathWithDoubleSlash, query = {}, lang = "uz", host = UWED
           return { success: true, data: matches, fallback: true };
         }
 
-        // Student / Group fallback
+                // Student / Group fallback
         const matches = [];
-        if (snap.events) {
+        let targetGroup = "";
+
+        if (rid.startsWith("grp:") || rid.startsWith("grp_")) {
+          targetGroup = rid.replace(/^grp[:_]/, "").toLowerCase();
+        } else if (Array.isArray(snap.students)) {
+          const st = snap.students.find((s) => s.id === rid || s.student_id === rid);
+          if (st) {
+            targetGroup = (st.group || st.group_name || "").toLowerCase();
+          }
+        }
+
+        if (!targetGroup) {
+          targetGroup = rid.toLowerCase();
+        }
+
+        if (snap.events && targetGroup) {
           for (const elist of Object.values(snap.events)) {
             for (const e of elist) {
-              if (e.g && rid && (e.g.includes(rid) || rid.includes(e.g))) {
-                matches.push({
-                  week_day: e.d,
-                  slot_id: e.s,
-                  title: e.t,
-                  instructor: e.i,
-                  room_number: e.r,
-                  groups: e.g,
-                  type: "PRACTICE",
-                  study_type: "LESSON",
-                });
+              if (e.g) {
+                const gLower = e.g.toLowerCase();
+                if (gLower.includes(targetGroup) || targetGroup.includes(gLower)) {
+                  matches.push({
+                    week_day: e.d,
+                    slot_id: e.s,
+                    title: e.t,
+                    instructor: e.i,
+                    room_number: e.r,
+                    groups: e.g,
+                    type: "PRACTICE",
+                    study_type: "LESSON",
+                  });
+                }
               }
             }
           }

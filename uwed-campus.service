@@ -1,0 +1,17 @@
+[Unit]
+Description=UWED Campus Server & Sync Engine
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/uwed-campus
+ExecStart=/usr/bin/python3 /opt/uwed-campus/uwed_campus_server.py
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target

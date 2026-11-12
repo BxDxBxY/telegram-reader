@@ -816,7 +816,7 @@ async function loadSnapshotFromDb(force = false) {
     const gist = await ghRequest("GET", `/gists/${GIST_ID}`);
     if (gist && gist.files && gist.files["campus_snapshot.json"] && gist.files["campus_snapshot.json"].content) {
       const parsed = JSON.parse(gist.files["campus_snapshot.json"].content);
-      if (parsed && (parsed.slots || parsed.rooms || parsed.teachers)) {
+      if (parsed && (parsed.slots || parsed.rooms || parsed.teachers || parsed.students)) {
         memSnapshot = parsed;
         lastSnapshotFetchTs = Date.now();
         return memSnapshot;
@@ -849,6 +849,7 @@ async function saveSnapshotToDb(snapshotData, source = "office_pc") {
     slots: Array.isArray(snapshotData.slots) ? snapshotData.slots : [],
     rooms: Array.isArray(snapshotData.rooms) ? snapshotData.rooms : [],
     teachers: Array.isArray(snapshotData.teachers) ? snapshotData.teachers : [],
+    students: Array.isArray(snapshotData.students) ? snapshotData.students : [],
     events:
       snapshotData.events && typeof snapshotData.events === "object"
         ? snapshotData.events
@@ -865,6 +866,7 @@ async function saveSnapshotToDb(snapshotData, source = "office_pc") {
     slots_count: validSnapshot.slots.length,
     rooms_count: validSnapshot.rooms.length,
     teachers_count: validSnapshot.teachers.length,
+    students_count: validSnapshot.students.length,
     events_count: Object.keys(validSnapshot.events).length,
   };
   await saveDb(db, true);

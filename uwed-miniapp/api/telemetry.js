@@ -267,6 +267,31 @@ module.exports = async (req, res) => {
     return res.status(200).json({ success: true, synced: true });
   }
 
+
+  // Set / Register Campus Server Relay URL
+  if (req.query.action === "set_relay_url" || (req.body && req.body.action === "set_relay_url")) {
+    if (!isAuthorizedAdminRequest(req)) {
+      return res.status(403).json({ success: false, error: "Unauthorized" });
+    }
+    const b = req.body || {};
+    const relayUrl = String(b.relay_url || req.query.relay_url || "").trim().replace(/\/+$/, "");
+    const db = await loadDb(true);
+    db.campus_relay_url = relayUrl;
+    db.campus_relay_updated_at = Date.now();
+    await saveDb(db, true);
+    return res.status(200).json({ success: true, campus_relay_url: relayUrl });
+  }
+
+  // Get current Campus Relay URL
+  if (req.query.action === "get_relay_url") {
+    const db = await loadDb();
+    return res.status(200).json({
+      success: true,
+      campus_relay_url: db.campus_relay_url || null,
+      updated_at: db.campus_relay_updated_at || null,
+    });
+  }
+
   // Polling endpoint for Campus Agent on Office PC
   if (req.method === "GET" && req.query.action === "check_sync_request") {
     if (!isAuthorizedAdminRequest(req)) {

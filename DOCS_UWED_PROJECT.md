@@ -195,3 +195,25 @@ git add .
 git commit -m "feat(uwed): full maintenance mode restriction, offline snapshot resilience, and technical docs"
 git push origin main
 ```
+
+
+---
+
+## 10. University Campus Server & Intranet Relay (`uwed_campus_server.py`)
+
+When the university IT blocks external traffic from outside the university campus network:
+
+### 10.1 Architecture
+The campus server script `uwed_campus_server.py` runs directly inside UWED campus (on the office PC, laptop, or server) with direct intranet access to `manage.uwed.uz`:
+
+1. **Full Harvester:** Crawls slots, rooms, teachers, all academic groups, students, and all weekly room events.
+2. **Cloud Sync Engine:** Pushes fresh snapshots to Vercel via `/api/telemetry?action=sync_snapshot` so the Mini App always has 100% complete data even if the campus PC sleeps.
+3. **Local HTTP Relay (Port 8080):** Serves as an intranet forward proxy. If paired with Cloudflare Tunnel (`cloudflared tunnel --url http://127.0.0.1:8080`), Vercel routes live student queries directly through it.
+4. **Standalone Telegram Bot Mode:** If started with `--bot`, it detaches the webhook and runs the bot directly inside the university network via long-polling (`getUpdates`).
+5. **24/7 Windows Keep-Alive:** Automatically disables sleep and Wi-Fi power saving.
+
+### 10.2 How to Run on Campus Server / Office PC
+- **Windows:** Double-click `run_campus_server.bat` (or run `python uwed_campus_server.py`).
+- **Windows Auto-Start:** Run `setup_office_pc.bat` once to install the Startup shortcut.
+- **Linux:** Run `bash run_campus_server.sh` or configure `uwed-campus.service` under systemd.
+- **Standalone Bot Mode:** `python uwed_campus_server.py --bot`
