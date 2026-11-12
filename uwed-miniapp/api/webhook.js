@@ -393,12 +393,20 @@ function fallbackSnapshotForPath(apiPath, query = {}) {
     const q = String(query.search || "").toLowerCase().trim();
     const qClean = q.replace(/[-\s]/g, "");
     const matches = (snap.rooms || []).filter((r) => {
-      const name = (r.name || "").toLowerCase();
-      const num = (r.number || "").toLowerCase();
+      const name = (r.name || r.room_name || "").toLowerCase();
+      const num = (r.number || r.room_number || "").toLowerCase();
       const bld = (r.building || "").toLowerCase();
       const nameClean = name.replace(/[-\s]/g, "");
       return name.includes(q) || num.includes(q) || bld === q || (qClean && nameClean.includes(qClean));
-    });
+    }).map((r) => ({
+      ...r,
+      name: r.name || r.room_name || "",
+      room_name: r.name || r.room_name || "",
+      number: r.number || r.room_number || "",
+      room_number: r.number || r.room_number || "",
+      type: r.type || r.room_type || "PRACTICE",
+      room_type: r.type || r.room_type || "PRACTICE",
+    }));
     return { success: true, data: matches.slice(0, 20), fallback: true };
   }
   if (cleanPath.includes("/student/search") || cleanPath.includes("/for-timetable")) {
