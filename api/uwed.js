@@ -11,9 +11,75 @@ function cyrToLat(str) {
 }
 
 const https = require("https");
-const { loadSnapshotFromDb } = require("./_telemetry");
+const http = require("http");
+const { loadSnapshotFromDb, loadDb } = require("./_telemetry");
 
 const UWED_HOST = "manage.uwed.uz";
+// Shared secret the campus relay (uwed_campus_server.py on a PC/kiosk inside the
+// university network) must send back, when set, so a stranger who finds the
+// tunnel URL can't use Vercel as a free proxy into campus_relay_url's target.
+const RELAY_SHARED_SECRET = process.env.UWED_RELAY_SECRET || "";
+
+// Forward a request to the campus relay (a PC on the university network, tunnelled
+// out via e.g. cloudflared) instead of hitting manage.uwed.uz directly. Used only as
+// a fallback when the direct request from Vercel's own IP fails/times out: when no
+// relay is registered this returns null immediately with zero extra network calls.
+async function tryRelay(cleanPathArg, query, lang) {
+  let relayUrl;
+  try {
+    const db = await loadDb();
+    relayUrl = String(db.campus_relay_url || "").trim();
+  } catch (_) {
+    return null;
+  }
+  if (!relayUrl) return null;
+
+  const cleanPath = cleanPathArg.startsWith("/") ? cleanPathArg : "/" + cleanPathArg;
+  const cleanLang = ["uz", "ru", "en"].includes(String(lang || "").toLowerCase())
+    ? String(lang).toLowerCase()
+    : "uz";
+  const qs = new URLSearchParams({ ...query, locale: cleanLang }).toString();
+
+  let target;
+  try {
+    target = new URL(cleanPath + (qs ? "?" + qs : ""), relayUrl);
+  } catch (_) {
+    return null;
+  }
+  const mod = target.protocol === "http:" ? http : https;
+
+  return new Promise((resolve) => {
+    const req = mod.request(
+      {
+        hostname: target.hostname,
+        port: target.port || (target.protocol === "http:" ? 80 : 443),
+        path: target.pathname + target.search,
+        method: "GET",
+        headers: RELAY_SHARED_SECRET ? { "X-Relay-Secret": RELAY_SHARED_SECRET } : {},
+        timeout: 7000,
+      },
+      (res) => {
+        const chunks = [];
+        res.on("data", (d) => chunks.push(d));
+        res.on("end", () => {
+          if (res.statusCode >= 400) return resolve(null);
+          try {
+            const parsed = JSON.parse(Buffer.concat(chunks).toString("utf-8"));
+            resolve(parsed && parsed.success !== false ? parsed : null);
+          } catch (_) {
+            resolve(null);
+          }
+        });
+      }
+    );
+    req.on("error", () => resolve(null));
+    req.on("timeout", () => {
+      req.destroy();
+      resolve(null);
+    });
+    req.end();
+  });
+}
 
 const DEFAULT_SLOTS = {
   1: { start: "08:30", end: "09:40" },
@@ -116,6 +182,18 @@ async function uwedGet(pathWithDoubleSlash, query = {}, lang = "uz", host = UWED
       // Stale-if-error auto-recovery: if manage.uwed.uz is down or overloaded, serve stale cache
       if (cached && cached.data && cached.data.success !== false) {
         return cached.data;
+      }
+      // Live campus relay: a PC/kiosk inside the university network (uwed_campus_server.py)
+      // tunnelled out can still reach manage.uwed.uz directly even when Vercel's own IP can't.
+      // This is genuinely live data, so try it before falling back to the static snapshot.
+      const relayData = await tryRelay(pathWithDoubleSlash, query, lang);
+      if (relayData) {
+        if (RESPONSE_CACHE.size > 600) {
+          const oldestKey = RESPONSE_CACHE.keys().next().value;
+          RESPONSE_CACHE.delete(oldestKey);
+        }
+        RESPONSE_CACHE.set(cacheKey, { ts: Date.now(), data: relayData });
+        return relayData;
       }
       // Autonomous snapshot fallback if upstream university API restricts or blocks external IP
       const snap = await loadSnapshotFromDb();

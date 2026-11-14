@@ -383,6 +383,12 @@ def perform_sync(fetcher: CampusFetcher, reason: str = "scheduled") -> bool:
 # ==============================================================================
 # Built-in HTTP Relay Proxy for Port 8080
 # ==============================================================================
+# Shared secret the relay requires from its caller (Vercel's api/uwed.js), when set, so
+# whoever finds the public tunnel URL (printed by cloudflared) can't use this PC as an open
+# proxy into manage.uwed.uz, or read /snapshot (which includes the students list) for free.
+RELAY_SHARED_SECRET = os.environ.get("UWED_RELAY_SECRET", "")
+
+
 class CampusRelayHandler(http.server.BaseHTTPRequestHandler):
     fetcher = CampusFetcher()
 
@@ -390,7 +396,7 @@ class CampusRelayHandler(http.server.BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type, X-Admin-Key, X-UWED-Client")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, X-Admin-Key, X-UWED-Client, X-Relay-Secret")
         self.end_headers()
 
     def do_GET(self) -> None:
@@ -398,6 +404,18 @@ class CampusRelayHandler(http.server.BaseHTTPRequestHandler):
         path = parsed.path
         qs = urllib.parse.parse_qs(parsed.query)
         params = {k: v[0] if len(v) == 1 else v for k, v in qs.items()}
+
+        if (
+            RELAY_SHARED_SECRET
+            and path not in ("/health", "/ping")
+            and self.headers.get("X-Relay-Secret") != RELAY_SHARED_SECRET
+        ):
+            self.send_response(403)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            self.wfile.write(json.dumps({"success": False, "error": "forbidden"}).encode("utf-8"))
+            return
 
         self.send_response(200)
         self.send_header("Content-Type", "application/json; charset=utf-8")
@@ -434,6 +452,15 @@ def start_relay_server(port: int = DEFAULT_PORT) -> ThreadedHTTPServer:
     t = threading.Thread(target=server.serve_forever, daemon=True)
     t.start()
     print(f"[Relay] Local HTTP Proxy listening on http://0.0.0.0:{port}")
+    if RELAY_SHARED_SECRET:
+        print("[Relay] Protected by UWED_RELAY_SECRET (set the same value as Vercel's UWED_RELAY_SECRET).")
+    else:
+        print(
+            "[Relay] WARNING: UWED_RELAY_SECRET is not set. Once this is exposed via a public "
+            "tunnel URL, anyone who finds that URL can query manage.uwed.uz through this PC for "
+            "free, including the students list via /snapshot. Set UWED_RELAY_SECRET before "
+            "exposing this publicly."
+        )
     return server
 
 
