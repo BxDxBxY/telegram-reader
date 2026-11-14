@@ -1996,9 +1996,65 @@ function formatNotificationSettings(userMoodle, lang) {
   return { text, kb };
 }
 
+// Send an in-memory file to a chat as a Telegram document.
+function sendTelegramDocument(chatId, filename, buffer, caption, mime = "application/json") {
+  const boundary = "----UWEDBotDoc" + Date.now().toString(16);
+  const body = Buffer.concat([
+    Buffer.from(
+      `--${boundary}\r\nContent-Disposition: form-data; name="chat_id"\r\n\r\n${chatId}\r\n` +
+        `--${boundary}\r\nContent-Disposition: form-data; name="caption"\r\n\r\n${caption}\r\n` +
+        `--${boundary}\r\nContent-Disposition: form-data; name="document"; filename="${filename}"\r\nContent-Type: ${mime}\r\n\r\n`,
+      "utf-8"
+    ),
+    buffer,
+    Buffer.from(`\r\n--${boundary}--\r\n`, "utf-8"),
+  ]);
+  return new Promise((resolve) => {
+    const r = https.request(
+      {
+        hostname: "api.telegram.org",
+        port: 443,
+        path: `/bot${BOT_TOKEN}/sendDocument`,
+        method: "POST",
+        headers: {
+          "Content-Type": `multipart/form-data; boundary=${boundary}`,
+          "Content-Length": body.length,
+        },
+        timeout: 20000,
+      },
+      (resp) => {
+        const chunks = [];
+        resp.on("data", (c) => chunks.push(c));
+        resp.on("end", () => {
+          try {
+            resolve(JSON.parse(Buffer.concat(chunks).toString("utf-8")));
+          } catch (_) {
+            resolve({ ok: false });
+          }
+        });
+      }
+    );
+    r.on("error", () => resolve({ ok: false }));
+    r.on("timeout", () => {
+      r.destroy();
+      resolve({ ok: false });
+    });
+    r.write(body);
+    r.end();
+  });
+}
+
 module.exports = async (req, res) => {
   if (req.method !== "POST") {
     return res.status(200).json({ ok: true, status: "UWED Helpdesk Webhook is active 24/7" });
+  }
+
+  // Reject forged updates: when TELEGRAM_WEBHOOK_SECRET is set, Telegram must send the same value
+  // in X-Telegram-Bot-Api-Secret-Token (configured via setWebhook secret_token). Without this check
+  // anyone who knows the admin ID could POST a fake "/broadcast" update.
+  const webhookSecret = process.env.TELEGRAM_WEBHOOK_SECRET;
+  if (webhookSecret && req.headers["x-telegram-bot-api-secret-token"] !== webhookSecret) {
+    return res.status(403).json({ ok: false });
   }
 
   const snap = await loadSnapshotFromDb();
@@ -2116,6 +2172,7 @@ module.exports = async (req, res) => {
         text.startsWith("/maint") ||
         text.startsWith("/tech") ||
         text.startsWith("/sync") ||
+        text.startsWith("/snapshot") ||
         text.startsWith("/update") ||
         text.startsWith("/refresh")
       ) {
@@ -2252,6 +2309,29 @@ module.exports = async (req, res) => {
                 : `⚠️ Failed to deliver to <code>${targetId}</code>: ${(sendRes && sendRes.description) || "unknown error"}`,
             parse_mode: "HTML",
           });
+          return res.status(200).json({ ok: true });
+        }
+
+        if (text.startsWith("/snapshot")) {
+          const fullSnap = await loadSnapshotFromDb(true);
+          const stamp = new Date(Number(fullSnap.updated_at) || Date.now()).toISOString().slice(0, 16).replace(/[:T]/g, "-");
+          const eventsCount = Object.values(fullSnap.events || {}).reduce((n, l) => n + (Array.isArray(l) ? l.length : 0), 0);
+          const caption =
+            `📦 Campus snapshot (${fullSnap.week_monday || "?"})\n` +
+            `Rooms: ${(fullSnap.rooms || []).length} · Teachers: ${(fullSnap.teachers || []).length} · ` +
+            `Groups/students: ${(fullSnap.students || []).length} · Events: ${eventsCount}`;
+          const sent = await sendTelegramDocument(
+            chatId,
+            `uwed_snapshot_${stamp}.json`,
+            Buffer.from(JSON.stringify(fullSnap), "utf-8"),
+            caption
+          );
+          if (!sent || !sent.ok) {
+            await tgApi("sendMessage", {
+              chat_id: chatId,
+              text: `⚠️ Failed to send snapshot: ${(sent && sent.description) || "unknown error"}`,
+            });
+          }
           return res.status(200).json({ ok: true });
         }
 

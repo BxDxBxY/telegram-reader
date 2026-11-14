@@ -538,6 +538,7 @@ module.exports = async (req, res) => {
         .slice(0, 30);
 
       const results = {};
+      const batchSnap = await loadSnapshotFromDb().catch(() => null);
       await Promise.all(
         ids.map(async (rid) => {
           try {
@@ -577,8 +578,32 @@ module.exports = async (req, res) => {
           } catch (_) {
             results[rid] = null;
           }
-          if ((!results[rid] || results[rid].length === 0) && snap.events && snap.events[rid]) {
-            results[rid] = snap.events[rid];
+          // Last-resort fallback: serve the stored snapshot (compact d/s/t/i/g/r) in batch shape.
+          if (!results[rid] || results[rid].length === 0) {
+            const snapEvs = batchSnap && batchSnap.events && batchSnap.events[rid];
+            if (Array.isArray(snapEvs) && snapEvs.length) {
+              const byKey = {};
+              for (const e of snapEvs) {
+                if (!e || !e.d || !e.s) continue;
+                const k = `${e.d}_${e.s}`;
+                if (!byKey[k]) {
+                  byKey[k] = {
+                    d: e.d,
+                    s: e.s,
+                    t: String(e.t || "").trim(),
+                    i: String(e.i || "").trim(),
+                    tid: "",
+                    c: "",
+                    sp: "",
+                    lt: "PRACTICE",
+                    st: "LESSON",
+                    ln: "",
+                    grp: String(e.g || "").trim(),
+                  };
+                }
+              }
+              results[rid] = Object.values(byKey);
+            }
           }
         })
       );
