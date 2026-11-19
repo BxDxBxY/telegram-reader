@@ -124,16 +124,24 @@ echo.
 
 REM ============ HAND OFF TO HIDDEN BACKGROUND (setup mode only) ============
 if /i "%MODE%"=="run" goto :run_guard
+
+REM ---- setup mode: test Telegram first, decide hidden vs visible ----
 call :telegram_ping
+if not defined TG_OK (
+    echo.
+    echo ======================================================================
+    echo   Telegram test message FAILED - staying VISIBLE so you can see logs.
+    echo   Fix: open your bot and press START, and make sure the token you
+    echo   typed matches Vercel UWED_HELPDESK_TOKEN. Then close and run again.
+    echo   (Continuing in this window anyway...)
+    echo ======================================================================
+    echo.
+    goto :run_guard
+)
 call :write_vbs
-echo ======================================================================
-echo   Setup complete. Starting HIDDEN in the background now.
-echo   - No terminal window will stay open.
-echo   - Status + logs go to your Telegram bot chat.
-echo   - It re-syncs every %UWED_SYNC_INTERVAL_MINS% minutes automatically.
-echo   To STOP it later: Task Manager -^> end "python.exe" and "cloudflared.exe".
-echo   This window closes in a few seconds...
-echo ======================================================================
+echo.
+echo   Telegram OK. Starting HIDDEN in the background. You can close windows.
+echo   All status goes to your Telegram chat from now on.
 start "" wscript.exe "%VBSFILE%"
 timeout /t 4 >nul
 exit /b 0
@@ -142,6 +150,7 @@ exit /b 0
 REM Don't start a second engine if one is already listening on the port.
 netstat -ano | find ":%PORT%" | find "LISTENING" >nul 2>nul && exit /b 0
 > "server.log" echo [start] %date% %time% on %COMPUTERNAME%
+call :tg "UWED: launcher started on %COMPUTERNAME%. Opening tunnel..."
 
 REM ================= 4. RUN (with watchdog) =================
 :MAINLOOP
@@ -149,13 +158,16 @@ call :start_tunnel
 call :get_url
 if not defined TUNNEL_URL (
     >> "server.log" echo [WARN] No tunnel URL yet; retrying in 10s
+    call :tg "UWED: tunnel not up yet, retrying... (if this repeats, Cloudflare may be blocked on this network)"
     taskkill /f /im cloudflared.exe >nul 2>nul
     timeout /t 10 >nul
     goto MAINLOOP
 )
 >> "server.log" echo [READY] Tunnel: %TUNNEL_URL% - starting campus server...
+call :tg "UWED: tunnel up (%TUNNEL_URL%). Starting campus server + sync."
 "%PY%" %PYARGS% "%SERVER_PY%" --relay-url "%TUNNEL_URL%" >> "server.log" 2>&1
 >> "server.log" echo [WATCHDOG] Server stopped; restarting in 5s
+call :tg "UWED: server stopped, auto-restarting in 5s."
 timeout /t 5 >nul
 goto MAINLOOP
 
@@ -174,17 +186,24 @@ del "adminkey.txt" >nul 2>nul
 goto :eof
 
 :telegram_ping
+set "TG_OK="
 if not defined UWED_HELPDESK_TOKEN goto :eof
 echo [Telegram] Sending a test message to your bot chat...
-curl -s --max-time 15 "https://api.telegram.org/bot!UWED_HELPDESK_TOKEN!/sendMessage" --data-urlencode "chat_id=%UWED_ADMIN_CHAT_ID%" --data-urlencode "text=UWED launcher: setup OK on %COMPUTERNAME%. Starting in background, sync every %UWED_SYNC_INTERVAL_MINS% min." > "tgping.txt" 2>nul
+curl -s --max-time 15 "https://api.telegram.org/bot!UWED_HELPDESK_TOKEN!/sendMessage" --data-urlencode "chat_id=%UWED_ADMIN_CHAT_ID%" --data-urlencode "text=UWED launcher: setup OK on %COMPUTERNAME%. Sync every %UWED_SYNC_INTERVAL_MINS% min." > "tgping.txt" 2>nul
 findstr /i "ok.:true" "tgping.txt" >nul 2>nul && (
+    set "TG_OK=1"
     echo [OK] Test message delivered to your Telegram.
 ) || (
-    echo [WARN] Could NOT message you on Telegram. Make sure you pressed START
-    echo        in the bot once, and bot_token.txt matches Vercel's token.
+    echo [WARN] Could NOT message you on Telegram.
     type "tgping.txt" 2>nul
 )
 del "tgping.txt" >nul 2>nul
+goto :eof
+
+:tg
+REM Best-effort status line to the admin's Telegram chat (plain ASCII only).
+if not defined UWED_HELPDESK_TOKEN goto :eof
+curl -s --max-time 15 "https://api.telegram.org/bot!UWED_HELPDESK_TOKEN!/sendMessage" --data-urlencode "chat_id=%UWED_ADMIN_CHAT_ID%" --data-urlencode "text=%~1" >nul 2>nul
 goto :eof
 
 :write_vbs
