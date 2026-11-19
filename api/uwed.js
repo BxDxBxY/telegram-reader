@@ -458,17 +458,27 @@ module.exports = async (req, res) => {
     }
 
     if (action === "snapshot") {
-      // Fresh base data (rooms + weekly events + teachers + slots) from the
-      // campus sync, so the Mini App's room map, free-room view and overlap
-      // finder use current data instead of the stale static snapshot.json.
+      // Fresh base data from the campus sync so the Mini App uses current data.
+      // ?light=1 returns rooms/slots/teachers WITHOUT the (large) events map, so
+      // the room grid loads fast and reliably even on slow networks; events are
+      // fetched separately with ?only=events.
       const snap = await loadSnapshotFromDb();
+      const only = String(req.query.only || "");
+      const light = req.query.light === "1" || req.query.light === "true";
+      if (only === "events") {
+        return res.status(200).json({
+          success: true,
+          updated_at: snap.updated_at || null,
+          events: snap.events && typeof snap.events === "object" ? snap.events : {},
+        });
+      }
       return res.status(200).json({
         success: true,
         updated_at: snap.updated_at || null,
         slots: Array.isArray(snap.slots) ? snap.slots : [],
         rooms: Array.isArray(snap.rooms) ? snap.rooms : [],
         teachers: Array.isArray(snap.teachers) ? snap.teachers : [],
-        events: snap.events && typeof snap.events === "object" ? snap.events : {},
+        events: light ? {} : (snap.events && typeof snap.events === "object" ? snap.events : {}),
       });
     }
 
