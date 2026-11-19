@@ -92,8 +92,17 @@ echo [OK] Server script ready: %SERVER_PY%
 
 REM ================= 3. CLOUDFLARED =================
 call :ensure_cloudflared
-if not exist "%CF_EXE%" (
-    echo [ERROR] Could not download cloudflared.exe. Check the internet connection.
+set "CF_OK="
+if exist "%CF_EXE%" for %%A in ("%CF_EXE%") do if %%~zA GTR 40000000 set "CF_OK=1"
+if not defined CF_OK (
+    echo.
+    echo [ERROR] cloudflared.exe did not download completely ^(it must be ~52 MB^).
+    echo         The campus network reset the download. Options:
+    echo           1^) run this file again ^(it resumes the download^), or
+    echo           2^) on another PC download cloudflared-windows-amd64.exe from
+    echo              %CF_SRC%
+    echo              rename it to cloudflared.exe and put it next to this file.
+    echo.
     pause
     exit /b 1
 )
@@ -106,8 +115,13 @@ call :start_tunnel
 call :get_url
 if not defined TUNNEL_URL (
     echo.
-    echo [WARN] Could not get a tunnel URL yet. Cloudflare may be slow or the
-    echo        network may block it. Retrying in 10 seconds...
+    echo [WARN] No tunnel URL yet. Last lines of the cloudflared log:
+    echo ----------------------------------------------------------------------
+    powershell -NoProfile -Command "if(Test-Path '%CF_LOG%'){Get-Content -Tail 15 -ErrorAction SilentlyContinue '%CF_LOG%'}else{'(no log file yet)'}"
+    echo ----------------------------------------------------------------------
+    echo [WARN] Cloudflare may be slow or the network may block it. Killing the
+    echo        tunnel and retrying in 10 seconds...
+    taskkill /f /im cloudflared.exe >nul 2>nul
     timeout /t 10 >nul
     goto MAINLOOP
 )
@@ -176,11 +190,14 @@ if exist "python-setup.exe" (
 goto :eof
 
 :ensure_cloudflared
-if exist "%CF_EXE%" (
-    for %%A in ("%CF_EXE%") do if %%~zA GTR 1000000 goto :eof
-)
+set /a _cf=0
+:ensure_cf_loop
+if exist "%CF_EXE%" for %%A in ("%CF_EXE%") do if %%~zA GTR 40000000 goto :eof
+set /a _cf+=1
+if !_cf! GTR 3 goto :eof
+echo [CF] Fetching cloudflared (attempt !_cf!/3, ~52 MB, this may take a while)...
 call :download "%CF_SRC%" "%CF_EXE%" "cloudflared tunnel"
-goto :eof
+goto ensure_cf_loop
 
 :start_tunnel
 tasklist /fi "imagename eq cloudflared.exe" 2>nul | find /i "cloudflared.exe" >nul
@@ -209,7 +226,7 @@ REM %1 = url  %2 = destination  %3 = label
 echo [DOWNLOAD] %~3 ...
 where curl >nul 2>nul
 if not errorlevel 1 (
-    curl -L --fail --retry 4 --retry-delay 2 --connect-timeout 20 -o "%~2" "%~1"
+    curl -C - -L --fail --retry 8 --retry-delay 2 --retry-all-errors --connect-timeout 20 -o "%~2" "%~1"
     if not errorlevel 1 if exist "%~2" goto :eof
 )
 echo [DOWNLOAD] retrying with PowerShell...
