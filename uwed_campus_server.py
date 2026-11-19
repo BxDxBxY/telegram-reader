@@ -50,8 +50,37 @@ VERCEL_CHECK_URL = f"{VERCEL_BASE_URL}/api/telemetry?action=check_sync_request"
 VERCEL_RELAY_REGISTER_URL = f"{VERCEL_BASE_URL}/api/telemetry?action=set_relay_url"
 UWED_HOST = "manage.uwed.uz"
 DEFAULT_PORT = int(os.environ.get("PORT", 8080))
-DEFAULT_SYNC_INTERVAL_MINS = 20
+DEFAULT_SYNC_INTERVAL_MINS = int(os.environ.get("UWED_SYNC_INTERVAL_MINS", 20))
 REMOTE_POLL_INTERVAL_SECS = 15
+# Telegram chat (admin) that receives status/log messages from this server.
+ADMIN_CHAT_ID = os.environ.get("UWED_ADMIN_CHAT_ID", "6906730753")
+# When true (default), push status lines to the admin's Telegram chat.
+NOTIFY_TELEGRAM = os.environ.get("UWED_NOTIFY_TELEGRAM", "1") not in ("0", "", "false", "False")
+
+
+def notify_admin(text: str) -> None:
+    """Best-effort: send a short status line to the admin's Telegram chat.
+
+    Never raises and never blocks the caller for long; failures are ignored so
+    that logging to Telegram can never take the server down.
+    """
+    if not NOTIFY_TELEGRAM or not BOT_TOKEN or not ADMIN_CHAT_ID:
+        return
+
+    def _send() -> None:
+        try:
+            url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+            payload = json.dumps(
+                {"chat_id": ADMIN_CHAT_ID, "text": text[:3900], "disable_web_page_preview": True}
+            ).encode("utf-8")
+            req = urllib.request.Request(
+                url, data=payload, headers={"Content-Type": "application/json"}
+            )
+            urllib.request.urlopen(req, timeout=10).read()
+        except Exception:
+            pass
+
+    threading.Thread(target=_send, daemon=True).start()
 
 TASHKENT_TZ = dt.timezone(dt.timedelta(hours=5))
 CLASSROOM_TYPES = {"PRACTICE", "LECTURE", "LANGUAGE_LAB", "COMPUTER", "SPORT_CENTER"}
@@ -139,7 +168,7 @@ class CampusFetcher:
     def check_intranet_access(self) -> bool:
         """Verifies if manage.uwed.uz is directly reachable from this machine."""
         try:
-            data = self.api_get("/timetable/public/v1/slots/by/academic/year", {"academic_year_id": "null"})
+            data = self.api_get("/public/timetable/v1/slots/by/academic/year", {"academic_year_id": "null"})
             return bool(data.get("data"))
         except Exception:
             return False
@@ -177,14 +206,14 @@ class CampusFetcher:
         print(f"\n[{ts_now}] === Starting Deep Campus Harvest (manage.uwed.uz) ===")
 
         # 1. Slots
-        slots_res = self.api_get("/timetable/public/v1/slots/by/academic/year", {"academic_year_id": "null"})
+        slots_res = self.api_get("/public/timetable/v1/slots/by/academic/year", {"academic_year_id": "null"})
         slots = slots_res.get("data") if isinstance(slots_res.get("data"), list) else list(DEFAULT_SLOTS)
         print(f"  [+] Slots: {len(slots)}")
 
         # 2. Rooms
         rooms_dict = {}
         for query in ("A-", "B-", "C-", "D-", "E-", "A", "B", "D", "Coworking", "Majlislar"):
-            res = self.api_get("/timetable/public/v1/search/rooms", {"search": query})
+            res = self.api_get("/public/timetable/v1/search/rooms", {"search": query})
             for r in res.get("data") or []:
                 rid = str(r.get("id") or "")
                 if rid and rid not in rooms_dict:
@@ -209,7 +238,7 @@ class CampusFetcher:
         # 3. Teachers (parallel syllable harvester)
         teachers_dict = {}
         with ThreadPoolExecutor(max_workers=16) as pool:
-            for tlist in pool.map(lambda p: self.api_get("/timetable/public/v1/search/teachers", {"search": p}).get("data") or [], SEARCH_PREFIXES):
+            for tlist in pool.map(lambda p: self.api_get("/public/timetable/v1/search/teachers", {"search": p}).get("data") or [], SEARCH_PREFIXES):
                 for t in tlist:
                     tid = str(t.get("id") or "")
                     if tid and tid not in teachers_dict:
@@ -220,7 +249,7 @@ class CampusFetcher:
         # 4. Students & Groups (parallel syllable harvester)
         students_dict = {}
         with ThreadPoolExecutor(max_workers=16) as pool:
-            for slist in pool.map(lambda p: self.api_get("/education/public/v1/student/search/for-timetable", {"search": p}).get("data") or [], SEARCH_PREFIXES):
+            for slist in pool.map(lambda p: self.api_get("/public/education/v1/student/search/for-timetable", {"search": p}).get("data") or [], SEARCH_PREFIXES):
                 for s in slist:
                     sid = str(s.get("id") or "")
                     if sid and sid not in students_dict:
@@ -239,7 +268,7 @@ class CampusFetcher:
 
         def fetch_events_for_room(rid: str) -> tuple[str, list[dict[str, Any]]]:
             res = self.api_get(
-                "/timetable/public/v1/events/list",
+                "/public/timetable/v1/events/list",
                 {"request_id": rid, "type": "ROOM", "start_time": monday},
             )
             evs = res.get("data")
@@ -321,9 +350,19 @@ def upload_snapshot_to_vercel(snapshot: dict[str, Any], trigger_source: str = "c
                 counts = data.get("counts", {})
                 print(f"[{ts_now}] [SUCCESS] Live update synced with Vercel!")
                 print(f"          Rooms: {counts.get('rooms')} | Teachers: {counts.get('teachers')} | Students: {len(snapshot.get('students', []))} | Events: {counts.get('events')}")
+                notify_admin(
+                    f"✅ Синхронизация OK ({ts_now})\n"
+                    f"Аудитории: {counts.get('rooms')} | Преподаватели: {counts.get('teachers')} | "
+                    f"Студенты: {len(snapshot.get('students', []))} | Пары: {counts.get('events')}"
+                )
                 return True
+            notify_admin(f"⚠️ Vercel отклонил снапшот ({ts_now}): {str(data)[:300]}")
     except Exception as e:
         print(f"[{ts_now}] [ERROR] Upload failed: {e}")
+        hint = ""
+        if "403" in str(e):
+            hint = "\n(403 — токен в Vercel UWED_HELPDESK_TOKEN не совпадает с токеном на этом ПК)"
+        notify_admin(f"❌ Ошибка загрузки в Vercel ({ts_now}): {e}{hint}")
     return False
 
 
@@ -561,9 +600,9 @@ class StandaloneCampusBot:
             return
 
         # Direct search by room or teacher name
-        rooms_found = self.fetcher.api_get("/timetable/public/v1/search/rooms", {"search": text}).get("data") or []
-        teachers_found = self.fetcher.api_get("/timetable/public/v1/search/teachers", {"search": text}).get("data") or []
-        students_found = self.fetcher.api_get("/education/public/v1/student/search/for-timetable", {"search": text}).get("data") or []
+        rooms_found = self.fetcher.api_get("/public/timetable/v1/search/rooms", {"search": text}).get("data") or []
+        teachers_found = self.fetcher.api_get("/public/timetable/v1/search/teachers", {"search": text}).get("data") or []
+        students_found = self.fetcher.api_get("/public/education/v1/student/search/for-timetable", {"search": text}).get("data") or []
 
         resp_lines = [f"🔎 Результаты поиска по запросу «<b>{text}</b>»:\n"]
         if rooms_found:
@@ -672,11 +711,24 @@ def main() -> None:
     # Start HTTP Relay Server
     start_relay_server(args.port)
 
+    notify_admin(
+        f"🟢 UWED кампус-сервер запущен на «{os.environ.get('COMPUTERNAME', 'PC')}».\n"
+        f"Интранет: {'OK' if fetcher.check_intranet_access() else 'НЕТ связи с manage.uwed.uz'}\n"
+        f"Туннель: {args.relay_url or 'не задан'}\n"
+        f"Автосинк каждые {DEFAULT_SYNC_INTERVAL_MINS} мин."
+    )
+
     # Register Relay URL if provided
     if args.relay_url:
         print(f"[Relay] Registering public URL {args.relay_url} with Vercel...")
         if register_relay_url_with_vercel(args.relay_url):
             print("  [OK] Vercel is now routing live student & schedule queries through this server!")
+            notify_admin(f"🔗 Релей зарегистрирован в Vercel: {args.relay_url}")
+        else:
+            notify_admin(
+                "⚠️ Не удалось зарегистрировать релей в Vercel (обычно 403 — токен "
+                "в Vercel UWED_HELPDESK_TOKEN не совпадает с токеном на этом ПК)."
+            )
 
     # Start Background Listeners
     t_key = threading.Thread(target=keyboard_listener, daemon=True)

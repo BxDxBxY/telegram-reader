@@ -755,7 +755,7 @@ function queryFloorStatus(snap, building, floor, day, slot, incOff, lang = "uz")
       free.push([r, info.text, info.score, info.isFullDay]);
     }
   }
-  free.sort((a, b) => b[2] - a[2] || a[0].name.localeCompare(b[0].name));
+  free.sort((a, b) => b[2] - a[2] || String(a[0].name || a[0].room_name || a[0].id || "").localeCompare(String(b[0].name || b[0].room_name || b[0].id || "")));
   return { free, busy, total: candidates.length };
 }
 
