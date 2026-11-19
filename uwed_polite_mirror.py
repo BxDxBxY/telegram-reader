@@ -25,6 +25,8 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import hashlib
+import hmac
 import http.client
 import json
 import os
@@ -52,7 +54,22 @@ VERCEL_SYNC_URL = os.environ.get(
     "VERCEL_SYNC_URL",
     "https://uwed-miniapp.vercel.app/api/telemetry?action=sync_snapshot",
 )
-ADMIN_KEY = os.environ.get("UWED_ADMIN_KEY", "")
+
+
+def resolve_admin_key() -> str:
+    if os.environ.get("UWED_ADMIN_KEY"):
+        return os.environ["UWED_ADMIN_KEY"].strip()
+    token = (os.environ.get("UWED_HELPDESK_TOKEN") or os.environ.get("UWED_BOT_TOKEN") or "").strip()
+    if not token:
+        tf = ROOT_DIR / "bot_token.txt"
+        if tf.exists():
+            token = tf.read_text(encoding="utf-8", errors="ignore").strip().splitlines()[0].strip()
+    if token:
+        return hmac.new(token.encode("utf-8"), b"uwed_admin_6906730753_bxdxbxy", hashlib.sha256).hexdigest()[:32]
+    return ""
+
+
+ADMIN_KEY = resolve_admin_key()
 
 ROOM_QUERIES = [
     "A-", "B-", "C-", "D-", "E-", "A", "B", "D",
