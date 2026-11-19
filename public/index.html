@@ -3662,7 +3662,7 @@
     };
 
     const STATE = {
-      lang: localStorage.getItem("uwed_lang") || "uz",
+      lang: localStorage.getItem("uwed_lang") || "ru",
       theme: localStorage.getItem("uwed_theme") || "dark",
       isAdmin: false,
       tab: "home",
@@ -4274,8 +4274,8 @@
           if (
             data.preferred_lang &&
             I18N[data.preferred_lang] &&
-            !localStorage.getItem("uwed_lang_manual") &&
-            !(new URLSearchParams(window.location.search).get("lang"))
+            !(new URLSearchParams(window.location.search).get("lang")) &&
+            STATE.lang !== data.preferred_lang
           ) {
             STATE.lang = data.preferred_lang;
             localStorage.setItem("uwed_lang", data.preferred_lang);
@@ -4332,7 +4332,16 @@
 
       try {
         const [snapRes, campusRes] = await Promise.all([
-          fetch("/snapshot.json").then((r) => r.json()).catch(() => ({})),
+          // Prefer the fresh snapshot from the campus sync; fall back to the
+          // bundled static file if the API is unavailable.
+          fetch("/api/uwed?action=snapshot")
+            .then((r) => r.json())
+            .then((d) =>
+              d && Array.isArray(d.rooms) && d.rooms.length
+                ? d
+                : fetch("/snapshot.json").then((r) => r.json())
+            )
+            .catch(() => fetch("/snapshot.json").then((r) => r.json()).catch(() => ({}))),
           fetch("/campus_data.json").then((r) => r.json()).catch(() => ({})),
         ]);
         if (snapRes.slots && snapRes.slots.length) STATE.slots = snapRes.slots;

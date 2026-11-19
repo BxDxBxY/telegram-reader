@@ -1,0 +1,9 @@
+# Vercel builds only the Node app (api/*.js + static). The Python files run on
+# the campus PC, not on Vercel - exclude them so no Python build is attempted.
+*.py
+pyproject.toml
+requirements.txt
+uwed-campus.service
+tgaudit/
+tests/
+prompts/

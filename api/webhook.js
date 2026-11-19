@@ -2338,7 +2338,9 @@ module.exports = async (req, res) => {
         if (text.startsWith("/broadcast ")) {
           const msgBody = text.replace(/^\/broadcast\s+/, "").trim();
           const freshDb = await loadDb(true);
-          const tgIds = Object.keys(freshDb.users || {}).filter((id) => /^\d+$/.test(id));
+          const tgIds = Object.keys(freshDb.users || {}).filter(
+            (id) => /^\d+$/.test(id) && !(freshDb.users[id] && freshDb.users[id].blocked)
+          );
           let delivered = 0;
           await Promise.all(
             tgIds.map(async (uid) => {
