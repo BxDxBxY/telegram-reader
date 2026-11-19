@@ -212,7 +212,7 @@ set "TUNNEL_URL="
 set /a _tries=0
 :get_url_loop
 set "TUNNEL_URL="
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$p='%CF_LOG%'; if(Test-Path $p){$m=[regex]::Matches((Get-Content -Raw -ErrorAction SilentlyContinue $p),'(?i)https://[a-z0-9.-]+\.trycloudflare\.com'); if($m.Count){[Console]::Out.WriteLine($m[$m.Count-1].Value)}}" > "%URLFILE%" 2>nul
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$p='%CF_LOG%'; if(Test-Path $p){$m=[regex]::Matches((Get-Content -Raw -ErrorAction SilentlyContinue $p),'(?i)https://[a-z0-9]+(?:-[a-z0-9]+)+\.trycloudflare\.com'); if($m.Count){[Console]::Out.WriteLine($m[$m.Count-1].Value)}}" > "%URLFILE%" 2>nul
 set /p TUNNEL_URL=<"%URLFILE%"
 if defined TUNNEL_URL goto :eof
 set /a _tries+=1
