@@ -788,7 +788,8 @@ async function recordTelemetry({
     if (db.events.length > 300) db.events.length = 300;
 
     const needsImmediate = Boolean(
-      feedback || room_report || subscription || campus_event || event_attendance || moodle
+      feedback || room_report || subscription || campus_event || event_attendance || moodle ||
+      action === "change_lang" || action === "bot_lang" || action === "save_settings"
     );
     await saveDb(db, needsImmediate);
     return db;

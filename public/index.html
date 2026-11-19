@@ -2654,6 +2654,29 @@
       };
     }
 
+    function showToast(msg, duration = 2600) {
+      try {
+        let el = document.getElementById("uwedGlobalToast");
+        if (!el) {
+          el = document.createElement("div");
+          el.id = "uwedGlobalToast";
+          el.style.cssText =
+            "position:fixed;bottom:86px;left:50%;transform:translateX(-50%);z-index:99999;" +
+            "background:rgba(15,23,42,0.94);color:#f8fafc;padding:10px 16px;border-radius:12px;" +
+            "font-size:13px;font-weight:600;box-shadow:0 8px 24px rgba(0,0,0,0.35);" +
+            "border:1px solid rgba(255,255,255,0.14);max-width:88vw;text-align:center;" +
+            "pointer-events:none;transition:opacity 0.25s ease;opacity:0;";
+          document.body.appendChild(el);
+        }
+        el.textContent = String(msg || "");
+        el.style.opacity = "1";
+        clearTimeout(el._hideTimer);
+        el._hideTimer = setTimeout(() => {
+          el.style.opacity = "0";
+        }, duration);
+      } catch (_) {}
+    }
+
     async function performSystemFix() {
       const btn = document.getElementById("btnHeaderSystemFix");
       if (btn) btn.style.transform = "rotate(360deg)";
@@ -2662,10 +2685,10 @@
         const res = await fetch("/api/uwed?action=system_fix", {
           headers: { "x-uwed-client": "uwed-helpdesk-v3" }
         });
-        const data = await res.json();
+        await res.json();
         localStorage.removeItem("uwed_slots_cache");
         localStorage.removeItem("uwed_rooms_cache");
-        await fetchInitialData();
+        await initApp();
         if (STATE.currentTab === "rooms") renderRoomsTab();
         else if (STATE.currentTab === "home") renderHomeDashboard();
         else if (STATE.currentTab === "moodle") refreshMoodleData();

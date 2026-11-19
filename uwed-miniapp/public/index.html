@@ -2654,6 +2654,29 @@
       };
     }
 
+    function showToast(msg, duration = 2600) {
+      try {
+        let el = document.getElementById("uwedGlobalToast");
+        if (!el) {
+          el = document.createElement("div");
+          el.id = "uwedGlobalToast";
+          el.style.cssText =
+            "position:fixed;bottom:86px;left:50%;transform:translateX(-50%);z-index:99999;" +
+            "background:rgba(15,23,42,0.94);color:#f8fafc;padding:10px 16px;border-radius:12px;" +
+            "font-size:13px;font-weight:600;box-shadow:0 8px 24px rgba(0,0,0,0.35);" +
+            "border:1px solid rgba(255,255,255,0.14);max-width:88vw;text-align:center;" +
+            "pointer-events:none;transition:opacity 0.25s ease;opacity:0;";
+          document.body.appendChild(el);
+        }
+        el.textContent = String(msg || "");
+        el.style.opacity = "1";
+        clearTimeout(el._hideTimer);
+        el._hideTimer = setTimeout(() => {
+          el.style.opacity = "0";
+        }, duration);
+      } catch (_) {}
+    }
+
     async function performSystemFix() {
       const btn = document.getElementById("btnHeaderSystemFix");
       if (btn) btn.style.transform = "rotate(360deg)";
@@ -2662,10 +2685,10 @@
         const res = await fetch("/api/uwed?action=system_fix", {
           headers: { "x-uwed-client": "uwed-helpdesk-v3" }
         });
-        const data = await res.json();
+        await res.json();
         localStorage.removeItem("uwed_slots_cache");
         localStorage.removeItem("uwed_rooms_cache");
-        await fetchInitialData();
+        await initApp();
         if (STATE.currentTab === "rooms") renderRoomsTab();
         else if (STATE.currentTab === "home") renderHomeDashboard();
         else if (STATE.currentTab === "moodle") refreshMoodleData();
@@ -3662,7 +3685,7 @@
     };
 
     const STATE = {
-      lang: localStorage.getItem("uwed_lang") || "uz",
+      lang: localStorage.getItem("uwed_lang") || "ru",
       theme: localStorage.getItem("uwed_theme") || "dark",
       isAdmin: false,
       tab: "home",
@@ -4274,8 +4297,8 @@
           if (
             data.preferred_lang &&
             I18N[data.preferred_lang] &&
-            !localStorage.getItem("uwed_lang_manual") &&
-            !(new URLSearchParams(window.location.search).get("lang"))
+            !(new URLSearchParams(window.location.search).get("lang")) &&
+            STATE.lang !== data.preferred_lang
           ) {
             STATE.lang = data.preferred_lang;
             localStorage.setItem("uwed_lang", data.preferred_lang);
@@ -4331,12 +4354,17 @@
       if (evDateEl) evDateEl.value = getTashkentNow().toISOString().slice(0, 10);
 
       try {
-        const [snapRes, campusRes] = await Promise.all([
-          fetch("/snapshot.json").then((r) => r.json()).catch(() => ({})),
-          fetch("/campus_data.json").then((r) => r.json()).catch(() => ({})),
-        ]);
-        if (snapRes.slots && snapRes.slots.length) STATE.slots = snapRes.slots;
-        STATE.rooms = (snapRes.rooms || []).map((r) => {
+        const fetchJson = async (url, tries = 3) => {
+          for (let i = 0; i < tries; i++) {
+            try {
+              const r = await fetch(url, { cache: "no-store" });
+              if (r.ok) return await r.json();
+            } catch (_) {}
+            await new Promise((res) => setTimeout(res, 500));
+          }
+          return null;
+        };
+        const mapRoom = (r) => {
           const name = r.name || r.room_name || "";
           const number = r.number || r.room_number || "";
           const type = r.type || r.room_type || "PRACTICE";
@@ -4346,21 +4374,36 @@
           }
           const building = r.building || (name ? name.charAt(0).toUpperCase() : "A");
           return {
-            ...r,
-            name,
-            room_name: name,
-            number,
-            room_number: number,
-            type,
-            room_type: type,
-            building,
-            floor: fl,
-            capacity: r.capacity || 30,
+            ...r, name, room_name: name, number, room_number: number,
+            type, room_type: type, building, floor: fl, capacity: r.capacity || 30,
           };
-        });
-        STATE.eventsByRoom = snapRes.events || {};
-        STATE.teachers = snapRes.teachers || [];
+        };
+
+        // 1) Base data (rooms/slots/teachers) WITHOUT events: small and reliable,
+        //    so the room grid always populates. Fall back to the static file.
+        let base = await fetchJson("/api/uwed?action=snapshot&light=1");
+        if (!base || !Array.isArray(base.rooms) || !base.rooms.length) {
+          base = (await fetchJson("/snapshot.json")) || {};
+        }
+        const campusRes = (await fetchJson("/campus_data.json")) || {};
+        if (base.slots && base.slots.length) STATE.slots = base.slots;
+        STATE.rooms = (base.rooms || []).map(mapRoom);
+        STATE.teachers = base.teachers || [];
         STATE.campusData = campusRes || {};
+        STATE.eventsByRoom = base.events && typeof base.events === "object" ? base.events : {};
+        try { renderHomeDashboard(); } catch (_) {}
+        try { renderRoomsTab(); } catch (_) {}
+
+        // 2) Events (larger) loaded separately so a slow/failed events fetch
+        //    never blocks the room list. Refine free/busy once they arrive.
+        if (!Object.keys(STATE.eventsByRoom).length) {
+          const evRes = await fetchJson("/api/uwed?action=snapshot&only=events");
+          if (evRes && evRes.events && Object.keys(evRes.events).length) {
+            STATE.eventsByRoom = evRes.events;
+            try { renderHomeDashboard(); } catch (_) {}
+            try { renderRoomsTab(); } catch (_) {}
+          }
+        }
       } catch (e) {
         console.error("Data load error:", e);
       }
@@ -6269,7 +6312,7 @@
       }
     }
 
-    async // ==========================================
+    // ==========================================
     // SMART EVENT & TIMETABLE CONFLICT ENGINE
     // ==========================================
     function normalizeDateStr(dStr) {
