@@ -459,7 +459,7 @@ module.exports = async (req, res) => {
 
     if (action === "slots") {
       const data = await uwedGet(
-        "/timetable/public/v1/slots/by/academic/year",
+        "/public/timetable/v1/slots/by/academic/year",
         { academic_year_id: "null" },
         lang
       );
@@ -481,7 +481,7 @@ module.exports = async (req, res) => {
     if (action === "search_teachers") {
       const q = (req.query.q || "").trim();
       if (q.length < 2) return res.status(200).json({ success: true, data: [] });
-      const data = await uwedGet("/timetable/public/v1/search/teachers", { search: q }, lang);
+      const data = await uwedGet("/public/timetable/v1/search/teachers", { search: q }, lang);
       return res.status(200).json(data);
     }
 
@@ -489,7 +489,7 @@ module.exports = async (req, res) => {
       const q = (req.query.q || "").trim();
       if (q.length < 2) return res.status(200).json({ success: true, data: [] });
       const data = await uwedGet(
-        "/education/public/v1/student/search/for-timetable",
+        "/public/education/v1/student/search/for-timetable",
         { search: q },
         lang
       );
@@ -499,7 +499,7 @@ module.exports = async (req, res) => {
     if (action === "search_rooms") {
       const q = (req.query.q || "").trim();
       if (q.length < 2) return res.status(200).json({ success: true, data: [] });
-      const data = await uwedGet("/timetable/public/v1/search/rooms", { search: q }, lang);
+      const data = await uwedGet("/public/timetable/v1/search/rooms", { search: q }, lang);
       return res.status(200).json(data);
     }
 
@@ -508,7 +508,7 @@ module.exports = async (req, res) => {
       const type = (req.query.type || "ROOM").trim().toUpperCase();
       if (!id) return res.status(400).json({ success: false, error: "Missing id" });
       const data = await uwedGet(
-        "/timetable/public/v1/events/list",
+        "/public/timetable/v1/events/list",
         {
           request_id: id,
           type,
@@ -554,7 +554,7 @@ module.exports = async (req, res) => {
         );
       } else if (id) {
         const evRes = await uwedGet(
-          "/timetable/public/v1/events/list",
+          "/public/timetable/v1/events/list",
           {
             request_id: id,
             type,
@@ -630,7 +630,7 @@ module.exports = async (req, res) => {
         ids.map(async (rid) => {
           try {
             const evRes = await uwedGet(
-              "/timetable/public/v1/events/list",
+              "/public/timetable/v1/events/list",
               {
                 request_id: rid,
                 type: "ROOM",

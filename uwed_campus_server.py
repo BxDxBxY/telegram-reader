@@ -139,7 +139,7 @@ class CampusFetcher:
     def check_intranet_access(self) -> bool:
         """Verifies if manage.uwed.uz is directly reachable from this machine."""
         try:
-            data = self.api_get("/timetable/public/v1/slots/by/academic/year", {"academic_year_id": "null"})
+            data = self.api_get("/public/timetable/v1/slots/by/academic/year", {"academic_year_id": "null"})
             return bool(data.get("data"))
         except Exception:
             return False
@@ -177,14 +177,14 @@ class CampusFetcher:
         print(f"\n[{ts_now}] === Starting Deep Campus Harvest (manage.uwed.uz) ===")
 
         # 1. Slots
-        slots_res = self.api_get("/timetable/public/v1/slots/by/academic/year", {"academic_year_id": "null"})
+        slots_res = self.api_get("/public/timetable/v1/slots/by/academic/year", {"academic_year_id": "null"})
         slots = slots_res.get("data") if isinstance(slots_res.get("data"), list) else list(DEFAULT_SLOTS)
         print(f"  [+] Slots: {len(slots)}")
 
         # 2. Rooms
         rooms_dict = {}
         for query in ("A-", "B-", "C-", "D-", "E-", "A", "B", "D", "Coworking", "Majlislar"):
-            res = self.api_get("/timetable/public/v1/search/rooms", {"search": query})
+            res = self.api_get("/public/timetable/v1/search/rooms", {"search": query})
             for r in res.get("data") or []:
                 rid = str(r.get("id") or "")
                 if rid and rid not in rooms_dict:
@@ -209,7 +209,7 @@ class CampusFetcher:
         # 3. Teachers (parallel syllable harvester)
         teachers_dict = {}
         with ThreadPoolExecutor(max_workers=16) as pool:
-            for tlist in pool.map(lambda p: self.api_get("/timetable/public/v1/search/teachers", {"search": p}).get("data") or [], SEARCH_PREFIXES):
+            for tlist in pool.map(lambda p: self.api_get("/public/timetable/v1/search/teachers", {"search": p}).get("data") or [], SEARCH_PREFIXES):
                 for t in tlist:
                     tid = str(t.get("id") or "")
                     if tid and tid not in teachers_dict:
@@ -220,7 +220,7 @@ class CampusFetcher:
         # 4. Students & Groups (parallel syllable harvester)
         students_dict = {}
         with ThreadPoolExecutor(max_workers=16) as pool:
-            for slist in pool.map(lambda p: self.api_get("/education/public/v1/student/search/for-timetable", {"search": p}).get("data") or [], SEARCH_PREFIXES):
+            for slist in pool.map(lambda p: self.api_get("/public/education/v1/student/search/for-timetable", {"search": p}).get("data") or [], SEARCH_PREFIXES):
                 for s in slist:
                     sid = str(s.get("id") or "")
                     if sid and sid not in students_dict:
@@ -239,7 +239,7 @@ class CampusFetcher:
 
         def fetch_events_for_room(rid: str) -> tuple[str, list[dict[str, Any]]]:
             res = self.api_get(
-                "/timetable/public/v1/events/list",
+                "/public/timetable/v1/events/list",
                 {"request_id": rid, "type": "ROOM", "start_time": monday},
             )
             evs = res.get("data")
@@ -561,9 +561,9 @@ class StandaloneCampusBot:
             return
 
         # Direct search by room or teacher name
-        rooms_found = self.fetcher.api_get("/timetable/public/v1/search/rooms", {"search": text}).get("data") or []
-        teachers_found = self.fetcher.api_get("/timetable/public/v1/search/teachers", {"search": text}).get("data") or []
-        students_found = self.fetcher.api_get("/education/public/v1/student/search/for-timetable", {"search": text}).get("data") or []
+        rooms_found = self.fetcher.api_get("/public/timetable/v1/search/rooms", {"search": text}).get("data") or []
+        teachers_found = self.fetcher.api_get("/public/timetable/v1/search/teachers", {"search": text}).get("data") or []
+        students_found = self.fetcher.api_get("/public/education/v1/student/search/for-timetable", {"search": text}).get("data") or []
 
         resp_lines = [f"🔎 Результаты поиска по запросу «<b>{text}</b>»:\n"]
         if rooms_found:

@@ -25,7 +25,7 @@ set "SERVER_PY=uwed_campus_server.py"
 set "CF_EXE=cloudflared.exe"
 set "CF_LOG=cloudflared.log"
 set "URLFILE=tunnel_url.txt"
-set "SERVER_SRC=https://raw.githubusercontent.com/BxDxBxY/telegram-reader/main/uwed_campus_server.py"
+set "SERVER_SRC=https://raw.githubusercontent.com/BxDxBxY/telegram-reader/claude/quirky-newton-hmzh3d/uwed_campus_server.py"
 set "CF_SRC=https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe"
 set "PY_SRC=https://www.python.org/ftp/python/3.12.7/python-3.12.7-amd64.exe"
 
@@ -79,10 +79,9 @@ if not defined PY (
 )
 echo [OK] Python: %PY% %PYARGS%
 
-REM ================= 2. SERVER SCRIPT =================
-if not exist "%SERVER_PY%" (
-    call :download "%SERVER_SRC%" "%SERVER_PY%" "campus server"
-)
+REM ================= 2. SERVER SCRIPT (always refresh to latest) =================
+del "%SERVER_PY%" >nul 2>nul
+call :download "%SERVER_SRC%" "%SERVER_PY%" "campus server"
 if not exist "%SERVER_PY%" (
     echo [ERROR] Could not download %SERVER_PY%. Check the internet connection.
     pause
