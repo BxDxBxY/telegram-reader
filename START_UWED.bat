@@ -28,6 +28,33 @@ set "URLFILE=tunnel_url.txt"
 set "SERVER_SRC=https://raw.githubusercontent.com/BxDxBxY/telegram-reader/claude/quirky-newton-hmzh3d/uwed_campus_server.py"
 set "CF_SRC=https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe"
 set "PY_SRC=https://www.python.org/ftp/python/3.12.7/python-3.12.7-amd64.exe"
+set "TOKENFILE=bot_token.txt"
+
+REM ---- Bot token: needed ONLY to match Vercel's admin key so this PC can
+REM      sync. It is read from bot_token.txt (saved next to this file on first
+REM      run) and NEVER uploaded anywhere. Must be the SAME token you set in
+REM      Vercel's UWED_HELPDESK_TOKEN. ----
+set "UWED_HELPDESK_TOKEN="
+if exist "%TOKENFILE%" set /p UWED_HELPDESK_TOKEN=<"%TOKENFILE%"
+if not defined UWED_HELPDESK_TOKEN (
+    echo.
+    echo  ---------------------------------------------------------------
+    echo   First-time setup: paste your Telegram bot token.
+    echo   ^(The exact token that is set in Vercel UWED_HELPDESK_TOKEN.^)
+    echo   It is saved locally in %TOKENFILE% and never sent anywhere.
+    echo  ---------------------------------------------------------------
+    set /p "UWED_HELPDESK_TOKEN=Bot token: "
+    if defined UWED_HELPDESK_TOKEN (>"%TOKENFILE%" echo !UWED_HELPDESK_TOKEN!)
+)
+if defined UWED_HELPDESK_TOKEN (
+    call :derive_admin_key
+    if defined UWED_ADMIN_KEY (
+        echo [OK] Admin key derived from your bot token - Vercel sync enabled.
+    )
+) else (
+    echo [WARN] No bot token entered - uploads to Vercel will be 403 until you
+    echo        put your token in %TOKENFILE% next to this file.
+)
 
 cls
 echo ======================================================================
@@ -150,6 +177,15 @@ goto MAINLOOP
 REM ====================================================================
 REM  Subroutines
 REM ====================================================================
+
+:derive_admin_key
+REM Compute UWED_ADMIN_KEY = first 32 hex of HMAC-SHA256(bot_token, label),
+REM exactly as Vercel does, so the campus server authenticates (no more 403).
+set "UWED_ADMIN_KEY="
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$h=New-Object System.Security.Cryptography.HMACSHA256; $h.Key=[Text.Encoding]::UTF8.GetBytes($env:UWED_HELPDESK_TOKEN.Trim()); $b=$h.ComputeHash([Text.Encoding]::UTF8.GetBytes('uwed_admin_6906730753_bxdxbxy')); [Console]::Out.WriteLine([BitConverter]::ToString($b).Replace('-','').ToLower().Substring(0,32))" > "adminkey.txt" 2>nul
+set /p UWED_ADMIN_KEY=<"adminkey.txt"
+del "adminkey.txt" >nul 2>nul
+goto :eof
 
 :find_python
 set "PY="

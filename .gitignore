@@ -28,3 +28,8 @@ node_modules/
 **/node_modules/
 
 scratch/
+bot_token.txt
+adminkey.txt
+tunnel_url.txt
+cloudflared.log
+cloudflared.exe
