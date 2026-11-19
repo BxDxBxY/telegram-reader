@@ -680,6 +680,22 @@ def remote_poll_worker(fetcher: CampusFetcher):
             pass
 
 
+def alert_cron_worker():
+    """Pings Vercel cron_alerts every 5 minutes for class reminders, morning digest & Moodle alerts."""
+    cron_url = f"{VERCEL_BASE_URL}/api/telemetry?action=cron_alerts"
+    while True:
+        time.sleep(300)
+        try:
+            req = urllib.request.Request(cron_url, headers={"User-Agent": "UWED-Campus-Server/3.0"})
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+                cnt = data.get("alerts_dispatched", 0)
+                if cnt:
+                    print(f"[Alerts] Dispatched {cnt} Telegram notifications (classes/Moodle/digest).")
+        except Exception:
+            pass
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="UWED Campus Server & Sync Engine")
     parser.add_argument("--bot", action="store_true", help="Run standalone Telegram Bot directly on campus")
@@ -736,6 +752,9 @@ def main() -> None:
 
     t_remote = threading.Thread(target=remote_poll_worker, args=(fetcher,), daemon=True)
     t_remote.start()
+
+    t_alerts = threading.Thread(target=alert_cron_worker, daemon=True)
+    t_alerts.start()
 
     # Initial sync on launch
     print("[Sync] Running initial harvest and sync with Vercel...")

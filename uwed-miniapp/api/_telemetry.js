@@ -719,21 +719,27 @@ async function recordTelemetry({
       }
     }
 
-    // 5.5 Moodle Session & Settings Sync
+    // 5.5 Moodle Session & Verified Identity Sync (NEVER persists plaintext passwords)
     if (moodle && (moodle.token || moodle.username)) {
       if (!db.moodle_users) db.moodle_users = {};
+      if (!db.verified_moodle_links) db.verified_moodle_links = {};
       const prevM = db.moodle_users[uid] || {};
+      const hasToken = Boolean(moodle.token || prevM.token);
+      const mUserId = moodle.userid || prevM.userid || null;
       db.moodle_users[uid] = {
         uid,
         chat_id: user.chat_id || uid,
         token: moodle.token || prevM.token || "",
         username: moodle.username || prevM.username || "",
         fullname: moodle.fullname || prevM.fullname || moodle.username || "",
-        userid: moodle.userid || prevM.userid || null,
+        userid: mUserId,
+        verified: hasToken,
+        verified_at: prevM.verified_at || (hasToken ? nowIso : null),
         courses: Array.isArray(moodle.courses) ? moodle.courses : prevM.courses || [],
         deadlines: Array.isArray(moodle.deadlines) ? moodle.deadlines : prevM.deadlines || [],
         grades: Array.isArray(moodle.grades) ? moodle.grades : prevM.grades || [],
-        last_grades: Array.isArray(moodle.grades) && moodle.grades.length > 0 ? moodle.grades : prevM.last_grades || [],
+        last_grades: Array.isArray(prevM.last_grades) ? prevM.last_grades : (Array.isArray(moodle.grades) ? moodle.grades : []),
+        notified_deadlines: prevM.notified_deadlines || {},
         notify_classes: moodle.notify_classes != null ? Boolean(moodle.notify_classes) : (prevM.notify_classes !== false),
         notify_grades: moodle.notify_grades != null ? Boolean(moodle.notify_grades) : (prevM.notify_grades !== false),
         notify_deadlines: moodle.notify_deadlines != null ? Boolean(moodle.notify_deadlines) : (prevM.notify_deadlines !== false),
@@ -743,7 +749,16 @@ async function recordTelemetry({
         last_morning_digest: prevM.last_morning_digest || null,
         updated_at: nowIso,
       };
-      existing.moodle = db.moodle_users[uid];
+      if (hasToken && mUserId) {
+        db.verified_moodle_links[String(mUserId)] = uid;
+      }
+      existing.moodle = {
+        verified: hasToken,
+        username: db.moodle_users[uid].username,
+        fullname: db.moodle_users[uid].fullname,
+        userid: mUserId,
+        updated_at: nowIso,
+      };
     }
 
     // 6. Campus Event Submission (Strict Admin-Only @bxdxbxy / 6906730753)
@@ -943,11 +958,15 @@ async function checkAndDispatchAlerts(snap, tgSender) {
               const rEvents = snap.events[sub.target_id] || [];
               matchedEvent = rEvents.find((e) => Number(e.d) === day && Number(e.s) === slot.id);
             } else {
-              const sTarget = (sub.title || sub.target_id || "").toLowerCase();
+              const sTarget = (sub.target_id || sub.title || "")
+                .replace(/^grp[:_]/i, "")
+                .replace(/^(Guruh|Группа):?\s*/i, "")
+                .trim()
+                .toLowerCase();
               for (const elist of Object.values(snap.events)) {
                 for (const e of elist) {
                   if (Number(e.d) === day && Number(e.s) === slot.id) {
-                    if (e.g && (e.g.toLowerCase().includes(sTarget) || sTarget.includes(e.g.toLowerCase()))) {
+                    if (sTarget && e.g && (e.g.toLowerCase().includes(sTarget) || sTarget.includes(e.g.toLowerCase()))) {
                       matchedEvent = e;
                       break;
                     }
@@ -1023,13 +1042,21 @@ async function checkAndDispatchAlerts(snap, tgSender) {
         }
       }
 
-      if (todayClasses.length > 0) {
+      if (todayClasses.length > 0 || (Array.isArray(mUser.deadlines) && mUser.deadlines.length > 0)) {
         const lang = sub.lang || "ru";
-        const lines = todayClasses.map((c) => `• <code>${c.time}</code> (${c.slot}-пара): <b>${c.title}</b> (Ауд. <b>${c.room || "—"}</b>)`).join("\n");
+        const nowSec = Math.floor(Date.now() / 1000);
+        const soonDl = (mUser.deadlines || []).filter((d) => d.time && d.time > nowSec && d.time - nowSec <= 48 * 3600);
+        const classLines = todayClasses.length
+          ? todayClasses.map((c) => `• <code>${c.time}</code> (${c.slot}-пара): <b>${c.title}</b> (Ауд. <b>${c.room || "—"}</b>)`).join("\n")
+          : (lang === "uz" ? "• Bugun darslar yõq" : "• Сегодня пар нет");
+        const dlBlock = soonDl.length
+          ? (lang === "uz" ? "\n\n📌 <b>Yaqin 48 soatdagi Moodle dedlaynlari:</b>\n" : "\n\n📌 <b>Дедлайны Moodle в ближайшие 48ч:</b>\n") +
+            soonDl.slice(0, 5).map((d) => `• ⏰ <b>${d.name || d.title || "Задание"}</b> (${d.course || "Moodle"})`).join("\n")
+          : "";
         const msg =
           lang === "uz"
-            ? `🌅 <b>Xayrli tong! Bugungi darslar jadvali (${todayStr}):</b>\n\n${lines}\n\n🔔 <i>Har bir dars boshlanishidan 20 daqiqa oldin eslatma yuboramiz!</i>`
-            : `🌅 <b>Доброе утро! Расписание пар на сегодня (${todayStr}):</b>\n\n${lines}\n\n🔔 <i>Бот предупредит вас за 20 минут до начала каждого занятия!</i>`;
+            ? `🌅 <b>Xayrli tong! Bugungi kunlik xulosa (${todayStr}):</b>\n\n${classLines}${dlBlock}\n\n🔔 <i>Har bir darsdan 20 daqiqa oldin eslatma yuboramiz!</i>`
+            : `🌅 <b>Доброе утро! Сводка на сегодня (${todayStr}):</b>\n\n${classLines}${dlBlock}\n\n🔔 <i>Бот предупредит за 20 минут до начала каждой пары!</i>`;
 
         await tgSender("sendMessage", {
           chat_id: sub.chat_id,
@@ -1039,6 +1066,61 @@ async function checkAndDispatchAlerts(snap, tgSender) {
         sub.last_morning_digest = todayStr;
         dbDirty = true;
         dispatchedCount++;
+      }
+    }
+  }
+
+  // 3. MOODLE DEADLINE ALERTS (<24h and <3h warnings, deduplicated)
+  const nowSecAll = Math.floor(Date.now() / 1000);
+  for (const mUser of Object.values(db.moodle_users || {})) {
+    if (!mUser || !mUser.chat_id || mUser.notify_deadlines === false) continue;
+    if (!mUser.notified_deadlines) mUser.notified_deadlines = {};
+    const lang = (db.subscriptions && db.subscriptions[mUser.uid] && db.subscriptions[mUser.uid].lang) || "ru";
+    for (const dl of mUser.deadlines || []) {
+      if (!dl || !dl.time) continue;
+      const secsLeft = dl.time - nowSecAll;
+      if (secsLeft <= 0 || secsLeft > 24 * 3600) continue;
+      const bucket = secsLeft <= 3 * 3600 ? "3h" : "24h";
+      const dlKey = `${dl.id || dl.name}_${dl.time}_${bucket}`;
+      if (mUser.notified_deadlines[dlKey]) continue;
+      const hrs = Math.max(1, Math.round(secsLeft / 3600));
+      const msg =
+        lang === "uz"
+          ? `⏳ <b>Moodle dedlayn eslatmasi (${hrs} soat qoldi)!</b>\n\n📝 <b>${dl.name || dl.title || "Topshiriq"}</b>\n📚 Kurs: <i>${dl.course || "Moodle"}</i>`
+          : `⏳ <b>Скоро дедлайн в Moodle (осталось ~${hrs} ч.)!</b>\n\n📝 <b>${dl.name || dl.title || "Задание"}</b>\n📚 Курс: <i>${dl.course || "Moodle"}</i>`;
+      await tgSender("sendMessage", { chat_id: mUser.chat_id, text: msg, parse_mode: "HTML" });
+      mUser.notified_deadlines[dlKey] = nowSecAll;
+      dbDirty = true;
+      dispatchedCount++;
+    }
+
+    // 4. MOODLE GRADE CHANGE ALERTS
+    if (mUser.notify_grades !== false && Array.isArray(mUser.grades) && mUser.grades.length > 0) {
+      const prevMap = new Map();
+      for (const g of mUser.last_grades || []) {
+        prevMap.set(`${g.course || ""}|${g.item || g.name || ""}`, String(g.grade || g.score || ""));
+      }
+      const changed = [];
+      for (const g of mUser.grades) {
+        const k = `${g.course || ""}|${g.item || g.name || ""}`;
+        const val = String(g.grade || g.score || "").trim();
+        if (val && val !== "-" && prevMap.has(k) && prevMap.get(k) !== val) {
+          changed.push({ course: g.course || "Moodle", item: g.item || g.name || "Оценка", prev: prevMap.get(k), next: val });
+        }
+      }
+      if (changed.length > 0) {
+        const lines = changed.slice(0, 6).map((c) => `• <b>${c.course}</b> — ${c.item}: <code>${c.next}</code>`).join("\n");
+        const msg =
+          lang === "uz"
+            ? `🎓 <b>Moodle'da yangi baho qõyildi!</b>\n\n${lines}`
+            : `🎓 <b>Преподаватель выставил оценку в Moodle!</b>\n\n${lines}`;
+        await tgSender("sendMessage", { chat_id: mUser.chat_id, text: msg, parse_mode: "HTML" });
+        mUser.last_grades = mUser.grades;
+        dbDirty = true;
+        dispatchedCount++;
+      } else if (!Array.isArray(mUser.last_grades) || mUser.last_grades.length === 0) {
+        mUser.last_grades = mUser.grades;
+        dbDirty = true;
       }
     }
   }

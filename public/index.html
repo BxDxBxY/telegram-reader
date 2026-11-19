@@ -2089,36 +2089,48 @@
     <section id="tab-overlap" style="display: none;">
       <div class="sub-bar">
         <button class="back-pill" onclick="switchTab('home')" id="backFromOverlap">← Asosiy</button>
+        <div style="display:flex; gap:6px;">
+          <button class="btn-sm" onclick="fillOverlapMe()" id="btnOvUseMe">👤 Из профиля</button>
+          <button class="btn-sm" onclick="swapOverlapPeople()" id="btnOvSwap">⇄</button>
+          <button class="btn-sm" onclick="clearOverlapPeople()" id="btnOvClear">✕</button>
+        </div>
       </div>
       <div class="panel">
-        <div style="font-size: 15.5px; font-weight: 800; margin-bottom: 4px;" id="ovTitle">🤝 Umumiy bõş vaqtni topiş</div>
+        <div style="font-size: 16px; font-weight: 800; margin-bottom: 4px;" id="ovTitle">🤝 Общие пары и общие окна</div>
         <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px;" id="ovSub">
-          Ikki talaba yoki õqituvçini tanlaꞑ — tizim qaysi juftliklarda ikkalaꞑiz ham bõş ekaniꞑizni kõrsatadi!
+          Выберите двух студентов, группы или преподавателей — покажем общие свободные окна и совместные пары!
         </div>
 
         <div class="panel-row">
           <div class="row-head">
-            <span class="row-label" id="ovLblP1">1-Iştirokçi (Siz yoki dõstingiz)</span>
+            <span class="row-label" id="ovLblP1">1-й участник (Вы или группа)</span>
             <span id="ovP1Chosen" style="font-size:11.5px; color:#34d399; font-weight:700;"></span>
           </div>
-          <input type="text" class="search-input" style="padding-left:14px;" id="ovSearch1" placeholder="HEMIS ID, familiya yoki oqim (AR16-01)..." oninput="onOverlapSearch(1)" />
+          <input type="text" class="search-input" style="padding-left:14px;" id="ovSearch1" placeholder="Фамилия, группа (10a, 3-10a-26) или преподаватель..." oninput="onOverlapSearch(1)" />
           <div id="ovResults1" class="list-stack" style="margin-top:6px;"></div>
         </div>
 
         <div class="panel-row">
           <div class="row-head">
-            <span class="row-label" id="ovLblP2">2-Iştirokçi (Dõstingiz yoki õqituvçi)</span>
+            <span class="row-label" id="ovLblP2">2-й участник (Друг, группа или преподаватель)</span>
             <span id="ovP2Chosen" style="font-size:11.5px; color:#38bdf8; font-weight:700;"></span>
           </div>
-          <input type="text" class="search-input" style="padding-left:14px;" id="ovSearch2" placeholder="HEMIS ID, familiya yoki oqim..." oninput="onOverlapSearch(2)" />
+          <input type="text" class="search-input" style="padding-left:14px;" id="ovSearch2" placeholder="Фамилия, группа (10a, 3-10a-26) или преподаватель..." oninput="onOverlapSearch(2)" />
           <div id="ovResults2" class="list-stack" style="margin-top:6px;"></div>
         </div>
 
         <div class="panel-row">
           <div class="chips-scroll" id="ovDayChips"></div>
         </div>
+
+        <div class="chips-scroll" style="margin-top:8px;" id="ovFilterChips">
+          <div class="pill pill-sm active" id="ovFltAll" onclick="setOverlapFilter('all')">Все пары</div>
+          <div class="pill pill-sm" id="ovFltFree" onclick="setOverlapFilter('free')">🟢 Общие окна</div>
+          <div class="pill pill-sm" id="ovFltShared" onclick="setOverlapFilter('shared')">🤝 Общие пары</div>
+        </div>
       </div>
 
+      <div id="overlapSummaryBar"></div>
       <div id="overlapComparisonOutput"></div>
     </section>
 
@@ -2455,15 +2467,32 @@
           <span class="bento-tag" id="profRoleBadge" style="align-self:flex-start;">TALABA</span>
         </div>
 
-        <!-- Academic & Schedule Snapshot -->
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:10px;">
-          <div style="background:rgba(15,23,42,0.65); border:1px solid var(--border); border-radius:12px; padding:10px; cursor:pointer;" onclick="openPinnedProfileFromAnywhere()">
-            <div style="font-size:10.5px; color:var(--text-muted); font-weight:700;" id="profLblPinned">Shaxsiy jadval</div>
+        <!-- Moodle Verification Status Bar -->
+        <div id="profVerifyBanner" style="display:flex; align-items:center; justify-content:space-between; gap:8px; padding:9px 12px; border-radius:12px; margin-bottom:10px; background:rgba(245,158,11,0.12); border:1px solid rgba(245,158,11,0.32); cursor:pointer;" onclick="switchTab('moodle')">
+          <div style="font-size:12px; font-weight:700; color:#fbbf24;" id="profVerifyText">🔒 Не верифицирован — войдите через Moodle</div>
+          <span style="font-size:11px; font-weight:800; color:#38bdf8;">Moodle →</span>
+        </div>
+
+        <!-- Unified Academic, Schedule & Moodle Snapshot -->
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:6px;">
+          <div style="background:rgba(15,23,42,0.45); border:1px solid var(--border); border-radius:12px; padding:10px; cursor:pointer;" onclick="openPinnedProfileFromAnywhere()">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <div style="font-size:10.5px; color:var(--text-muted); font-weight:700;" id="profLblPinned">Моё расписание</div>
+              <span style="font-size:10px; color:#fb7185; font-weight:700; padding:1px 5px; border-radius:6px; background:rgba(244,63,94,0.14); display:none;" id="profUnpinBtn" onclick="event.stopPropagation(); removePinnedProfile();">Сброс</span>
+            </div>
             <div style="font-size:13px; font-weight:800; color:#34d399; margin-top:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" id="profPinnedVal">—</div>
           </div>
-          <div style="background:rgba(15,23,42,0.65); border:1px solid var(--border); border-radius:12px; padding:10px; cursor:pointer;" onclick="switchTab('gpa')">
-            <div style="font-size:10.5px; color:var(--text-muted); font-weight:700;" id="profLblGpa">Rasmiy GPA</div>
+          <div style="background:rgba(15,23,42,0.45); border:1px solid var(--border); border-radius:12px; padding:10px; cursor:pointer;" onclick="switchTab('gpa')">
+            <div style="font-size:10.5px; color:var(--text-muted); font-weight:700;" id="profLblGpa">Официальный GPA</div>
             <div style="font-size:13px; font-weight:800; color:#38bdf8; margin-top:3px;" id="profGpaVal">0.00 / 5.0</div>
+          </div>
+          <div style="background:rgba(15,23,42,0.45); border:1px solid var(--border); border-radius:12px; padding:10px; cursor:pointer;" onclick="switchTab('moodle')">
+            <div style="font-size:10.5px; color:var(--text-muted); font-weight:700;" id="profLblMoodleDl">Moodle · Дедлайны</div>
+            <div style="font-size:13px; font-weight:800; color:#fbbf24; margin-top:3px;" id="profMoodleDlVal">Не подключён</div>
+          </div>
+          <div style="background:rgba(15,23,42,0.45); border:1px solid var(--border); border-radius:12px; padding:10px; cursor:pointer;" onclick="switchTab('overlap')">
+            <div style="font-size:10.5px; color:var(--text-muted); font-weight:700;" id="profLblOverlap">Общие пары и окна</div>
+            <div style="font-size:13px; font-weight:800; color:#a78bfa; margin-top:3px;">🤝 Сравнить →</div>
           </div>
         </div>
       </div>
@@ -5033,12 +5062,14 @@
             username: login,
             fullname: (data.me && data.me.fullname) || login,
             userid: (data.me && data.me.userid) || null,
+            verified: true,
             courses: data.courses || [],
             deadlines: data.deadlines || [],
             grades: data.grades || [],
             notify_classes: true,
             notify_grades: true,
             notify_deadlines: true,
+            morning_digest: true,
             lead_time_mins: 20
           };
           trackEvent("moodle_connect", data.me ? data.me.fullname : login, {}, { moodle: moodlePayload });
@@ -5047,6 +5078,22 @@
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ user: getCurrentUser(), moodle: moodlePayload })
           }).catch(() => {});
+
+          // Unify Moodle -> GPA & Profile & Schedule
+          try { syncMoodleGradesToGpa(data); } catch (_) {}
+          try { autoLinkStudentFromMoodle(moodlePayload.fullname); } catch (_) {}
+          try { renderProfileTab(); } catch (_) {}
+          showToast("✅ Moodle подключён! Личность студента подтверждена.");
+
+          // If user was verifying to register for an event, resume registration
+          if (STATE.pendingEventRegId) {
+            const pendingEv = STATE.pendingEventRegId;
+            STATE.pendingEventRegId = null;
+            setTimeout(() => {
+              switchTab("events");
+              toggleEventAttendance(pendingEv);
+            }, 400);
+          }
         } else {
           errEl.textContent =
             data && data.error === "bad_login"
@@ -5058,6 +5105,67 @@
         btn.textContent = "🔗 Moodle’ga ulanish";
         errEl.textContent = "❌ Tarmoq xatosi.";
       }
+    }
+
+    function getVerifiedMoodleIdentity() {
+      try {
+        const saved = localStorage.getItem("uwed_moodle_cache");
+        if (!saved) return null;
+        const parsed = JSON.parse(saved);
+        if (parsed && parsed.ok && parsed.token && parsed.me) {
+          return {
+            verified: true,
+            token: parsed.token,
+            userid: parsed.me.userid || null,
+            username: parsed.me.username || "",
+            fullname: parsed.me.fullname || "",
+            courses: parsed.courses || [],
+            deadlines: parsed.deadlines || [],
+            grades: parsed.grades || [],
+          };
+        }
+      } catch (_) {}
+      return null;
+    }
+
+    function syncMoodleGradesToGpa(moodleData) {
+      if (!moodleData || !Array.isArray(moodleData.grades) || !moodleData.grades.length) return;
+      const byCourse = new Map();
+      for (const g of moodleData.grades) {
+        const cname = String(g.course || g.coursename || "").trim();
+        const rawScore = parseFloat(String(g.grade || g.score || "").replace(",", "."));
+        if (!cname || isNaN(rawScore)) continue;
+        if (!byCourse.has(cname)) byCourse.set(cname, { sum: 0, cnt: 0 });
+        const acc = byCourse.get(cname);
+        acc.sum += Math.min(100, Math.max(0, rawScore));
+        acc.cnt += 1;
+      }
+      if (!byCourse.size) return;
+      const mapped = [];
+      for (const [name, acc] of byCourse.entries()) {
+        mapped.push({ name, credits: 4, score: Math.round(acc.sum / acc.cnt) });
+      }
+      if (mapped.length) {
+        STATE.gpaRows = mapped;
+        localStorage.setItem("uwed_gpa_rows_v2", JSON.stringify(mapped));
+        try { renderGpaRows(); } catch (_) {}
+        try { recalcGpaSummary(); } catch (_) {}
+      }
+    }
+
+    async function autoLinkStudentFromMoodle(fullname) {
+      if (!fullname || localStorage.getItem("uwed_pinned_profile")) return;
+      const parts = String(fullname).trim().split(/\s+/);
+      const q = parts.slice(0, 2).join(" ");
+      if (q.length < 3) return;
+      try {
+        const res = await fetch(`/api/uwed?action=search_students&q=${encodeURIComponent(q)}&lang=${encodeURIComponent(STATE.lang)}`);
+        const data = await res.json();
+        const first = Array.isArray(data.data) && data.data.find((s) => !s.is_group);
+        if (first && first.id) {
+          savePinnedProfile("STUDENT", first.id, first.full_name || fullname);
+        }
+      } catch (_) {}
     }
 
     async function refreshMoodleData() {
@@ -5076,6 +5184,8 @@
         if (data && data.ok) {
           localStorage.setItem("uwed_moodle_cache", JSON.stringify(data));
           renderMoodleDashboard(data);
+          try { syncMoodleGradesToGpa(data); } catch (_) {}
+          try { renderProfileTab(); } catch (_) {}
         } else if (data && data.error === "need_login") {
           logoutMoodle();
         }
@@ -5086,6 +5196,7 @@
       haptic("medium");
       localStorage.removeItem("uwed_moodle_cache");
       initMoodleTab();
+      try { renderProfileTab(); } catch (_) {}
     }
 
     function renderMoodleDashboard(data) {
@@ -6116,8 +6227,66 @@
       container.innerHTML = html || `<div class="empty-msg">${t.noRoomsMatch}</div>`;
     }
 
-    /* ── FRIEND / GROUP OVERLAP FINDER ── */
+    /* ── FRIEND / GROUP OVERLAP FINDER (Общие пары и общие окна) ── */
     let ovTimers = { 1: null, 2: null };
+    let ovFilterMode = "all";
+
+    function setOverlapFilter(mode) {
+      ovFilterMode = mode || "all";
+      ["all", "free", "shared"].forEach((m) => {
+        const id = m === "all" ? "ovFltAll" : m === "free" ? "ovFltFree" : "ovFltShared";
+        const el = document.getElementById(id);
+        if (el) el.classList.toggle("active", ovFilterMode === m);
+      });
+      renderOverlapOutput();
+    }
+
+    async function fillOverlapMe() {
+      haptic("light");
+      try {
+        const raw = localStorage.getItem("uwed_pinned_profile");
+        if (raw) {
+          const p = JSON.parse(raw);
+          await chooseOverlapPerson(1, p.kind, p.id, p.title);
+          showToast("✅ Подставлено ваше расписание из профиля");
+          return;
+        }
+      } catch (_) {}
+      showToast("Сначала сохраните своё расписание в разделе «Студенты» или «Профиль»");
+    }
+
+    function swapOverlapPeople() {
+      haptic("light");
+      const tmp = STATE.overlap.p1;
+      STATE.overlap.p1 = STATE.overlap.p2;
+      STATE.overlap.p2 = tmp;
+      const c1 = document.getElementById("ovP1Chosen");
+      const c2 = document.getElementById("ovP2Chosen");
+      if (c1) c1.textContent = STATE.overlap.p1 ? `✓ ${STATE.overlap.p1.title}` : "";
+      if (c2) c2.textContent = STATE.overlap.p2 ? `✓ ${STATE.overlap.p2.title}` : "";
+      renderOverlapOutput();
+    }
+
+    function clearOverlapPeople() {
+      haptic("light");
+      STATE.overlap.p1 = null;
+      STATE.overlap.p2 = null;
+      const c1 = document.getElementById("ovP1Chosen");
+      const c2 = document.getElementById("ovP2Chosen");
+      if (c1) c1.textContent = "";
+      if (c2) c2.textContent = "";
+      const sBar = document.getElementById("overlapSummaryBar");
+      if (sBar) sBar.innerHTML = "";
+      renderOverlapOutput();
+    }
+
+    function openFreeRoomsForSlot(slotId) {
+      haptic("medium");
+      STATE.slot = Number(slotId) || STATE.slot;
+      STATE.onlyFree = true;
+      switchTab("rooms");
+      renderRoomsTab();
+    }
 
     async function initOverlapDefaults() {
       if (!STATE.overlap.p1) {
@@ -6142,45 +6311,65 @@
       }
       ovTimers[slotNum] = setTimeout(async () => {
         const items = [];
+        const seenIds = new Set();
         try {
           const [tRes, sRes] = await Promise.all([
             fetch(`/api/uwed?action=search_teachers&q=${encodeURIComponent(q)}&lang=${encodeURIComponent(STATE.lang)}`).then((r) => r.json()),
             fetch(`/api/uwed?action=search_students&q=${encodeURIComponent(q)}&lang=${encodeURIComponent(STATE.lang)}`).then((r) => r.json()),
           ]);
           for (const t of (tRes.data || []).slice(0, 4)) {
-            items.push({ kind: "TEACHER", id: t.id, title: `👨‍🏫 ${toNewUz(t.full_name)}` });
+            if (!seenIds.has(`T:${t.id}`)) {
+              seenIds.add(`T:${t.id}`);
+              items.push({ kind: "TEACHER", id: t.id, title: `👨‍🏫 ${toNewUz(t.full_name)}` });
+            }
           }
-          for (const s of (sRes.data || []).slice(0, 4)) {
-            items.push({ kind: "STUDENT", id: s.id, title: `🎓 ${toNewUz(s.full_name)}` });
+          for (const s of (sRes.data || []).slice(0, 5)) {
+            if (!seenIds.has(`S:${s.id}`)) {
+              seenIds.add(`S:${s.id}`);
+              items.push({ kind: "STUDENT", id: s.id, title: `🎓 ${toNewUz(s.full_name)}` });
+            }
           }
         } catch (_) {}
 
+        // Offline / local group & stream matching from STATE.eventsByRoom
         const qUp = q.toUpperCase();
         for (const r of STATE.rooms) {
           for (const ev of STATE.eventsByRoom[r.id] || []) {
-            if (ev.c && ev.c.toUpperCase().includes(qUp)) {
-              if (!items.some((x) => x.id === ev.c)) {
-                items.push({ kind: "STREAM", id: ev.c, title: `📚 ${ev.c} (${toNewUz(ev.t)})` });
+            if (ev.g) {
+              const parts = String(ev.g).match(/[A-Za-z0-9\-]+/g) || [];
+              for (const part of parts) {
+                const pClean = part.trim();
+                const gid = `grp:${pClean}`;
+                if (pClean.length >= 2 && pClean.toUpperCase().includes(qUp) && !seenIds.has(`S:${gid}`)) {
+                  seenIds.add(`S:${gid}`);
+                  items.push({ kind: "STUDENT", id: gid, title: `👥 Группа ${pClean}` });
+                }
               }
-              if (items.length >= 10) break;
             }
+            if (ev.c && ev.c.toUpperCase().includes(qUp) && !seenIds.has(`C:${ev.c}`)) {
+              seenIds.add(`C:${ev.c}`);
+              items.push({ kind: "STREAM", id: ev.c, title: `📚 ${ev.c} (${toNewUz(ev.t)})` });
+            }
+            if (items.length >= 12) break;
           }
-          if (items.length >= 10) break;
+          if (items.length >= 12) break;
         }
 
-        const chooseTxt = T().ovChooseBtn || "Select →";
-        resBox.innerHTML = items
-          .map((it) => {
-            const safeT = it.title.replace(/'/g, "\\'");
-            return `
-              <div class="list-item" style="padding:9px 12px;" onclick="chooseOverlapPerson(${slotNum}, '${it.kind}', '${it.id}', '${safeT}')">
-                <div class="list-title" style="font-size:13px;">${it.title}</div>
-                <span style="color:#38bdf8; font-size:12px; font-weight:700;">${chooseTxt}</span>
-              </div>
-            `;
-          })
-          .join("");
-      }, 300);
+        const chooseTxt = T().ovChooseBtn || "Выбрать →";
+        resBox.innerHTML = items.length
+          ? items
+              .map((it) => {
+                const safeT = it.title.replace(/'/g, "\\'");
+                return `
+                  <div class="list-item" style="padding:9px 12px;" onclick="chooseOverlapPerson(${slotNum}, '${it.kind}', '${it.id}', '${safeT}')">
+                    <div class="list-title" style="font-size:13px;">${it.title}</div>
+                    <span style="color:#38bdf8; font-size:12px; font-weight:700;">${chooseTxt}</span>
+                  </div>
+                `;
+              })
+              .join("")
+          : `<div class="empty-msg" style="padding:8px;">Ничего не найдено</div>`;
+      }, 260);
     }
 
     async function fetchPersonScheduleEvents(kind, id) {
@@ -6193,7 +6382,7 @@
                 week_day: ev.d,
                 slot_id: ev.s,
                 title: ev.t,
-                room_number: r.name,
+                room_number: r.name || r.room_name,
                 instructor: ev.i,
               });
             }
@@ -6201,20 +6390,41 @@
         }
         return list;
       }
+      let apiList = [];
       try {
         const res = await fetch(`/api/uwed?action=events&type=${kind}&id=${encodeURIComponent(id)}&lang=${encodeURIComponent(STATE.lang)}`);
         const data = await res.json();
-        return Array.isArray(data.data) ? data.data : [];
-      } catch (_) {
-        return [];
+        apiList = Array.isArray(data.data) ? data.data : [];
+      } catch (_) {}
+
+      // Offline fallback from local snapshot events
+      if (apiList.length === 0 && (String(id).startsWith("grp:") || kind === "STUDENT")) {
+        const targetGrp = String(id).replace(/^grp[:_]/i, "").toUpperCase();
+        for (const r of STATE.rooms) {
+          for (const ev of STATE.eventsByRoom[r.id] || []) {
+            if (ev.g && ev.g.toUpperCase().includes(targetGrp)) {
+              apiList.push({
+                week_day: ev.d,
+                slot_id: ev.s,
+                title: ev.t,
+                room_number: r.name || r.room_name,
+                instructor: ev.i,
+              });
+            }
+          }
+        }
       }
+      return apiList;
     }
 
     async function chooseOverlapPerson(slotNum, kind, id, title) {
       haptic("medium");
-      document.getElementById(`ovResults${slotNum}`).innerHTML = "";
-      document.getElementById(`ovSearch${slotNum}`).value = "";
-      document.getElementById(`ovP${slotNum}Chosen`).textContent = `✓ ${title}`;
+      const resEl = document.getElementById(`ovResults${slotNum}`);
+      const srchEl = document.getElementById(`ovSearch${slotNum}`);
+      const chEl = document.getElementById(`ovP${slotNum}Chosen`);
+      if (resEl) resEl.innerHTML = "";
+      if (srchEl) srchEl.value = "";
+      if (chEl) chEl.textContent = `✓ ${title}`;
       const evs = await fetchPersonScheduleEvents(kind, id);
       STATE.overlap[`p${slotNum}`] = { kind, id, title, events: evs };
       trackEvent("overlap_pick", `${slotNum}:${title}`);
@@ -6224,10 +6434,12 @@
     function renderOverlapOutput() {
       const t = T();
       const box = document.getElementById("overlapComparisonOutput");
+      const sumBar = document.getElementById("overlapSummaryBar");
       if (!box) return;
       const p1 = STATE.overlap.p1;
       const p2 = STATE.overlap.p2;
       if (!p1 || !p2) {
+        if (sumBar) sumBar.innerHTML = "";
         box.innerHTML = `<div class="empty-msg">${t.ovSub}</div>`;
         return;
       }
@@ -6241,20 +6453,81 @@
         if (Number(e.week_day) === Number(STATE.day) && e.slot_id) map2[Number(e.slot_id)] = e;
       }
 
-      const freeWord = t.ovPersonFree || "Free";
-      box.innerHTML = STATE.slots
-        .slice(0, 6)
-        .map((s) => {
-          const sid = Number(s.id);
-          const e1 = map1[sid];
-          const e2 = map2[sid];
-          if (!e1 && !e2) {
+      let freeCount = 0;
+      let sharedCount = 0;
+      const slotsList = (STATE.slots && STATE.slots.length ? STATE.slots : [
+        { id: 1, start_time: "08:30", end_time: "09:40" },
+        { id: 2, start_time: "09:55", end_time: "11:05" },
+        { id: 3, start_time: "11:20", end_time: "12:30" },
+        { id: 4, start_time: "12:45", end_time: "13:55" },
+        { id: 5, start_time: "14:30", end_time: "15:40" },
+        { id: 6, start_time: "15:55", end_time: "17:05" },
+        { id: 7, start_time: "17:20", end_time: "18:30" },
+        { id: 8, start_time: "18:45", end_time: "19:55" },
+      ]);
+
+      const rows = slotsList.map((s) => {
+        const sid = Number(s.id);
+        const e1 = map1[sid];
+        const e2 = map2[sid];
+        const isFree = !e1 && !e2;
+        const sameRoom = Boolean(e1 && e2 && e1.room_number && e2.room_number && String(e1.room_number).toUpperCase() === String(e2.room_number).toUpperCase());
+        const sameSubj = Boolean(e1 && e2 && e1.title && e2.title && String(e1.title).toLowerCase() === String(e2.title).toLowerCase());
+        const isSharedClass = sameRoom || sameSubj;
+        if (isFree) freeCount++;
+        if (isSharedClass) sharedCount++;
+        return { s, sid, e1, e2, isFree, isSharedClass };
+      });
+
+      if (sumBar) {
+        sumBar.innerHTML = `
+          <div class="panel" style="display:flex; justify-content:space-around; align-items:center; padding:10px 12px; margin-bottom:10px; gap:8px;">
+            <div style="text-align:center;">
+              <div style="font-size:18px; font-weight:800; color:#34d399;">${freeCount}</div>
+              <div style="font-size:11px; color:var(--text-muted);">🟢 Общие окна</div>
+            </div>
+            <div style="width:1px; height:28px; background:var(--border);"></div>
+            <div style="text-align:center;">
+              <div style="font-size:18px; font-weight:800; color:#38bdf8;">${sharedCount}</div>
+              <div style="font-size:11px; color:var(--text-muted);">🤝 Общие пары</div>
+            </div>
+          </div>
+        `;
+      }
+
+      const filtered = rows.filter((r) => {
+        if (ovFilterMode === "free") return r.isFree;
+        if (ovFilterMode === "shared") return r.isSharedClass;
+        return true;
+      });
+
+      const freeWord = t.ovPersonFree || "Свободен";
+      if (!filtered.length) {
+        box.innerHTML = `<div class="empty-msg">В этот день по выбранному фильтру совпадений нет. Попробуйте другой день недели.</div>`;
+        return;
+      }
+
+      box.innerHTML = filtered
+        .map(({ s, sid, e1, e2, isFree, isSharedClass }) => {
+          if (isFree) {
             return `
               <div class="slot-row free">
                 <div class="slot-time">${t.pairLabel(sid)}<span>${s.start_time}–${s.end_time}</span></div>
                 <div class="slot-info">
-                  <div class="slot-subj" style="color:#34d399;">${t.ovBothFree}</div>
+                  <div class="slot-subj" style="color:#34d399;">🟢 ${t.ovBothFree}</div>
                   <div class="slot-meta">${p1.title}  &  ${p2.title}</div>
+                  <button class="btn-sm" style="margin-top:6px; font-size:11px;" onclick="openFreeRoomsForSlot(${sid})">🔍 Свободные кабинеты в это окно</button>
+                </div>
+              </div>
+            `;
+          }
+          if (isSharedClass) {
+            return `
+              <div class="slot-row" style="border-left:4px solid #38bdf8; background:rgba(56,189,248,0.09);">
+                <div class="slot-time">${t.pairLabel(sid)}<span>${s.start_time}–${s.end_time}</span></div>
+                <div class="slot-info">
+                  <div class="slot-subj" style="color:#38bdf8;">🤝 Общая пара! ${toNewUz(e1.title || e2.title || "")}</div>
+                  <div class="slot-meta" style="margin-top:3px;">🚪 Ауд. <b>${e1.room_number || e2.room_number || "—"}</b> · 👨‍🏫 ${toNewUz(e1.instructor || e2.instructor || "—")}</div>
                 </div>
               </div>
             `;
@@ -6508,6 +6781,15 @@
         return;
       }
 
+      // Require Moodle identity verification before registering for an event (anti-impersonation)
+      const verifiedMoodle = getVerifiedMoodleIdentity();
+      if (!verifiedMoodle && !STATE.isAdmin) {
+        STATE.pendingEventRegId = evId;
+        showToast("🔒 Для записи на мероприятие подтвердите личность через Moodle", 3400);
+        switchTab("moodle");
+        return;
+      }
+
       const conflict = checkEventTimetableConflict(ev);
       if (conflict && conflict.hasConflict) {
         openConflictModal(ev, conflict);
@@ -6521,6 +6803,7 @@
       const ev = (STATE.campusEvents || []).find((x) => x.id === evId);
       if (!ev) return;
       const title = toNewUz(ev[`title_${STATE.lang}`] || ev.title_uz || ev.title || "");
+      const verifiedMoodle = getVerifiedMoodleIdentity();
 
       if (isAlready) {
         STATE.attendingEvents = (STATE.attendingEvents || []).filter((x) => x.id !== evId);
@@ -6530,6 +6813,8 @@
           id: ev.id,
           title,
           date: normalizeDateStr(ev.date) || STATE.selectedDateStr,
+          verified_moodle_id: verifiedMoodle ? verifiedMoodle.userid : null,
+          verified_fullname: verifiedMoodle ? verifiedMoodle.fullname : "",
           time: ev.time || "14:00",
           location: ev.location || "UWED",
           channel_name: ev.channel_name || "@uwed_official",
@@ -7412,7 +7697,9 @@
         }
       );
       renderSavedProfileBanner();
-      document.getElementById("modalPinBtn").textContent = T().pinnedBtn;
+      const pinBtn = document.getElementById("modalPinBtn");
+      if (pinBtn) pinBtn.textContent = T().pinnedBtn;
+      showToast("✅ Расписание сохранено в вашем профиле");
     }
 
     function removePinnedProfile() {
@@ -7422,35 +7709,15 @@
       renderSavedProfileBanner();
       renderEventsTab();
       renderProfileTab();
+      showToast("Расписание отвязано от профиля");
     }
 
     function renderSavedProfileBanner() {
-      const t = T();
+      // Kept permanently hidden per UX preference: saved schedule lives cleanly in Profile tab
       const banner = document.getElementById("savedProfileBanner");
-      try {
-        const raw = localStorage.getItem("uwed_pinned_profile");
-        if (!raw) {
-          banner.style.display = "none";
-          return;
-        }
-        const p = JSON.parse(raw);
-        banner.style.display = "flex";
-        const safeTitle = (p.title || "").replace(/'/g, "\\'");
-        const openCall =
-          p.kind === "STREAM"
-            ? `openStreamModal('${p.id}')`
-            : `openPersonModal('${p.kind}', '${p.id}', '${safeTitle}')`;
-        banner.innerHTML = `
-          <div style="font-size: 12.5px; font-weight: 600; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
-            🔔 <span style="color:#38bdf8;">${t.mySchedule}:</span> <b>${toNewUz(p.title)}</b>
-          </div>
-          <div style="display:flex; gap:6px; flex-shrink:0;">
-            <button class="btn-sm" onclick="${openCall}">${t.openBtn}</button>
-            <button class="btn-sm" style="background:rgba(255,255,255,0.12);" onclick="removePinnedProfile()">✕</button>
-          </div>
-        `;
-      } catch (_) {
+      if (banner) {
         banner.style.display = "none";
+        banner.innerHTML = "";
       }
     }
 
@@ -7458,33 +7725,85 @@
     function renderProfileTab() {
       const t = T();
       const u = getCurrentUser();
+      const verifiedMoodle = getVerifiedMoodleIdentity();
       const av = document.getElementById("profAvatar");
       if (av) {
-        const init = (u.first_name ? u.first_name.charAt(0) : "") + (u.last_name ? u.last_name.charAt(0) : "");
-        av.textContent = init.toUpperCase() || "UW";
+        const displayFull = (verifiedMoodle && verifiedMoodle.fullname) || [u.first_name, u.last_name].filter(Boolean).join(" ");
+        const parts = displayFull.trim().split(/\s+/);
+        const init = ((parts[0] || "").charAt(0) + (parts[1] || "").charAt(0)).toUpperCase();
+        av.textContent = init || "UW";
       }
       const fn = document.getElementById("profFullName");
-      if (fn) fn.textContent = [u.first_name, u.last_name].filter(Boolean).join(" ") || (t.profDefaultStudent || "UWED Talaba");
+      if (fn) {
+        fn.textContent =
+          (verifiedMoodle && verifiedMoodle.fullname) ||
+          [u.first_name, u.last_name].filter(Boolean).join(" ") ||
+          (t.profDefaultStudent || "UWED Talaba");
+      }
       const un = document.getElementById("profUsername");
-      if (un) un.textContent = u.username ? `@${u.username}` : (u.phone || "UWED User");
+      if (un) un.textContent = u.username ? `@${u.username}` : (verifiedMoodle && verifiedMoodle.username ? `Moodle: ${verifiedMoodle.username}` : (u.phone || "UWED User"));
       const uid = document.getElementById("profTgId");
       if (uid) uid.textContent = `TG-ID: ${u.id}`;
       const rb = document.getElementById("profRoleBadge");
-      if (rb) rb.textContent = STATE.isAdmin ? (t.profRoleAdmin || "ADMIN ⚡") : (t.profRoleStudent || "TALABA 🎓");
+      if (rb) {
+        rb.textContent = STATE.isAdmin
+          ? (t.profRoleAdmin || "ADMIN ⚡")
+          : verifiedMoodle
+          ? "VERIFIED ✅"
+          : (t.profRoleStudent || "TALABA 🎓");
+      }
 
-      // Pinned Schedule
+      // Moodle Verification Status Banner + Deadlines Card
+      const vBar = document.getElementById("profVerifyBanner");
+      const vTxt = document.getElementById("profVerifyText");
+      const dlVal = document.getElementById("profMoodleDlVal");
+      if (verifiedMoodle) {
+        if (vBar) {
+          vBar.style.background = "rgba(16,185,129,0.12)";
+          vBar.style.borderColor = "rgba(16,185,129,0.35)";
+        }
+        if (vTxt) {
+          vTxt.style.color = "#34d399";
+          vTxt.textContent = `✅ Верифицирован через Moodle (${verifiedMoodle.fullname || verifiedMoodle.username})`;
+        }
+        if (dlVal) {
+          const dlCount = (verifiedMoodle.deadlines || []).length;
+          const grCount = (verifiedMoodle.grades || []).length;
+          dlVal.style.color = dlCount > 0 ? "#fbbf24" : "#34d399";
+          dlVal.textContent = `${dlCount} дедл. · ${grCount} оц.`;
+        }
+      } else {
+        if (vBar) {
+          vBar.style.background = "rgba(245,158,11,0.12)";
+          vBar.style.borderColor = "rgba(245,158,11,0.32)";
+        }
+        if (vTxt) {
+          vTxt.style.color = "#fbbf24";
+          vTxt.textContent = "🔒 Не верифицирован — войдите через Moodle";
+        }
+        if (dlVal) {
+          dlVal.style.color = "var(--text-muted)";
+          dlVal.textContent = "Подключить →";
+        }
+      }
+
+      // Pinned Schedule (managed cleanly inside Profile)
       const pinVal = document.getElementById("profPinnedVal");
+      const unpinBtn = document.getElementById("profUnpinBtn");
       const rawPin = localStorage.getItem("uwed_pinned_profile");
       if (pinVal) {
         if (rawPin) {
           try {
             const p = JSON.parse(rawPin);
             pinVal.textContent = toNewUz(p.title);
+            if (unpinBtn) unpinBtn.style.display = "inline-block";
           } catch (_) {
             pinVal.textContent = "—";
+            if (unpinBtn) unpinBtn.style.display = "none";
           }
         } else {
-          pinVal.textContent = t.profNotPinned || "Belgilanmagan (Tanlash →)";
+          pinVal.textContent = t.profNotPinned || "Выбрать группу →";
+          if (unpinBtn) unpinBtn.style.display = "none";
         }
       }
 
