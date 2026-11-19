@@ -2475,24 +2475,24 @@
 
         <!-- Unified Academic, Schedule & Moodle Snapshot -->
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:6px;">
-          <div style="background:rgba(15,23,42,0.45); border:1px solid var(--border); border-radius:12px; padding:10px; cursor:pointer;" onclick="openPinnedProfileFromAnywhere()">
+          <div style="background:var(--bg-elevated); border:1px solid var(--border); border-radius:12px; padding:10px; cursor:pointer;" onclick="openPinnedProfileFromAnywhere()">
             <div style="display:flex; justify-content:space-between; align-items:center;">
               <div style="font-size:10.5px; color:var(--text-muted); font-weight:700;" id="profLblPinned">Моё расписание</div>
               <span style="font-size:10px; color:#fb7185; font-weight:700; padding:1px 5px; border-radius:6px; background:rgba(244,63,94,0.14); display:none;" id="profUnpinBtn" onclick="event.stopPropagation(); removePinnedProfile();">Сброс</span>
             </div>
-            <div style="font-size:13px; font-weight:800; color:#34d399; margin-top:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" id="profPinnedVal">—</div>
+            <div style="font-size:13px; font-weight:800; color:#10b981; margin-top:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" id="profPinnedVal">—</div>
           </div>
-          <div style="background:rgba(15,23,42,0.45); border:1px solid var(--border); border-radius:12px; padding:10px; cursor:pointer;" onclick="switchTab('gpa')">
+          <div style="background:var(--bg-elevated); border:1px solid var(--border); border-radius:12px; padding:10px; cursor:pointer;" onclick="switchTab('gpa')">
             <div style="font-size:10.5px; color:var(--text-muted); font-weight:700;" id="profLblGpa">Официальный GPA</div>
-            <div style="font-size:13px; font-weight:800; color:#38bdf8; margin-top:3px;" id="profGpaVal">0.00 / 5.0</div>
+            <div style="font-size:13px; font-weight:800; color:#0ea5e9; margin-top:3px;" id="profGpaVal">0.00 / 5.0</div>
           </div>
-          <div style="background:rgba(15,23,42,0.45); border:1px solid var(--border); border-radius:12px; padding:10px; cursor:pointer;" onclick="switchTab('moodle')">
+          <div style="background:var(--bg-elevated); border:1px solid var(--border); border-radius:12px; padding:10px; cursor:pointer;" onclick="switchTab('moodle')">
             <div style="font-size:10.5px; color:var(--text-muted); font-weight:700;" id="profLblMoodleDl">Moodle · Дедлайны</div>
-            <div style="font-size:13px; font-weight:800; color:#fbbf24; margin-top:3px;" id="profMoodleDlVal">Не подключён</div>
+            <div style="font-size:13px; font-weight:800; color:#f59e0b; margin-top:3px;" id="profMoodleDlVal">Не подключён</div>
           </div>
-          <div style="background:rgba(15,23,42,0.45); border:1px solid var(--border); border-radius:12px; padding:10px; cursor:pointer;" onclick="switchTab('overlap')">
+          <div style="background:var(--bg-elevated); border:1px solid var(--border); border-radius:12px; padding:10px; cursor:pointer;" onclick="switchTab('overlap')">
             <div style="font-size:10.5px; color:var(--text-muted); font-weight:700;" id="profLblOverlap">Общие пары и окна</div>
-            <div style="font-size:13px; font-weight:800; color:#a78bfa; margin-top:3px;">🤝 Сравнить →</div>
+            <div style="font-size:13px; font-weight:800; color:#8b5cf6; margin-top:3px;">🤝 Сравнить →</div>
           </div>
         </div>
       </div>
@@ -6425,6 +6425,7 @@
       if (resEl) resEl.innerHTML = "";
       if (srchEl) srchEl.value = "";
       if (chEl) chEl.textContent = `✓ ${title}`;
+      STATE.overlap[`p${slotNum}`] = { kind, id, title, events: [] };
       const evs = await fetchPersonScheduleEvents(kind, id);
       STATE.overlap[`p${slotNum}`] = { kind, id, title, events: evs };
       trackEvent("overlap_pick", `${slotNum}:${title}`);
@@ -6514,7 +6515,7 @@
               <div class="slot-row free">
                 <div class="slot-time">${t.pairLabel(sid)}<span>${s.start_time}–${s.end_time}</span></div>
                 <div class="slot-info">
-                  <div class="slot-subj" style="color:#34d399;">🟢 ${t.ovBothFree}</div>
+                  <div class="slot-subj" style="color:#34d399;">${t.ovBothFree}</div>
                   <div class="slot-meta">${p1.title}  &  ${p2.title}</div>
                   <button class="btn-sm" style="margin-top:6px; font-size:11px;" onclick="openFreeRoomsForSlot(${sid})">🔍 Свободные кабинеты в это окно</button>
                 </div>
