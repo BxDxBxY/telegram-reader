@@ -4332,7 +4332,16 @@
 
       try {
         const [snapRes, campusRes] = await Promise.all([
-          fetch("/snapshot.json").then((r) => r.json()).catch(() => ({})),
+          // Prefer the fresh snapshot from the campus sync; fall back to the
+          // bundled static file if the API is unavailable.
+          fetch("/api/uwed?action=snapshot")
+            .then((r) => r.json())
+            .then((d) =>
+              d && Array.isArray(d.rooms) && d.rooms.length
+                ? d
+                : fetch("/snapshot.json").then((r) => r.json())
+            )
+            .catch(() => fetch("/snapshot.json").then((r) => r.json()).catch(() => ({}))),
           fetch("/campus_data.json").then((r) => r.json()).catch(() => ({})),
         ]);
         if (snapRes.slots && snapRes.slots.length) STATE.slots = snapRes.slots;

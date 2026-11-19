@@ -457,6 +457,21 @@ module.exports = async (req, res) => {
       });
     }
 
+    if (action === "snapshot") {
+      // Fresh base data (rooms + weekly events + teachers + slots) from the
+      // campus sync, so the Mini App's room map, free-room view and overlap
+      // finder use current data instead of the stale static snapshot.json.
+      const snap = await loadSnapshotFromDb();
+      return res.status(200).json({
+        success: true,
+        updated_at: snap.updated_at || null,
+        slots: Array.isArray(snap.slots) ? snap.slots : [],
+        rooms: Array.isArray(snap.rooms) ? snap.rooms : [],
+        teachers: Array.isArray(snap.teachers) ? snap.teachers : [],
+        events: snap.events && typeof snap.events === "object" ? snap.events : {},
+      });
+    }
+
     if (action === "slots") {
       const data = await uwedGet(
         "/public/timetable/v1/slots/by/academic/year",
