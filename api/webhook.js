@@ -2063,7 +2063,7 @@ module.exports = async (req, res) => {
   const upd = req.body || {};
 
   try {
-    const db = await loadDb();
+    const db = await loadDb(true);
     const incomingFrom =
       (upd.message && upd.message.from) || (upd.callback_query && upd.callback_query.from) || null;
     const uRec = incomingFrom && db.users ? db.users[String(incomingFrom.id)] : null;
@@ -2073,7 +2073,7 @@ module.exports = async (req, res) => {
       if (upd.callback_query) {
         await tgApi("answerCallbackQuery", {
           callback_query_id: upd.callback_query.id,
-          text: "🚫 Access Restricted by Admin",
+          text: "🚫 Доступ ограничен администратором",
           show_alert: true,
         });
       }

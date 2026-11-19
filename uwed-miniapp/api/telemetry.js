@@ -309,7 +309,30 @@ module.exports = async (req, res) => {
 
   // Public safe state for Mini App (crowd-sourced room statuses, campus events & block check)
   if (req.method === "GET" && req.query.action === "public_state") {
-    const db = await loadDb();
+    const db = await loadDb(true);
+    const initDataHdr = req.headers["x-tg-init-data"] || req.query.initData || "";
+    const tgUser = verifyTelegramInitData(initDataHdr);
+    const uid = String((tgUser && tgUser.id) || req.query.uid || "");
+    const qUid = String(req.query.uid || "");
+    const userRecord = (uid && db.users && db.users[uid]) || (qUid && db.users && db.users[qUid]) || null;
+    const isAdminUser =
+      uid === ADMIN_ID ||
+      qUid === ADMIN_ID ||
+      (userRecord && String(userRecord.username || "").toLowerCase() === ADMIN_USERNAME) ||
+      isAuthorizedAdminRequest(req);
+    const isBlocked = Boolean(!isAdminUser && userRecord && userRecord.blocked);
+
+    if (isBlocked) {
+      return res.status(200).json({
+        success: true,
+        is_blocked: true,
+        is_admin: false,
+        room_reports: {},
+        campus_events: [],
+        attending_events: [],
+      });
+    }
+
     // Auto-refresh tracked Telegram channels every 10 minutes non-blockingly
     if (
       !Array.isArray(db.channel_posts) ||
@@ -322,13 +345,6 @@ module.exports = async (req, res) => {
         syncTrackedChannels(db, false).catch(() => {});
       }
     }
-    const uid = String(req.query.uid || "");
-    const userRecord = uid && db.users ? db.users[uid] : null;
-    const isBlocked = Boolean(userRecord && userRecord.blocked && uid !== ADMIN_ID);
-    const isAdminUser =
-      uid === ADMIN_ID ||
-      (userRecord && String(userRecord.username || "").toLowerCase() === ADMIN_USERNAME) ||
-      isAuthorizedAdminRequest(req);
 
     const safeReports = {};
     for (const [rm, rep] of Object.entries(db.room_reports || {})) {
@@ -684,7 +700,9 @@ module.exports = async (req, res) => {
 
         if (targetUid === "ALL") {
           const db = await loadDb(true);
-          const tgIds = Object.keys(db.users || {}).filter((id) => /^\d+$/.test(id));
+          const allTgIds = Object.keys(db.users || {}).filter((id) => /^\d+$/.test(id));
+          const tgIds = allTgIds.filter((id) => !(db.users[id] && db.users[id].blocked));
+          const skippedBlocked = allTgIds.length - tgIds.length;
           let delivered = 0;
           await Promise.all(
             tgIds.map(async (id) => {
@@ -692,7 +710,7 @@ module.exports = async (req, res) => {
               if (r && r.ok) delivered++;
             })
           );
-          return res.status(200).json({ success: true, delivered, total: tgIds.length });
+          return res.status(200).json({ success: true, delivered, total: tgIds.length, skipped_blocked: skippedBlocked });
         } else {
           const tgRes = await sendTelegramMessage(
             targetUid,
@@ -707,6 +725,17 @@ module.exports = async (req, res) => {
             tg_response: tgRes,
           });
         }
+      }
+    }
+
+    // Strict block check before processing any regular user telemetry/action
+    const postInitData = req.headers["x-tg-init-data"] || body.initData || "";
+    const postTgUser = verifyTelegramInitData(postInitData);
+    const postUid = String((postTgUser && postTgUser.id) || (body.user && body.user.id) || "");
+    if (postUid && postUid !== ADMIN_ID) {
+      const checkDb = await loadDb();
+      if (checkDb && checkDb.users && checkDb.users[postUid] && checkDb.users[postUid].blocked) {
+        return res.status(403).json({ success: false, is_blocked: true, error: "Access Restricted" });
       }
     }
 

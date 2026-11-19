@@ -470,8 +470,9 @@ def run_mirror(args: argparse.Namespace) -> None:
             db.mark_done("rooms", q)
     print(f"      Rooms in local DB: {db.stats()['rooms']}")
 
-    # 3. Teachers
-    print(f"[3/5] Mirroring teachers ({len(NAME_PREFIXES)} gentle prefix queries)...")
+    # 3. Teachers (with adaptive 3-letter drilling if a prefix returns >= 15 rows)
+    print(f"[3/5] Mirroring teachers ({len(NAME_PREFIXES)} gentle prefix queries + adaptive 3-letter drill)...")
+    alphabet = "abcdefghijklmnopqrstuvwxyz"
     for idx, p in enumerate(NAME_PREFIXES, 1):
         if db.is_done("teachers", p):
             continue
@@ -483,16 +484,34 @@ def run_mirror(args: argparse.Namespace) -> None:
             {"search": p},
         )
         if res and isinstance(res.get("data"), list):
-            for t in res["data"]:
+            rows = res["data"]
+            for t in rows:
                 db.upsert_teacher(t)
             db.conn.commit()
+            if len(rows) >= 15:
+                for ch in alphabet:
+                    p3 = p + ch
+                    if db.is_done("teachers_3", p3):
+                        continue
+                    r3 = client.get_json(
+                        [
+                            "/api/public/timetable/v1/search/teachers",
+                            "/api/timetable/public/v1/search/teachers",
+                        ],
+                        {"search": p3},
+                    )
+                    if r3 and isinstance(r3.get("data"), list):
+                        for t in r3["data"]:
+                            db.upsert_teacher(t)
+                        db.conn.commit()
+                        db.mark_done("teachers_3", p3)
             db.mark_done("teachers", p)
         if idx % 20 == 0:
             print(f"      Progress: {idx}/{len(NAME_PREFIXES)} prefixes | Teachers: {db.stats()['teachers']}")
     print(f"      Teachers in local DB: {db.stats()['teachers']}")
 
-    # 4. Students
-    print(f"[4/5] Mirroring students ({len(NAME_PREFIXES)} gentle prefix queries)...")
+    # 4. Students (with adaptive 3-letter drilling to capture 100% of all students)
+    print(f"[4/5] Mirroring ALL students ({len(NAME_PREFIXES)} prefixes + adaptive 3-letter drill)...")
     for idx, p in enumerate(NAME_PREFIXES, 1):
         if db.is_done("students", p):
             continue
@@ -504,9 +523,27 @@ def run_mirror(args: argparse.Namespace) -> None:
             {"search": p},
         )
         if res and isinstance(res.get("data"), list):
-            for s in res["data"]:
+            rows = res["data"]
+            for s in rows:
                 db.upsert_student(s)
             db.conn.commit()
+            if len(rows) >= 15:
+                for ch in alphabet:
+                    p3 = p + ch
+                    if db.is_done("students_3", p3):
+                        continue
+                    r3 = client.get_json(
+                        [
+                            "/api/public/education/v1/student/search/for-timetable",
+                            "/api/education/public/v1/student/search/for-timetable",
+                        ],
+                        {"search": p3},
+                    )
+                    if r3 and isinstance(r3.get("data"), list):
+                        for s in r3["data"]:
+                            db.upsert_student(s)
+                        db.conn.commit()
+                        db.mark_done("students_3", p3)
             db.mark_done("students", p)
         if idx % 20 == 0:
             print(f"      Progress: {idx}/{len(NAME_PREFIXES)} prefixes | Students: {db.stats()['students']}")

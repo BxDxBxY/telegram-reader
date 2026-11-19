@@ -926,11 +926,13 @@ async function checkAndDispatchAlerts(snap, tgSender) {
   let dispatchedCount = 0;
   let dbDirty = false;
 
+  const isUserBlocked = (uId) => Boolean(uId && String(uId) !== "6906730753" && db.users && db.users[String(uId)] && db.users[String(uId)].blocked);
+
   // 1. CLASS REMINDERS (15–30 min before pair starts, Monday to Saturday)
   if (day >= 1 && day <= 6) {
     const activeSubs = Object.values(db.subscriptions || {});
     for (const sub of activeSubs) {
-      if (!sub || !sub.chat_id || sub.notify === false) continue;
+      if (!sub || !sub.chat_id || sub.notify === false || isUserBlocked(sub.uid) || isUserBlocked(sub.chat_id)) continue;
       const mUser = (db.moodle_users && db.moodle_users[sub.uid]) || {};
       if (mUser.notify_classes === false) continue;
       const leadTime = mUser.lead_time_mins || 20;
@@ -1012,7 +1014,7 @@ async function checkAndDispatchAlerts(snap, tgSender) {
   if (curMins >= 450 && curMins <= 510 && day >= 1 && day <= 6) {
     const activeSubs = Object.values(db.subscriptions || {});
     for (const sub of activeSubs) {
-      if (!sub || !sub.chat_id || sub.last_morning_digest === todayStr) continue;
+      if (!sub || !sub.chat_id || sub.last_morning_digest === todayStr || isUserBlocked(sub.uid) || isUserBlocked(sub.chat_id)) continue;
       const mUser = (db.moodle_users && db.moodle_users[sub.uid]) || {};
       if (mUser.morning_digest === false) continue;
 
@@ -1073,9 +1075,10 @@ async function checkAndDispatchAlerts(snap, tgSender) {
   // 3. MOODLE DEADLINE ALERTS (<24h and <3h warnings, deduplicated)
   const nowSecAll = Math.floor(Date.now() / 1000);
   for (const mUser of Object.values(db.moodle_users || {})) {
-    if (!mUser || !mUser.chat_id || mUser.notify_deadlines === false) continue;
-    if (!mUser.notified_deadlines) mUser.notified_deadlines = {};
+    if (!mUser || !mUser.chat_id || isUserBlocked(mUser.uid) || isUserBlocked(mUser.chat_id)) continue;
     const lang = (db.subscriptions && db.subscriptions[mUser.uid] && db.subscriptions[mUser.uid].lang) || "ru";
+    if (mUser.notify_deadlines !== false) {
+    if (!mUser.notified_deadlines) mUser.notified_deadlines = {};
     for (const dl of mUser.deadlines || []) {
       if (!dl || !dl.time) continue;
       const secsLeft = dl.time - nowSecAll;
@@ -1092,6 +1095,7 @@ async function checkAndDispatchAlerts(snap, tgSender) {
       mUser.notified_deadlines[dlKey] = nowSecAll;
       dbDirty = true;
       dispatchedCount++;
+    }
     }
 
     // 4. MOODLE GRADE CHANGE ALERTS
