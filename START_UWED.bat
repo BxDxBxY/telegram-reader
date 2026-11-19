@@ -26,7 +26,7 @@ set "CF_LOG=cloudflared.log"
 set "URLFILE=tunnel_url.txt"
 set "TOKENFILE=bot_token.txt"
 set "VBSFILE=uwed_hidden.vbs"
-set "SERVER_SRC=https://raw.githubusercontent.com/BxDxBxY/telegram-reader/claude/quirky-newton-hmzh3d/uwed_campus_server.py"
+set "SERVER_SRC=https://raw.githubusercontent.com/BxDxBxY/telegram-reader/main/uwed_campus_server.py"
 set "CF_SRC=https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe"
 set "PY_SRC=https://www.python.org/ftp/python/3.12.7/python-3.12.7-amd64.exe"
 
