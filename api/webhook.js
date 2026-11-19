@@ -765,7 +765,7 @@ function buildReplyKeyboard(baseWebappUrl, lang = "uz") {
   const restartBtn = lang === "ru" ? "🔄 Перезапуск / Статус" : lang === "en" ? "🔄 System Status / Fix" : "🔄 Qayta yuklash / Holat";
   return {
     keyboard: [
-      [{ text: tr.openApp, web_app: { url: `${baseWebappUrl}?v=r3&lang=${lang}` } }],
+      [{ text: tr.openApp, web_app: { url: `${baseWebappUrl}?v=r4&lang=${lang}` } }],
       [{ text: tr.findRoomsBtn }, { text: tr.eventsBtn }],
       [{ text: tr.mySchedBtn }, { text: moodleBtn }],
       [{ text: restartBtn }, { text: tr.helpBtn }],
@@ -794,26 +794,26 @@ function formatHomeHub(snap, lang, baseWebappUrl) {
 
   const kb = {
     inline_keyboard: [
-      [{ text: tr.openApp, web_app: { url: `${baseWebappUrl}?v=r3&lang=${lang}` } }],
+      [{ text: tr.openApp, web_app: { url: `${baseWebappUrl}?v=r4&lang=${lang}` } }],
       [{ text: tr.findRoomsBtn, callback_data: `m:pick:${lang}` }],
       [
         {
           text: lang === "ru" ? "🎓 Moodle · Дедлайны" : lang === "en" ? "🎓 Moodle · Deadlines" : "🎓 Moodle · Dedlayn",
-          web_app: { url: `${baseWebappUrl}?v=r3&lang=${lang}&tab=moodle` },
+          web_app: { url: `${baseWebappUrl}?v=r4&lang=${lang}&tab=moodle` },
         },
         {
           text: lang === "ru" ? "🧮 GPA · HEMIS" : lang === "en" ? "🧮 GPA · HEMIS" : "🧮 GPA · HEMIS",
-          web_app: { url: `${baseWebappUrl}?v=r3&lang=${lang}&tab=gpa` },
+          web_app: { url: `${baseWebappUrl}?v=r4&lang=${lang}&tab=gpa` },
         },
       ],
       [
         {
           text: lang === "ru" ? "🗺 3D Карта УМЭД" : lang === "en" ? "🗺 3D Campus Map" : "🗺 3D Xarita",
-          web_app: { url: `${baseWebappUrl}?v=r3&lang=${lang}&tab=map` },
+          web_app: { url: `${baseWebappUrl}?v=r4&lang=${lang}&tab=map` },
         },
         {
           text: lang === "ru" ? "📦 Обмен · Lost&Found" : lang === "en" ? "📦 Swap · Lost&Found" : "📦 Almashinuv · Topilma",
-          web_app: { url: `${baseWebappUrl}?v=r3&lang=${lang}&tab=lf` },
+          web_app: { url: `${baseWebappUrl}?v=r4&lang=${lang}&tab=lf` },
         },
       ],
       [
@@ -825,10 +825,10 @@ function formatHomeHub(snap, lang, baseWebappUrl) {
         { text: tr.mySchedBtn, callback_data: `m:my:${lang}` },
       ],
       [
-        { text: tr.overlapBtn, web_app: { url: `${baseWebappUrl}?v=r3&lang=${lang}&tab=overlap` } },
+        { text: tr.overlapBtn, web_app: { url: `${baseWebappUrl}?v=r4&lang=${lang}&tab=overlap` } },
         {
           text: lang === "ru" ? "🚀 Гранты (9)" : lang === "en" ? "🚀 Grants (9)" : "🚀 Grantlar (9)",
-          web_app: { url: `${baseWebappUrl}?v=r3&lang=${lang}&tab=opps` },
+          web_app: { url: `${baseWebappUrl}?v=r4&lang=${lang}&tab=opps` },
         },
       ],
       ["uz", "ru", "en"].map((l) => ({
@@ -863,7 +863,7 @@ function formatBlockPicker(snap, lang, baseWebappUrl) {
         { text: `🅱️ B (${bRes.free.length})`, callback_data: `v:${lang}:B:A:${cur.day}:${cur.slot}:0` },
         { text: `🇩 D (${dRes.free.length})`, callback_data: `v:${lang}:D:A:${cur.day}:${cur.slot}:0` },
       ],
-      [{ text: tr.openApp, web_app: { url: `${baseWebappUrl}?v=r3&lang=${lang}` } }],
+      [{ text: tr.openApp, web_app: { url: `${baseWebappUrl}?v=r4&lang=${lang}` } }],
       [{ text: tr.backHomeBtn, callback_data: `m:home:${lang}` }],
     ],
   };
@@ -1068,7 +1068,7 @@ async function formatCampusEventsMessage(lang, baseWebappUrl) {
   }
   const kb = {
     inline_keyboard: [
-      [{ text: `🗓 ${tr.openApp}`, web_app: { url: `${baseWebappUrl}?v=r3&lang=${lang}&tab=events` } }],
+      [{ text: `🗓 ${tr.openApp}`, web_app: { url: `${baseWebappUrl}?v=r4&lang=${lang}&tab=events` } }],
       [{ text: tr.backHomeBtn, callback_data: `m:home:${lang}` }],
     ],
   };
@@ -1393,7 +1393,7 @@ async function formatSystemFixCard(snap, lang, baseWebappUrl) {
         [{ text: "📅 Пары на сегодня", callback_data: `m:today:${lang}` }],
         [{ text: "🎓 Moodle · Дедлайны & Оценки", callback_data: `m:moodle:${lang}` }],
         [{ text: "🔔 Настройки напоминаний", callback_data: `m:notify:${lang}` }],
-        [{ text: "📱 Открыть UWED Mini App", web_app: { url: `${baseWebappUrl}?v=r3&lang=${lang}` } }],
+        [{ text: "📱 Открыть UWED Mini App", web_app: { url: `${baseWebappUrl}?v=r4&lang=${lang}` } }],
         [{ text: "← Главное меню", callback_data: `m:home:${lang}` }],
       ],
     };
@@ -1423,7 +1423,7 @@ async function formatSystemFixCard(snap, lang, baseWebappUrl) {
         [{ text: "📅 Today's Classes", callback_data: `m:today:${lang}` }],
         [{ text: "🎓 Moodle · Deadlines & Grades", callback_data: `m:moodle:${lang}` }],
         [{ text: "🔔 Notification Settings", callback_data: `m:notify:${lang}` }],
-        [{ text: "📱 Open UWED Mini App", web_app: { url: `${baseWebappUrl}?v=r3&lang=${lang}` } }],
+        [{ text: "📱 Open UWED Mini App", web_app: { url: `${baseWebappUrl}?v=r4&lang=${lang}` } }],
         [{ text: "← Main Menu", callback_data: `m:home:${lang}` }],
       ],
     };
@@ -1452,7 +1452,7 @@ async function formatSystemFixCard(snap, lang, baseWebappUrl) {
       [{ text: "📅 Bugungi darslar", callback_data: `m:today:${lang}` }],
       [{ text: "🎓 Moodle · Dedlayn & Baholar", callback_data: `m:moodle:${lang}` }],
       [{ text: "🔔 Eslatma sozlamalari", callback_data: `m:notify:${lang}` }],
-      [{ text: "📱 UWED Mini App'ni ochish", web_app: { url: `${baseWebappUrl}?v=r3&lang=${lang}` } }],
+      [{ text: "📱 UWED Mini App'ni ochish", web_app: { url: `${baseWebappUrl}?v=r4&lang=${lang}` } }],
       [{ text: "← Asosiy menyu", callback_data: `m:home:${lang}` }],
     ],
   };
@@ -1483,7 +1483,7 @@ async function formatMoodleDashboard(userMoodle, lang, baseWebappUrl) {
 
       const kb = {
         inline_keyboard: [
-          [{ text: "🔗 Войти в Moodle через Mini App", web_app: { url: `${baseWebappUrl}?v=r3&lang=${lang}&tab=moodle` } }],
+          [{ text: "🔗 Войти в Moodle через Mini App", web_app: { url: `${baseWebappUrl}?v=r4&lang=${lang}&tab=moodle` } }],
           [{ text: "← Назад в меню", callback_data: `m:home:${lang}` }],
         ],
       };
@@ -1509,7 +1509,7 @@ async function formatMoodleDashboard(userMoodle, lang, baseWebappUrl) {
 
       const kb = {
         inline_keyboard: [
-          [{ text: "🔗 Open Moodle in Mini App", web_app: { url: `${baseWebappUrl}?v=r3&lang=${lang}&tab=moodle` } }],
+          [{ text: "🔗 Open Moodle in Mini App", web_app: { url: `${baseWebappUrl}?v=r4&lang=${lang}&tab=moodle` } }],
           [{ text: "← Main Menu", callback_data: `m:home:${lang}` }],
         ],
       };
@@ -1535,7 +1535,7 @@ async function formatMoodleDashboard(userMoodle, lang, baseWebappUrl) {
 
     const kb = {
       inline_keyboard: [
-        [{ text: "🔗 Mini App orqali Moodle'ga kirish", web_app: { url: `${baseWebappUrl}?v=r3&lang=${lang}&tab=moodle` } }],
+        [{ text: "🔗 Mini App orqali Moodle'ga kirish", web_app: { url: `${baseWebappUrl}?v=r4&lang=${lang}&tab=moodle` } }],
         [{ text: "← Asosiy menyu", callback_data: `m:home:${lang}` }],
       ],
     };
@@ -1933,7 +1933,7 @@ async function formatTodayClasses(from, snap, db, lang, baseWebappUrl) {
 
   const kb = {
     inline_keyboard: [
-      [{ text: "🗺 3D " + (lang === "ru" ? "Карта кампуса" : "Kampus xaritasi"), web_app: { url: `${baseWebappUrl}?v=r3&lang=${lang}&tab=map` } }],
+      [{ text: "🗺 3D " + (lang === "ru" ? "Карта кампуса" : "Kampus xaritasi"), web_app: { url: `${baseWebappUrl}?v=r4&lang=${lang}&tab=map` } }],
       [{ text: "🎓 Moodle", callback_data: `m:moodle:${lang}` }],
       [{ text: "← " + (lang === "ru" ? "Главное меню" : "Asosiy menyu"), callback_data: `m:home:${lang}` }],
     ],
@@ -2596,7 +2596,7 @@ module.exports = async (req, res) => {
           parse_mode: "HTML",
           reply_markup: {
             inline_keyboard: [
-              [{ text: "🔗 Moodle Mini App", web_app: { url: `${baseWebappUrl}?v=r3&lang=${lang}&tab=moodle` } }],
+              [{ text: "🔗 Moodle Mini App", web_app: { url: `${baseWebappUrl}?v=r4&lang=${lang}&tab=moodle` } }],
             ],
           },
         });
@@ -2687,7 +2687,7 @@ module.exports = async (req, res) => {
             text: tr.noMySched,
             parse_mode: "HTML",
             reply_markup: {
-              inline_keyboard: [[{ text: tr.openApp, web_app: { url: `${baseWebappUrl}?v=r3&lang=${lang}` } }]],
+              inline_keyboard: [[{ text: tr.openApp, web_app: { url: `${baseWebappUrl}?v=r4&lang=${lang}` } }]],
             },
           });
           return res.status(200).json({ ok: true });
@@ -2734,7 +2734,7 @@ module.exports = async (req, res) => {
           text: tr.feedbackPrompt,
           parse_mode: "HTML",
           reply_markup: {
-            inline_keyboard: [[{ text: tr.openApp, web_app: { url: `${baseWebappUrl}?v=r3&lang=${lang}&tab=feedback` } }]],
+            inline_keyboard: [[{ text: tr.openApp, web_app: { url: `${baseWebappUrl}?v=r4&lang=${lang}&tab=feedback` } }]],
           },
         });
         return res.status(200).json({ ok: true });
@@ -2805,7 +2805,7 @@ module.exports = async (req, res) => {
         for (const s of students) {
           rows.push([{ text: `🎓 ${tr.studentWord}: ${toNewUz(s.full_name, lang)}`, callback_data: `p:${lang}:S:${s.id}:${cur.day}` }]);
         }
-        rows.push([{ text: tr.openApp, web_app: { url: `${baseWebappUrl}?v=r3&lang=${lang}` } }]);
+        rows.push([{ text: tr.openApp, web_app: { url: `${baseWebappUrl}?v=r4&lang=${lang}` } }]);
         await tgApi("sendMessage", {
           chat_id: chatId,
           text: tr.searchResults(text),
@@ -2820,7 +2820,7 @@ module.exports = async (req, res) => {
         text: tr.notFound(text),
         parse_mode: "HTML",
         reply_markup: {
-          inline_keyboard: [[{ text: tr.openApp, web_app: { url: `${baseWebappUrl}?v=r3&lang=${lang}` } }]],
+          inline_keyboard: [[{ text: tr.openApp, web_app: { url: `${baseWebappUrl}?v=r4&lang=${lang}` } }]],
         },
       });
       return res.status(200).json({ ok: true });
@@ -3164,7 +3164,7 @@ module.exports = async (req, res) => {
                 parse_mode: "HTML",
                 reply_markup: {
                   inline_keyboard: [
-                    [{ text: tr.openApp, web_app: { url: `${baseWebappUrl}?v=r3&lang=${lang}` } }],
+                    [{ text: tr.openApp, web_app: { url: `${baseWebappUrl}?v=r4&lang=${lang}` } }],
                     [{ text: tr.backHomeBtn, callback_data: `m:home:${lang}` }],
                   ],
                 },
@@ -3198,7 +3198,7 @@ module.exports = async (req, res) => {
               parse_mode: "HTML",
               reply_markup: {
                 inline_keyboard: [
-                  [{ text: tr.openApp, web_app: { url: `${baseWebappUrl}?v=r3&lang=${lang}` } }],
+                  [{ text: tr.openApp, web_app: { url: `${baseWebappUrl}?v=r4&lang=${lang}` } }],
                   [{ text: tr.backHomeBtn, callback_data: `m:home:${lang}` }],
                 ],
               },
