@@ -2,7 +2,9 @@
 <html lang="uz">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <title>UWED • Smart Campus & Jadval</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -618,6 +620,198 @@
     #uwedMapLibre {
       width: 100%;
       height: 100%;
+      min-height: 300px;
+      touch-action: pan-x pan-y;
+    }
+    #uwedMap2DSvg {
+      width: 100%;
+      height: 100%;
+      min-height: 300px;
+      display: none;
+      background: radial-gradient(circle at 50% 45%, #132242 0%, #091021 100%);
+      position: relative;
+      overflow: hidden;
+      touch-action: manipulation;
+    }
+    html[data-theme="light"] #uwedMap2DSvg {
+      background: radial-gradient(circle at 50% 45%, #e0f2fe 0%, #f1f5f9 100%);
+    }
+    .map-svg-bld {
+      cursor: pointer;
+      transition: transform 0.18s ease, filter 0.18s ease;
+    }
+    .map-svg-bld:active { filter: brightness(1.2); }
+    .slot-row.busy, .slot-row.conflict {
+      cursor: pointer;
+      transition: transform 0.14s ease, border-color 0.15s ease, background 0.15s ease;
+    }
+    .slot-row.busy:active, .slot-row.conflict:active {
+      transform: scale(0.985);
+      border-color: rgba(56, 189, 248, 0.55);
+    }
+    .slot-tap-hint {
+      font-size: 10px;
+      color: #38bdf8;
+      font-weight: 700;
+      margin-top: 4px;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      opacity: 0.85;
+    }
+    .acad-hub-card {
+      background: linear-gradient(135deg, rgba(16, 185, 129, 0.13), rgba(59, 130, 246, 0.13));
+      border: 1px solid rgba(56, 189, 248, 0.28);
+      border-radius: 18px;
+      padding: 13px 14px;
+      margin-bottom: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .acad-hub-row {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+    }
+    .acad-mini-stat {
+      background: rgba(15, 23, 42, 0.45);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 8px 10px;
+      cursor: pointer;
+      min-width: 0;
+    }
+    html[data-theme="light"] .acad-mini-stat {
+      background: rgba(255, 255, 255, 0.85);
+    }
+    .campus-extra-strip {
+      display: flex;
+      gap: 7px;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      padding-bottom: 4px;
+      margin-bottom: 14px;
+      scrollbar-width: none;
+    }
+    .campus-extra-strip::-webkit-scrollbar { display: none; }
+    .campus-extra-chip {
+      flex: 0 0 auto;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 11px;
+      border-radius: 12px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      font-size: 11.5px;
+      font-weight: 700;
+      color: var(--text);
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .rooms-summary-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 10px 13px;
+      border-radius: 14px;
+      background: linear-gradient(135deg, rgba(16,185,129,0.14), rgba(6,182,212,0.10));
+      border: 1px solid rgba(16,185,129,0.3);
+      margin-bottom: 10px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .class-detail-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 1200;
+      background: rgba(2, 6, 23, 0.72);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      display: none;
+      align-items: flex-end;
+      justify-content: center;
+      padding: 0;
+    }
+    .class-detail-backdrop.open { display: flex; }
+    .class-detail-sheet {
+      width: 100%;
+      max-width: 540px;
+      background: var(--bg-card-solid);
+      border-top: 1px solid rgba(56, 189, 248, 0.35);
+      border-radius: 22px 22px 0 0;
+      padding: 18px 16px calc(22px + env(safe-area-inset-bottom, 0px));
+      max-height: 86dvh;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      box-shadow: 0 -16px 40px rgba(0, 0, 0, 0.45);
+    }
+    .notify-toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      margin-bottom: 7px;
+      font-size: 12.5px;
+      font-weight: 700;
+    }
+    .notify-switch {
+      appearance: none;
+      -webkit-appearance: none;
+      width: 42px;
+      height: 24px;
+      border-radius: 99px;
+      background: rgba(148,163,184,0.35);
+      position: relative;
+      cursor: pointer;
+      transition: background 0.18s;
+      flex-shrink: 0;
+    }
+    .notify-switch::after {
+      content: "";
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #fff;
+      transition: transform 0.18s;
+    }
+    .notify-switch:checked { background: #10b981; }
+    .notify-switch:checked::after { transform: translateX(18px); }
+    /* iOS & Mobile Polish */
+    html, body {
+      -webkit-text-size-adjust: 100%;
+      overscroll-behavior-y: contain;
+    }
+    body {
+      padding-bottom: calc(86px + env(safe-area-inset-bottom, 0px));
+    }
+    .bottom-nav {
+      padding-bottom: calc(6px + env(safe-area-inset-bottom, 0px));
+    }
+    .chips-scroll, .modal-body {
+      -webkit-overflow-scrolling: touch;
+    }
+    button, .pill, .b-card, .bento-item, .sq-tile, .room-card {
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+    }
+    @media (max-width: 420px) {
+      .search-input, .hero-search-input, input[type="text"], input[type="password"], input[type="number"], textarea, select {
+        font-size: 16px !important;
+      }
+      .blocks-showcase { gap: 7px; }
+      .b-card { padding: 11px 9px; }
+      .acad-hub-row { gap: 6px; }
+      .acad-mini-stat { padding: 7px 8px; }
     }
     .map-pin-btn {
       background: linear-gradient(135deg, #059669, #10b981);
@@ -1787,147 +1981,132 @@
         <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:8px;">
           <div class="hero-pill" style="margin-bottom:0;">
             <span class="pulse-dot"></span>
-            <span id="heroTimeBadge">LIVE • manage.uwed.uz</span>
+            <span id="heroTimeBadge">LIVE • UWED</span>
           </div>
           <div style="display:flex; align-items:center; gap:6px;">
-            <span style="font-size:10px; font-weight:800; background:rgba(6,182,212,0.2); color:#38bdf8; border:1px solid rgba(6,182,212,0.35); padding:3px 8px; border-radius:99px; letter-spacing:0.5px;">DIPLOMAT HUB</span>
-            <img src="/logo.jpg" alt="UWED Helpdesk Emblem" style="width:36px; height:26px; object-fit:cover; border-radius:7px; border:1px solid rgba(255,255,255,0.28); box-shadow:0 4px 12px rgba(0,0,0,0.45);" />
+            <img src="/logo.jpg" alt="UWED Helpdesk" style="width:36px; height:26px; object-fit:cover; border-radius:7px; border:1px solid rgba(255,255,255,0.28); box-shadow:0 4px 12px rgba(0,0,0,0.45);" />
           </div>
         </div>
 
-        <div class="hero-greet" id="heroUserGreet">Assalomu alaykum! 👋</div>
-        <div class="hero-quote" id="heroQuoteText">«Diplomatiya, ta’lim va kampus imkoniyatlari yagona markazda»</div>
+        <div class="hero-greet" id="heroUserGreet">...</div>
+        <div class="hero-quote" id="heroQuoteText"></div>
 
         <!-- Global Search Bar across Rooms, Teachers, Students, Buildings, Leadership & Docs -->
         <div class="hero-search-wrap">
           <svg style="position:absolute;left:13px;top:50%;transform:translateY(-50%);width:16px;height:16px;color:#38bdf8;pointer-events:none;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-          <input type="text" class="hero-search-input" id="heroGlobalSearchInput" placeholder="Xona, ustoz, talaba, bino yoki hujjat qidiring..." oninput="onHeroGlobalSearch(this.value)" />
+          <input type="text" class="hero-search-input" id="heroGlobalSearchInput" placeholder="..." oninput="onHeroGlobalSearch(this.value)" />
           <div class="hero-search-results" id="heroGlobalSearchResults"></div>
         </div>
 
-        <!-- Non-overflowing Live Classrooms Radar Box with full-width CTA button -->
+        <!-- Live Classrooms Radar Box -->
         <div class="hero-radar-box">
           <div class="hero-radar-top">
             <div style="display:flex; align-items:baseline; gap:10px;">
-              <span class="hero-big-num" id="heroFreeCount">--</span>
+              <span class="hero-big-num" id="heroFreeCount">—</span>
               <div>
-                <span class="hero-big-lbl" id="heroFreeLabel">bõş auditoriya hozir</span>
-                <div style="font-size:11px; color:var(--text-sec); margin-top:2px;" id="heroSubText">
-                  A, B va D binolaridagi jonli holat
-                </div>
+                <span class="hero-big-lbl" id="heroFreeLabel">...</span>
+                <div style="font-size:11px; color:var(--text-sec); margin-top:2px;" id="heroSubText">...</div>
               </div>
             </div>
             <span class="pulse-dot" style="width:10px; height:10px;"></span>
           </div>
           <button class="hero-cta" onclick="openQuickFreeRooms()" id="heroCtaBtn">
             <span>⚡</span>
-            <span id="heroCtaText">Hozir bõş xonalarni kõriş</span>
+            <span id="heroCtaText">...</span>
           </button>
         </div>
       </div>
 
-      <!-- 3x2 Super-App Pastel Quick Grid (Moodle, GPA/HEMIS, 3D Map, Leadership/Docs, Grants, Lost&Found) -->
-      <div class="super-quick-grid">
-        <div class="sq-tile" onclick="switchTab('moodle')">
-          <div class="sq-ic c-green">🎓</div>
-          <div class="sq-title" id="sqMoodleT">Moodle JIDU</div>
-          <div class="sq-sub" id="sqMoodleS">Dedlaynlar va baholar</div>
+      <!-- Unified Academic Hub (Moodle + HEMIS GPA + Next Class in one glance) -->
+      <div class="acad-hub-card" id="homeAcadHubCard">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <span style="font-size:12px; font-weight:800; color:var(--text);" id="homeAcadHubTitle">🎓 Moodle · HEMIS · Расписание</span>
+          <span style="font-size:10.5px; font-weight:700; color:#34d399;" id="homeAcadSyncBadge"></span>
         </div>
-        <div class="sq-tile" onclick="switchTab('gpa')">
-          <div class="sq-ic c-blue">🧮</div>
-          <div class="sq-title" id="sqGpaT">GPA · HEMIS</div>
-          <div class="sq-sub" id="sqGpaS">Kalkulyator va baholar</div>
-        </div>
-        <div class="sq-tile" onclick="switchTab('map')">
-          <div class="sq-ic c-cyan">🗺</div>
-          <div class="sq-title" id="sqMapT">3D Xarita</div>
-          <div class="sq-sub" id="sqMapS">Binolar va bõş xonalar</div>
-        </div>
-        <div class="sq-tile" onclick="switchTab('docs')">
-          <div class="sq-ic c-purple">🏛</div>
-          <div class="sq-title" id="sqDocsT">Rahbariyat · Nizom</div>
-          <div class="sq-sub" id="sqDocsS">Rektorat va hujjatlar</div>
-        </div>
-        <div class="sq-tile" onclick="switchTab('opps')">
-          <div class="sq-ic c-amber">🚀</div>
-          <div class="sq-title" id="sqOppsT">Imkoniyatlar</div>
-          <div class="sq-sub" id="sqOppsS">Grant va stajirovkalar</div>
-        </div>
-        <div class="sq-tile" onclick="switchTab('lf')">
-          <div class="sq-ic c-rose">📦</div>
-          <div class="sq-title" id="sqLfT">Lost & Found</div>
-          <div class="sq-sub" id="sqLfS">Topilmalar va kitob almashish</div>
-        </div>
-      </div>
-
-      <!-- 2 Colorful Promo Cards (Like UWEDIANS Учёба & Обмен) -->
-      <div class="promo-banners-row">
-        <div class="promo-banner pb-study" onclick="switchTab('moodle')">
-          <div style="display:flex; justify-content:space-between; align-items:center;">
-            <span style="font-size:22px;">📚</span>
-            <span style="font-size:10px; font-weight:800; background:rgba(0,0,0,0.28); padding:3px 8px; border-radius:99px; color:#fff;">moodle.uwed.uz</span>
+        <div class="acad-hub-row">
+          <div class="acad-mini-stat" onclick="switchTab('moodle')">
+            <div style="font-size:10px; color:var(--text-muted); font-weight:700;">MOODLE</div>
+            <div style="font-size:13px; font-weight:800; color:var(--text); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" id="homeAcadMoodleVal">—</div>
           </div>
-          <div>
-            <div style="font-size:14px; font-weight:800; color:#fff;" id="pbStudyTitle">Ta’lim · Moodle</div>
-            <div style="font-size:11px; color:rgba(255,255,255,0.88);" id="pbStudySub">Dedlaynlar, kurslar, HEMIS GPA</div>
+          <div class="acad-mini-stat" onclick="switchTab('gpa')">
+            <div style="font-size:10px; color:var(--text-muted); font-weight:700;">GPA · HEMIS</div>
+            <div style="font-size:13px; font-weight:800; color:#34d399; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" id="homeAcadGpaVal">—</div>
+          </div>
+          <div class="acad-mini-stat" onclick="openPinnedProfileFromAnywhere()">
+            <div style="font-size:10px; color:var(--text-muted); font-weight:700;" id="homeAcadSchedLbl">РАСПИСАНИЕ</div>
+            <div style="font-size:13px; font-weight:800; color:#38bdf8; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" id="homeAcadSchedVal">—</div>
           </div>
         </div>
-
-        <div class="promo-banner pb-lf" onclick="switchTab('lf')">
-          <div style="display:flex; justify-content:space-between; align-items:center;">
-            <span style="font-size:22px;">🔄</span>
-            <span style="font-size:10px; font-weight:800; background:rgba(0,0,0,0.28); padding:3px 8px; border-radius:99px; color:#fff;">HUB</span>
-          </div>
-          <div>
-            <div style="font-size:14px; font-weight:800; color:#fff;" id="pbLfTitle">Almashinuv · Topilma</div>
-            <div style="font-size:11px; color:rgba(255,255,255,0.88);" id="pbLfSub">Kitob almashish va Lost&Found</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Promo Strip for Active Grants & Opportunities -->
-      <div class="promo-strip ps-opps" onclick="switchTab('opps')">
-        <div style="display:flex; align-items:center; gap:11px;">
-          <span style="font-size:22px;">🌍</span>
-          <div>
-            <div style="font-size:13.5px; font-weight:800; color:#fff;" id="psOppsTitle">Xalqaro Grantlar va Almashinuv</div>
-            <div style="font-size:11px; color:rgba(255,255,255,0.85);" id="psOppsSub">9 ta faol dastur — muddatni õtkazib yubormang</div>
-          </div>
-        </div>
-        <span style="font-size:11px; font-weight:800; background:rgba(255,255,255,0.22); padding:4px 9px; border-radius:99px; color:#fff;">9 LIVE →</span>
       </div>
 
       <div class="sec-title">
-        <span id="secBlocksTitle">Õquv binolari (Bloklar)</span>
-        <span style="font-size:11px; color:#38bdf8; cursor:pointer;" onclick="switchTab('map')" id="secMapLink">3D Xarita →</span>
+        <span id="secBlocksTitle">...</span>
+        <span style="font-size:11px; color:#38bdf8; cursor:pointer;" onclick="switchTab('map')" id="secMapLink">...</span>
       </div>
 
       <div class="blocks-showcase">
         <div class="b-card blk-a" onclick="openBlockFromHome('A')">
           <div class="b-badge">A</div>
-          <div class="b-name" id="homeBlkAName">A blok</div>
-          <div class="b-floors" id="homeBlkAFloors">1–4 qavatlar</div>
-          <div class="b-free-num" id="homeBlkAFree">- bõş</div>
-          <div class="b-bar"><div class="b-bar-fill" id="homeBlkABar" style="width: 50%;"></div></div>
+          <div class="b-name" id="homeBlkAName">A</div>
+          <div class="b-floors" id="homeBlkAFloors">1–4</div>
+          <div class="b-free-num" id="homeBlkAFree">—</div>
+          <div class="b-bar"><div class="b-bar-fill" id="homeBlkABar" style="width: 0%;"></div></div>
         </div>
         <div class="b-card blk-b" onclick="openBlockFromHome('B')">
           <div class="b-badge">B</div>
-          <div class="b-name" id="homeBlkBName">B blok</div>
-          <div class="b-floors" id="homeBlkBFloors">1–7 qavatlar</div>
-          <div class="b-free-num" id="homeBlkBFree">- bõş</div>
-          <div class="b-bar"><div class="b-bar-fill" id="homeBlkBBar" style="width: 50%;"></div></div>
+          <div class="b-name" id="homeBlkBName">B</div>
+          <div class="b-floors" id="homeBlkBFloors">1–7</div>
+          <div class="b-free-num" id="homeBlkBFree">—</div>
+          <div class="b-bar"><div class="b-bar-fill" id="homeBlkBBar" style="width: 0%;"></div></div>
         </div>
         <div class="b-card blk-d" onclick="openBlockFromHome('D')">
           <div class="b-badge">D</div>
-          <div class="b-name" id="homeBlkDName">D blok</div>
-          <div class="b-floors" id="homeBlkDFloors">1–4 qavatlar</div>
-          <div class="b-free-num" id="homeBlkDFree">- bõş</div>
-          <div class="b-bar"><div class="b-bar-fill" id="homeBlkDBar" style="width: 50%;"></div></div>
+          <div class="b-name" id="homeBlkDName">D</div>
+          <div class="b-floors" id="homeBlkDFloors">1–4</div>
+          <div class="b-free-num" id="homeBlkDFree">—</div>
+          <div class="b-bar"><div class="b-bar-fill" id="homeBlkDBar" style="width: 0%;"></div></div>
+        </div>
+      </div>
+
+      <!-- Additional Campus Buildings & Facilities from Campus API (C, TTJ-B, SOK, Basseyn, ECO, F, KPP) -->
+      <div class="campus-extra-strip" id="homeExtraCampusStrip"></div>
+
+      <!-- Clean 3x2 Core Services Grid (No Duplicates!) -->
+      <div class="super-quick-grid">
+        <div class="sq-tile" onclick="switchTab('moodle')">
+          <div class="sq-ic c-green">🎓</div>
+          <div class="sq-title" id="sqMoodleT">Moodle</div>
+          <div class="sq-sub" id="sqMoodleS">...</div>
+        </div>
+        <div class="sq-tile" onclick="switchTab('gpa')">
+          <div class="sq-ic c-blue">🧮</div>
+          <div class="sq-title" id="sqGpaT">GPA · HEMIS</div>
+          <div class="sq-sub" id="sqGpaS">...</div>
+        </div>
+        <div class="sq-tile" onclick="switchTab('map')">
+          <div class="sq-ic c-cyan">🗺</div>
+          <div class="sq-title" id="sqMapT">Map</div>
+          <div class="sq-sub" id="sqMapS">...</div>
+        </div>
+        <div class="sq-tile" onclick="switchTab('docs')">
+          <div class="sq-ic c-purple">🏛</div>
+          <div class="sq-title" id="sqDocsT">Docs</div>
+          <div class="sq-sub" id="sqDocsS">...</div>
+        </div>
+        <div class="sq-tile" onclick="switchTab('opps')">
+          <div class="sq-ic c-amber">🚀</div>
+          <div class="sq-title" id="sqOppsT">Grants</div>
+          <div class="sq-sub" id="sqOppsS">...</div>
+        </div>
+        <div class="sq-tile" onclick="switchTab('lf')">
+          <div class="sq-ic c-rose">📦</div>
+          <div class="sq-title" id="sqLfT">Lost & Found</div>
+          <div class="sq-sub" id="sqLfS">...</div>
         </div>
       </div>
 
       <div class="sec-title">
-        <span id="secSectionsTitle">Smart Jadval va Radar</span>
+        <span id="secSectionsTitle">...</span>
       </div>
 
       <div class="bento-grid">
@@ -1937,8 +2116,8 @@
             <span class="bento-tag">LIVE</span>
           </div>
           <div>
-            <div class="bento-title" id="bentoRoomsTitle">Auditoriyalar</div>
-            <div class="bento-desc" id="bentoRoomsDesc">Blok, qavat va jonli xona holati (oçiq/yopiq)</div>
+            <div class="bento-title" id="bentoRoomsTitle">...</div>
+            <div class="bento-desc" id="bentoRoomsDesc">...</div>
           </div>
         </div>
 
@@ -1948,8 +2127,8 @@
             <span class="bento-tag" id="bentoEventsBadge">TG</span>
           </div>
           <div>
-            <div class="bento-title" id="bentoEventsTitle">Tadbirlar Kalendari</div>
-            <div class="bento-desc" id="bentoEventsDesc">Telegram kanallardagi barcha JIDU e’lonlari</div>
+            <div class="bento-title" id="bentoEventsTitle">...</div>
+            <div class="bento-desc" id="bentoEventsDesc">...</div>
           </div>
         </div>
 
@@ -1959,8 +2138,8 @@
             <span class="bento-tag">RADAR</span>
           </div>
           <div>
-            <div class="bento-title" id="bentoTeachersTitle">Õqituvçi Radari</div>
-            <div class="bento-desc" id="bentoTeachersDesc">Ustoz hozir qaysi xonada ekanini topiş</div>
+            <div class="bento-title" id="bentoTeachersTitle">...</div>
+            <div class="bento-desc" id="bentoTeachersDesc">...</div>
           </div>
         </div>
 
@@ -1970,8 +2149,8 @@
             <span class="bento-tag">.ICS</span>
           </div>
           <div>
-            <div class="bento-title" id="bentoStudentsTitle">Talabalar</div>
-            <div class="bento-desc" id="bentoStudentsDesc">Şaxsiy jadval, obuna va telefon kalendariga yuklaş</div>
+            <div class="bento-title" id="bentoStudentsTitle">...</div>
+            <div class="bento-desc" id="bentoStudentsDesc">...</div>
           </div>
         </div>
 
@@ -1981,19 +2160,19 @@
             <span class="bento-tag">NEW</span>
           </div>
           <div>
-            <div class="bento-title" id="bentoOverlapTitle">Umumiy bõş vaqt</div>
-            <div class="bento-desc" id="bentoOverlapDesc">Dõstiꞑiz bilan bir vaqtdagi bõş juftliklarni topiş</div>
+            <div class="bento-title" id="bentoOverlapTitle">...</div>
+            <div class="bento-desc" id="bentoOverlapDesc">...</div>
           </div>
         </div>
 
         <div class="bento-item" onclick="switchTab('feedback')">
           <div class="bento-top">
             <div class="bento-icon">💬</div>
-            <span class="bento-tag">MUROJAAT</span>
+            <span class="bento-tag">FEEDBACK</span>
           </div>
           <div>
-            <div class="bento-title" id="bentoFeedbackTitle">Murojaat va Taklif</div>
-            <div class="bento-desc" id="bentoFeedbackDesc">Anonim yoki ochiq murojaat va fikr qoldirish</div>
+            <div class="bento-title" id="bentoFeedbackTitle">...</div>
+            <div class="bento-desc" id="bentoFeedbackDesc">...</div>
           </div>
         </div>
       </div>
@@ -2040,11 +2219,20 @@
         </div>
 
         <div class="panel-row">
-          <div class="chips-scroll">
+          <div class="chips-scroll" id="roomQuickPresetChips">
             <div class="pill pill-sm active" id="fltFreeOnly" onclick="setRoomMode('free')">🟢 Faqat bõşlari</div>
             <div class="pill pill-sm" id="fltAllRooms" onclick="setRoomMode('all')">📋 Barça xonalar</div>
+            <div class="pill pill-sm" id="fltAllDayFree" onclick="toggleRoomTypeFilter('ALL_DAY')">🔥 Весь день</div>
+            <div class="pill pill-sm" id="fltTypeComp" onclick="toggleRoomTypeFilter('COMPUTER')">💻 ПК</div>
+            <div class="pill pill-sm" id="fltTypeLang" onclick="toggleRoomTypeFilter('LANGUAGE_LAB')">🎧 Лингафон</div>
+            <div class="pill pill-sm" id="fltTypeLect" onclick="toggleRoomTypeFilter('LECTURE')">🎓 Лекция</div>
           </div>
         </div>
+      </div>
+
+      <div class="rooms-summary-bar" id="roomsSummaryBar">
+        <span id="roomsSummaryText">—</span>
+        <span style="font-size:11px; color:#38bdf8;" id="roomsBestPickTag"></span>
       </div>
 
       <div class="search-box">
@@ -2210,7 +2398,8 @@
     <section id="tab-map" style="display: none;">
       <div class="sub-bar">
         <button class="back-pill" onclick="switchTab('home')" id="backFromMap">← Asosiy</button>
-        <div style="display:flex; gap:6px;">
+        <div style="display:flex; gap:6px; flex-wrap:wrap;">
+          <button class="row-link" onclick="toggleMapRenderMode()" id="btnMapModeToggle">🗺 2D Схема</button>
           <button class="row-link" onclick="toggleMap3DSatellite()" id="btnSatToggle">🛰 Sputnik</button>
           <button class="row-link" id="btnNowMap" onclick="resetToNow()">⚡ Hozir</button>
         </div>
@@ -2219,9 +2408,10 @@
       <!-- Building Quick Chips for 3D Map -->
       <div class="chips-scroll" id="map3dBuildingChips" style="margin-bottom: 10px;"></div>
 
-      <!-- Interactive 3D MapLibre Container -->
+      <!-- Interactive 3D MapLibre + iOS-Safe 2D SVG Campus Map Container -->
       <div class="map3d-wrap">
         <div id="uwedMapLibre"></div>
+        <div id="uwedMap2DSvg"></div>
       </div>
 
       <!-- Selected Building Detail Card (Departments, Rooms & Live Free Counter) -->
@@ -2339,11 +2529,33 @@
           <div class="pill pill-sm active" id="mdlTabDeadlines" onclick="switchMoodleSubTab('deadlines')">⏰ Dedlaynlar</div>
           <div class="pill pill-sm" id="mdlTabGrades" onclick="switchMoodleSubTab('grades')">📊 Baholar</div>
           <div class="pill pill-sm" id="mdlTabCourses" onclick="switchMoodleSubTab('courses')">📚 Kurslar</div>
+          <div class="pill pill-sm" id="mdlTabNotify" onclick="switchMoodleSubTab('notify')">🔔 Уведомления</div>
         </div>
 
         <div id="mdlPaneDeadlines" class="list-stack"></div>
         <div id="mdlPaneGrades" class="list-stack" style="display:none;"></div>
         <div id="mdlPaneCourses" class="list-stack" style="display:none;"></div>
+        <div id="mdlPaneNotify" class="panel" style="display:none;">
+          <div style="font-size:13.5px; font-weight:800; margin-bottom:4px;" id="mdlNotifyTitle">🔔 Уведомления в Telegram боте</div>
+          <div style="font-size:11.5px; color:var(--text-muted); margin-bottom:10px;" id="mdlNotifySub">Синхронизировано с @uwedhelpdesk_bot. Вы получите уведомления о парах, дедлайнах и новых оценках.</div>
+          <label class="notify-toggle-row">
+            <span>📅 Напоминания о парах (за 20 мин)</span>
+            <input type="checkbox" class="notify-switch" id="chkNotifyClasses" checked onchange="saveMoodleNotifyPrefs()" />
+          </label>
+          <label class="notify-toggle-row">
+            <span>⏳ Дедлайны Moodle (за 24ч и 3ч)</span>
+            <input type="checkbox" class="notify-switch" id="chkNotifyDeadlines" checked onchange="saveMoodleNotifyPrefs()" />
+          </label>
+          <label class="notify-toggle-row">
+            <span>🎓 Новые оценки в Moodle</span>
+            <input type="checkbox" class="notify-switch" id="chkNotifyGrades" checked onchange="saveMoodleNotifyPrefs()" />
+          </label>
+          <label class="notify-toggle-row">
+            <span>🌅 Утренняя сводка (07:45)</span>
+            <input type="checkbox" class="notify-switch" id="chkNotifyMorning" checked onchange="saveMoodleNotifyPrefs()" />
+          </label>
+          <div id="mdlNotifySyncStatus" style="font-size:11.5px; color:#34d399; margin-top:8px;"></div>
+        </div>
       </div>
     </section>
 
@@ -2370,17 +2582,24 @@
       </div>
 
       <div class="gpa-ring-card">
-        <div>
+        <div style="flex:1; min-width:0;">
           <div style="font-size:11.5px; font-weight:700; text-transform:uppercase; color:#6ee7b7;" id="gpaMainLbl">Rasmiy JIDU GPA ko'rsatkichi</div>
-          <div style="font-size:42px; font-weight:800; letter-spacing:-1px; color:var(--text);" id="gpaCalculatedVal">0.00</div>
+          <div style="display:flex; align-items:baseline; gap:10px; flex-wrap:wrap;">
+            <div style="font-size:40px; font-weight:800; letter-spacing:-1px; color:var(--text);" id="gpaCalculatedVal">0.00</div>
+            <span style="font-size:12px; font-weight:800; color:#38bdf8;" id="gpaScale4Val"></span>
+          </div>
           <div style="font-size:12px; color:var(--text-sec);" id="gpaSummaryMeta">Jami kredit: 0 · O'rtacha ball: 0</div>
+          <div id="gpaPeriodBadge" style="font-size:11px; color:#fbbf24; font-weight:700; margin-top:4px;"></div>
           <div id="gpaHonorBadgeWrap"></div>
         </div>
-        <div style="text-align:right;">
+        <div style="text-align:right; flex-shrink:0;">
           <button class="btn-sm" style="margin-bottom:6px; display:block; width:100%;" onclick="loadOfficialGpaFromSchedule()">🔄 Fanlarni yangilash</button>
           <button class="btn-sm" style="background:rgba(56,189,248,0.18); border-color:rgba(56,189,248,0.38); color:#38bdf8; display:block; width:100%;" onclick="toggleHemisImportBox()">📥 HEMIS Import</button>
         </div>
       </div>
+
+      <!-- HEMIS Official Per-Semester GPA History (shown when imported from HEMIS) -->
+      <div id="gpaHemisHistoryBox" class="panel" style="display:none; margin-bottom:10px; border-color:rgba(56,189,248,0.35);"></div>
 
       <div class="panel" style="margin-bottom:10px; padding:11px 14px; display:flex; justify-content:space-between; align-items:center;">
         <div>
@@ -2618,6 +2837,22 @@
       <span id="navLblProfile">Profil</span>
     </button>
   </nav>
+
+  <!-- Detailed Class / Pair Info Bottom Sheet -->
+  <div class="class-detail-backdrop" id="classDetailBackdrop" onclick="if(event.target===this) closeClassDetailModal()">
+    <div class="class-detail-sheet">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px; margin-bottom:12px;">
+        <div style="min-width:0; flex:1;">
+          <div id="cdBadgeRow" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:6px;"></div>
+          <div id="cdTitle" style="font-size:17px; font-weight:800; color:var(--text); line-height:1.25;">—</div>
+          <div id="cdTopic" style="font-size:12.5px; color:#38bdf8; margin-top:4px; display:none;"></div>
+        </div>
+        <button class="btn-sm" onclick="closeClassDetailModal()" style="padding:6px 10px; font-size:13px;">✕</button>
+      </div>
+      <div id="cdMetaGrid" style="display:grid; gap:8px; margin-bottom:14px;"></div>
+      <div id="cdActionsRow" style="display:flex; flex-wrap:wrap; gap:8px;"></div>
+    </div>
+  </div>
 
   <script>
     const tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
@@ -4296,7 +4531,34 @@
       }
     };
 
-    async function loadPublicCampusState() {
+    function syncLocalMoodleToServer(parsed) {
+      if (!parsed || !parsed.token) return;
+      const u = getCurrentUser();
+      const moodlePayload = {
+        token: parsed.token,
+        username: (parsed.me && parsed.me.username) || "",
+        fullname: (parsed.me && parsed.me.fullname) || "",
+        userid: (parsed.me && parsed.me.userid) || null,
+        verified: true,
+        courses: parsed.courses || [],
+        deadlines: parsed.deadlines || [],
+        grades: parsed.grades || [],
+      };
+      fetch("/api/telemetry?action=sync_moodle", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(tg && tg.initData ? { "X-Tg-Init-Data": tg.initData } : {}),
+        },
+        body: JSON.stringify({
+          user: u,
+          initData: tg && tg.initData ? tg.initData : "",
+          moodle: moodlePayload,
+        }),
+      }).catch(() => {});
+    }
+
+    async function loadPublicCampusState(keepGateOpen = false) {
       try {
         const u = getCurrentUser();
         const res = await fetch(`/api/telemetry?action=public_state&uid=${encodeURIComponent(u.id)}`, {
@@ -4337,7 +4599,6 @@
           ) {
             STATE.lang = data.preferred_lang;
             localStorage.setItem("uwed_lang", data.preferred_lang);
-            applyTranslations();
           }
           STATE.roomReports = data.room_reports || {};
           STATE.campusEvents = data.campus_events || [];
@@ -4346,7 +4607,29 @@
             : ["uwed_official"];
           STATE.attendingEvents = Array.isArray(data.attending_events) ? data.attending_events : [];
           STATE.snapshotMeta = data.campus_snapshot_meta || null;
+          STATE.serverMoodle = data.my_moodle || { connected: false };
           checkCampusWifiConnectivity();
+
+          // Auto-sync local Moodle connection to Bot backend if Bot doesn't have it yet!
+          try {
+            const localMdlRaw = localStorage.getItem("uwed_moodle_cache");
+            if (localMdlRaw) {
+              const parsedMdl = JSON.parse(localMdlRaw);
+              if (parsedMdl && parsedMdl.ok && parsedMdl.token && !STATE.serverMoodle.connected) {
+                syncLocalMoodleToServer(parsedMdl);
+                STATE.serverMoodle.connected = true;
+              }
+            }
+          } catch (_) {}
+
+          // Hydrate notification toggles from server state
+          if (STATE.serverMoodle) {
+            const setChk = (id, val) => { const el = document.getElementById(id); if (el) el.checked = val !== false; };
+            setChk("chkNotifyClasses", STATE.serverMoodle.notify_classes);
+            setChk("chkNotifyDeadlines", STATE.serverMoodle.notify_deadlines);
+            setChk("chkNotifyGrades", STATE.serverMoodle.notify_grades);
+            setChk("chkNotifyMorning", STATE.serverMoodle.morning_digest);
+          }
 
           const bBadge = document.getElementById("bentoEventsBadge");
           if (bBadge) bBadge.textContent = `${STATE.campusEvents.length} LIVE`;
@@ -4361,13 +4644,16 @@
             );
             renderSavedProfileBanner();
           }
-          try { renderHomeDashboard(); } catch (_) {}
-          try { renderRoomsTab(); } catch (_) {}
-          try { renderEventsTab(); } catch (_) {}
+          if (!keepGateOpen) {
+            try { applyTranslations(); } catch (_) {}
+            try { renderHomeDashboard(); } catch (_) {}
+            try { renderRoomsTab(); } catch (_) {}
+            try { renderEventsTab(); } catch (_) {}
+          }
         }
       } catch (_) {
       } finally {
-        if (!STATE.isBlocked) {
+        if (!keepGateOpen && !STATE.isBlocked) {
           const gate = document.getElementById("uwedAccessGate");
           if (gate) gate.remove();
         }
@@ -4382,32 +4668,43 @@
         localStorage.setItem("uwed_lang", qLang);
       }
 
+      // Apply user's saved/URL language IMMEDIATELY while opaque gate is still covering UI (zero Uzbek flash!)
+      try { applyTranslations(); } catch (_) {}
+
       const u = getCurrentUser();
       const fbEl = document.getElementById("fbContactInput");
-      if (u.username && fbEl && !fbEl.value) {
-        fbEl.value = `@${u.username}`;
-      }
+      if (u.username && fbEl && !fbEl.value) fbEl.value = `@${u.username}`;
       const lfEl = document.getElementById("lfContactInput");
-      if (u.username && lfEl && !lfEl.value) {
-        lfEl.value = `@${u.username}`;
-      }
+      if (u.username && lfEl && !lfEl.value) lfEl.value = `@${u.username}`;
       const evDateEl = document.getElementById("evDateInput");
       if (evDateEl) evDateEl.value = getTashkentNow().toISOString().slice(0, 10);
 
-      // 0) STRICT ACCESS GATE FIRST: check blocklist & maintenance BEFORE fetching/rendering any data
-      await loadPublicCampusState();
+      // Safety timer: never keep access gate stuck longer than 3.5s even on slow mobile networks
+      const gateTimer = setTimeout(() => {
+        if (!STATE.isBlocked && !STATE.isMaintenanceBlocked) {
+          const gate = document.getElementById("uwedAccessGate");
+          if (gate) gate.remove();
+        }
+      }, 3500);
+
+      // 0) STRICT ACCESS GATE FIRST: check blocklist, maintenance & preferred_lang
+      await loadPublicCampusState(true);
       if (STATE.isBlocked || STATE.isMaintenanceBlocked) {
+        clearTimeout(gateTimer);
         return;
       }
 
+      // Re-apply translations now that server preferred_lang is known (still behind gate!)
+      try { applyTranslations(); } catch (_) {}
+
       try {
-        const fetchJson = async (url, tries = 3) => {
+        const fetchJson = async (url, tries = 2) => {
           for (let i = 0; i < tries; i++) {
             try {
               const r = await fetch(url, { cache: "no-store" });
               if (r.ok) return await r.json();
             } catch (_) {}
-            await new Promise((res) => setTimeout(res, 500));
+            await new Promise((res) => setTimeout(res, 350));
           }
           return null;
         };
@@ -4426,29 +4723,33 @@
           };
         };
 
-        // 1) Base data (rooms/slots/teachers) WITHOUT events: small and reliable,
-        //    so the room grid always populates. Fall back to the static file.
-        let base = await fetchJson("/api/uwed?action=snapshot&light=1");
+        // Load base rooms + events + campusData IN PARALLEL so free count is accurate on the VERY FIRST paint (never flashes 129!)
+        const [baseRes, evRes, campusRes] = await Promise.all([
+          fetchJson("/api/uwed?action=snapshot&light=1"),
+          fetchJson("/api/uwed?action=snapshot&only=events"),
+          fetchJson("/campus_data.json"),
+        ]);
+
+        let base = baseRes;
         if (!base || !Array.isArray(base.rooms) || !base.rooms.length) {
           base = (await fetchJson("/snapshot.json")) || {};
         }
-        const campusRes = (await fetchJson("/campus_data.json")) || {};
         if (base.slots && base.slots.length) STATE.slots = base.slots;
         STATE.rooms = (base.rooms || []).map(mapRoom);
         STATE.teachers = base.teachers || [];
         STATE.campusData = campusRes || {};
-        STATE.eventsByRoom = base.events && typeof base.events === "object" ? base.events : {};
-        try { renderHomeDashboard(); } catch (_) {}
-        try { renderRoomsTab(); } catch (_) {}
-
-        // 2) Events (larger) loaded separately so a slow/failed events fetch
-        //    never blocks the room list. Refine free/busy once they arrive.
-        if (!Object.keys(STATE.eventsByRoom).length) {
-          const evRes = await fetchJson("/api/uwed?action=snapshot&only=events");
-          if (evRes && evRes.events && Object.keys(evRes.events).length) {
-            STATE.eventsByRoom = evRes.events;
-            try { renderHomeDashboard(); } catch (_) {}
-            try { renderRoomsTab(); } catch (_) {}
+        if (evRes && evRes.events && Object.keys(evRes.events).length) {
+          STATE.eventsByRoom = evRes.events;
+          STATE.eventsLoaded = true;
+        } else if (base.events && typeof base.events === "object" && Object.keys(base.events).length) {
+          STATE.eventsByRoom = base.events;
+          STATE.eventsLoaded = true;
+        } else {
+          // Fallback to static snapshot.json events if live events endpoint failed
+          const staticSnap = await fetchJson("/snapshot.json", 1);
+          if (staticSnap && staticSnap.events) {
+            STATE.eventsByRoom = staticSnap.events;
+            STATE.eventsLoaded = true;
           }
         }
       } catch (e) {
@@ -4458,47 +4759,118 @@
       const cur = detectCurrentSlotAndDay();
       STATE.day = cur.day;
       STATE.slot = cur.slot;
-      try {
-        applyTranslations();
-      } catch (e) {
-        console.error("applyTranslations error:", e);
-      }
-      if (STATE.isBlocked || STATE.isMaintenanceBlocked) {
+      try { applyTranslations(); } catch (e) { console.error("applyTranslations error:", e); }
+      try { renderHomeDashboard(); } catch (_) {}
+      try { renderRoomsTab(); } catch (_) {}
+      try { renderEventsTab(); } catch (_) {}
+
+      clearTimeout(gateTimer);
+      if (!STATE.isBlocked && !STATE.isMaintenanceBlocked) {
+        const gate = document.getElementById("uwedAccessGate");
+        if (gate) gate.remove();
+      } else {
         return;
       }
+
       trackEvent("open_app", STATE.lang);
 
       const qTab = urlParams.get("tab");
       if (qTab && ["rooms", "events", "teachers", "students", "overlap", "feedback", "map", "moodle", "gpa", "opps", "docs", "lf", "profile"].includes(qTab)) {
         switchTab(qTab);
-      } else {
-        renderHomeDashboard();
       }
     }
 
     function renderHomeDashboard() {
       const t = T();
       const cur = detectCurrentSlotAndDay();
+      const ready = Boolean(STATE.rooms.length && STATE.eventsLoaded);
       let totalFreeAll = 0;
 
       for (const b of ["A", "B", "D"]) {
         const bRooms = STATE.rooms.filter((r) => r.building === b && isTeachingRoom(r));
         let bFree = 0;
-        for (const r of bRooms) {
-          const dayMap = getRoomDayEvents(r.id, cur.day);
-          const rep = STATE.roomReports[r.name];
-          const isCrowdBusy = rep && (rep.status === "busy_students" || rep.status === "locked");
-          if (!dayMap[cur.slot] && !isCrowdBusy) bFree++;
+        if (ready) {
+          for (const r of bRooms) {
+            const dayMap = getRoomDayEvents(r.id, cur.day);
+            const rep = STATE.roomReports[r.name];
+            const isCrowdBusy = rep && (rep.status === "busy_students" || rep.status === "locked");
+            if (!dayMap[cur.slot] && !isCrowdBusy) bFree++;
+          }
         }
         totalFreeAll += bFree;
-        const pct = bRooms.length ? Math.round((bFree / bRooms.length) * 100) : 0;
+        const pct = ready && bRooms.length ? Math.round((bFree / bRooms.length) * 100) : 0;
         const fEl = document.getElementById(`homeBlk${b}Free`);
-        if (fEl) fEl.textContent = t.freeShort(bFree, bRooms.length);
+        if (fEl) fEl.textContent = ready ? t.freeShort(bFree, bRooms.length) : "…";
         const barEl = document.getElementById(`homeBlk${b}Bar`);
         if (barEl) barEl.style.width = `${pct}%`;
       }
       const heroCnt = document.getElementById("heroFreeCount");
-      if (heroCnt) heroCnt.textContent = totalFreeAll;
+      if (heroCnt) heroCnt.textContent = ready ? totalFreeAll : "…";
+
+      // Render Unified Academic Hub summary (Moodle + GPA + Pinned Schedule)
+      try {
+        const isRu = STATE.lang === "ru";
+        const isEn = STATE.lang === "en";
+        const mdlValEl = document.getElementById("homeAcadMoodleVal");
+        const gpaValEl = document.getElementById("homeAcadGpaVal");
+        const schValEl = document.getElementById("homeAcadSchedVal");
+        const schLblEl = document.getElementById("homeAcadSchedLbl");
+        const syncBadge = document.getElementById("homeAcadSyncBadge");
+        if (schLblEl) schLblEl.textContent = isRu ? "РАСПИСАНИЕ" : (isEn ? "SCHEDULE" : "JADVAL");
+
+        const mdlIdent = getVerifiedMoodleIdentity();
+        if (mdlValEl) {
+          if (mdlIdent) {
+            const nowSec = Math.floor(Date.now() / 1000);
+            const soonCnt = (mdlIdent.deadlines || []).filter((d) => d.time && d.time > nowSec).length;
+            mdlValEl.textContent = soonCnt ? `⏰ ${soonCnt} ${isRu ? "дедл." : (isEn ? "due" : "dedl.")}` : `✅ ${isRu ? "Связан" : (isEn ? "Linked" : "Ulangan")}`;
+            mdlValEl.style.color = soonCnt ? "#fbbf24" : "#34d399";
+          } else {
+            mdlValEl.textContent = isRu ? "Подключить →" : (isEn ? "Connect →" : "Ulaş →");
+            mdlValEl.style.color = "#38bdf8";
+          }
+        }
+        if (syncBadge) {
+          const botSynced = Boolean(STATE.serverMoodle && STATE.serverMoodle.connected);
+          syncBadge.textContent = botSynced ? (isRu ? "🔔 Бот синхр." : (isEn ? "🔔 Bot synced" : "🔔 Bot bilan sinx.")) : "";
+        }
+        if (gpaValEl) {
+          const calcGpa = document.getElementById("gpaCalculatedVal");
+          const savedGpa = localStorage.getItem("uwed_hemis_gpa_val") || (calcGpa && calcGpa.textContent !== "0.00" ? calcGpa.textContent : "");
+          gpaValEl.textContent = savedGpa ? `${savedGpa} / 5.0` : (isRu ? "Открыть →" : (isEn ? "Open →" : "Oçiş →"));
+        }
+        if (schValEl) {
+          const pinRaw = localStorage.getItem("uwed_pinned_profile");
+          if (pinRaw) {
+            const pin = JSON.parse(pinRaw);
+            schValEl.textContent = (pin.title || "").split(" ").slice(0, 2).join(" ") || (isRu ? "Моё" : "Mening");
+          } else {
+            schValEl.textContent = isRu ? "Выбрать →" : (isEn ? "Select →" : "Tanlaş →");
+          }
+        }
+      } catch (_) {}
+
+      // Render Additional Campus Facilities strip from campus_data.json & snapshot rooms (C, TTJ-B, SOK, Basseyn, ECO, F, KPP)
+      try {
+        const strip = document.getElementById("homeExtraCampusStrip");
+        if (strip) {
+          const bList = (STATE.campusData && STATE.campusData.buildings) || [];
+          const extras = bList.filter((b) => !["A", "B", "D"].includes(b.code));
+          const icons = { C: "🏛", SOK: "🏋️", Basseyn: "🏊", ECO: "🌿", F: "🏢", KPP: "🚪" };
+          const hasTtj = STATE.rooms.some((r) => r.building === "TTJ-B");
+          const chips = [];
+          if (hasTtj) {
+            chips.push(`<div class="campus-extra-chip" onclick="openBlockFromHome('TTJ-B')">🏠 TTJ-B</div>`);
+          }
+          for (const b of extras) {
+            const nm = b["name_" + (STATE.lang === "ru" ? "ru" : "uz")] || b.name_uz || b.code;
+            const ic = icons[b.code] || "📍";
+            chips.push(`<div class="campus-extra-chip" onclick="switchTab('map'); setTimeout(()=>selectMap3DBuilding('${b.code}'), 200);">${ic} ${nm}</div>`);
+          }
+          strip.innerHTML = chips.join("");
+          strip.style.display = chips.length ? "flex" : "none";
+        }
+      } catch (_) {}
     }
 
     function openQuickFreeRooms() {
@@ -4719,15 +5091,120 @@
       ]
     };
 
-    function initMap3D() {
+    let uwedMapMode = "auto"; // "3d" | "2d" | "auto"
+    let uwedMap3DLoaded = false;
+
+    function isWebGLAvailable() {
+      try {
+        const c = document.createElement("canvas");
+        return Boolean(window.WebGLRenderingContext && (c.getContext("webgl2") || c.getContext("webgl") || c.getContext("experimental-webgl")));
+      } catch (_) {
+        return false;
+      }
+    }
+
+    function renderMap2DSvg() {
+      const box = document.getElementById("uwedMap2DSvg");
+      if (!box) return;
+      const bList = (STATE.campusData && STATE.campusData.buildings) || [];
+      const cur = detectCurrentSlotAndDay();
+      const isRu = STATE.lang === "ru";
+      const coords = {
+        A: { x: 115, y: 120, w: 92, h: 52, color: "#3b82f6", lbl: isRu ? "Блок A" : "A blok" },
+        B: { x: 245, y: 95, w: 96, h: 66, color: "#06b6d4", lbl: isRu ? "Блок B" : "B blok" },
+        D: { x: 245, y: 185, w: 96, h: 52, color: "#10b981", lbl: isRu ? "Блок D" : "D blok" },
+        C: { x: 115, y: 195, w: 92, h: 42, color: "#8b5cf6", lbl: isRu ? "Блок C" : "C (Rektorat)" },
+        ECO: { x: 35, y: 175, w: 62, h: 42, color: "#22c55e", lbl: "ECO" },
+        SOK: { x: 365, y: 115, w: 72, h: 46, color: "#f59e0b", lbl: isRu ? "Спорт" : "SOK" },
+        Basseyn: { x: 365, y: 178, w: 72, h: 42, color: "#0ea5e9", lbl: isRu ? "Бассейн" : "Basseyn" },
+        F: { x: 35, y: 110, w: 62, h: 42, color: "#ec4899", lbl: "F" },
+        KPP: { x: 175, y: 268, w: 92, h: 28, color: "#64748b", lbl: "🚪 КПП" },
+      };
+
+      const freeCounts = {};
+      for (const code of ["A", "B", "D"]) {
+        const bRooms = STATE.rooms.filter((r) => r.building === code && isTeachingRoom(r));
+        let bFree = 0;
+        bRooms.forEach((r) => { if (!getRoomDayEvents(r.id, cur.day)[cur.slot]) bFree++; });
+        freeCounts[code] = bFree;
+      }
+
+      const shapes = Object.entries(coords).map(([code, c]) => {
+        const isSel = uwedSelectedBldCode === code;
+        const stroke = isSel ? "#ffffff" : "rgba(255,255,255,0.28)";
+        const sw = isSel ? 3 : 1.5;
+        const freeBadge = freeCounts[code] != null
+          ? `<rect x="${c.x + c.w - 36}" y="${c.y - 10}" width="38" height="19" rx="9.5" fill="#059669" stroke="#fff" stroke-width="1.2"/>
+             <text x="${c.x + c.w - 17}" y="${c.y + 3}" text-anchor="middle" fill="#fff" font-size="10" font-weight="800">🟢${freeCounts[code]}</text>`
+          : "";
+        return `
+          <g class="map-svg-bld" onclick="selectMap3DBuilding('${code}')">
+            <rect x="${c.x}" y="${c.y}" width="${c.w}" height="${c.h}" rx="12" fill="${c.color}" fill-opacity="${isSel ? 0.95 : 0.78}" stroke="${stroke}" stroke-width="${sw}"/>
+            <text x="${c.x + c.w / 2}" y="${c.y + c.h / 2 + 4}" text-anchor="middle" fill="#ffffff" font-size="12" font-weight="800">${c.lbl}</text>
+            ${freeBadge}
+          </g>`;
+      }).join("");
+
+      box.innerHTML = `
+        <svg viewBox="0 0 460 315" width="100%" height="100%" style="display:block; min-height:300px;" preserveAspectRatio="xMidYMid meet">
+          <defs>
+            <pattern id="uwedGrid" width="24" height="24" patternUnits="userSpaceOnUse">
+              <path d="M 24 0 L 0 0 0 24" fill="none" stroke="rgba(148,163,184,0.12)" stroke-width="1"/>
+            </pattern>
+          </defs>
+          <rect width="460" height="315" fill="url(#uwedGrid)"/>
+          <!-- Campus Main Walkways -->
+          <path d="M 221 268 L 221 155 M 160 175 L 365 175 M 221 120 L 245 120" stroke="rgba(56,189,248,0.35)" stroke-width="5" stroke-linecap="round" stroke-dasharray="6 6" fill="none"/>
+          <text x="230" y="28" text-anchor="middle" fill="#94a3b8" font-size="11" font-weight="700">🏛 UWED / JIDU CAMPUS — ${isRu ? "Нажмите на здание" : "Binoni bosing"}</text>
+          ${shapes}
+          <text x="230" y="308" text-anchor="middle" fill="#64748b" font-size="9.5" font-weight="700">пр. Мустакиллик, 54 · Ташкент</text>
+        </svg>`;
+    }
+
+    function applyMapDisplayMode(mode) {
+      uwedMapMode = mode;
+      const ml = document.getElementById("uwedMapLibre");
+      const s2d = document.getElementById("uwedMap2DSvg");
+      const btn = document.getElementById("btnMapModeToggle");
+      const satBtn = document.getElementById("btnSatToggle");
+      const isRu = STATE.lang === "ru";
+      if (mode === "2d") {
+        if (ml) ml.style.display = "none";
+        if (s2d) s2d.style.display = "block";
+        if (satBtn) satBtn.style.display = "none";
+        if (btn) btn.textContent = isRu ? "🌍 3D Карта" : "🌍 3D Xarita";
+        renderMap2DSvg();
+      } else {
+        if (s2d) s2d.style.display = "none";
+        if (ml) ml.style.display = "block";
+        if (satBtn) satBtn.style.display = "inline-flex";
+        if (btn) btn.textContent = isRu ? "🗺 2D Схема" : "🗺 2D Sxema";
+        if (uwedMapInstance) {
+          requestAnimationFrame(() => { try { uwedMapInstance.resize(); } catch (_) {} });
+        }
+      }
+    }
+
+    function toggleMapRenderMode() {
+      haptic("light");
+      if (uwedMapMode === "2d") {
+        applyMapDisplayMode("3d");
+        initMap3D(true);
+      } else {
+        applyMapDisplayMode("2d");
+      }
+    }
+
+    function initMap3D(force3D = false) {
       const bList = (STATE.campusData && STATE.campusData.buildings) || [];
       const chipsEl = document.getElementById("map3dBuildingChips");
+      const isRu = STATE.lang === "ru";
       if (chipsEl && bList.length) {
         chipsEl.innerHTML =
-          `<div class="pill pill-sm ${!uwedSelectedBldCode ? "active" : ""}" onclick="selectMap3DBuilding(null)">🌐 Barçasi</div>` +
+          `<div class="pill pill-sm ${!uwedSelectedBldCode ? "active" : ""}" onclick="selectMap3DBuilding(null)">🌐 ${isRu ? "Все" : "Barçasi"}</div>` +
           bList
             .map((b) => {
-              const nm = b["name_" + (STATE.lang === "ru" ? "ru" : "uz")] || b.name_uz || b.code;
+              const nm = b["name_" + (isRu ? "ru" : "uz")] || b.name_uz || b.code;
               return `<div class="pill pill-sm ${uwedSelectedBldCode === b.code ? "active" : ""}" onclick="selectMap3DBuilding('${b.code}')">📍 ${nm}</div>`;
             })
             .join("");
@@ -4735,42 +5212,83 @@
 
       renderIsometricFloorExplorer();
       showWalkingRoute(STATE.walkingTarget || "A");
+      renderMap2DSvg();
 
-      if (!window.maplibregl) return;
-      if (uwedMapInstance) {
-        setTimeout(() => uwedMapInstance.resize(), 120);
+      if (uwedMapMode === "2d" && !force3D) {
+        applyMapDisplayMode("2d");
         return;
       }
 
-      uwedMapInstance = new maplibregl.Map({
-        container: "uwedMapLibre",
-        style: "https://tiles.openfreemap.org/styles/liberty",
-        center: [69.3218, 41.3240],
-        zoom: 16.8,
-        pitch: 60,
-        bearing: -22,
-        attributionControl: false,
-      });
+      if (!window.maplibregl || !isWebGLAvailable()) {
+        applyMapDisplayMode("2d");
+        return;
+      }
 
-      uwedMapInstance.on("load", () => {
+      applyMapDisplayMode("3d");
+      if (uwedMapInstance) {
+        requestAnimationFrame(() => {
+          try { uwedMapInstance.resize(); } catch (_) {}
+          setTimeout(() => { try { uwedMapInstance.resize(); } catch (_) {} }, 180);
+        });
+        return;
+      }
+
+      // Initialize MapLibre inside rAF so iOS WKWebView has real non-zero layout dimensions!
+      requestAnimationFrame(() => {
         try {
-          uwedMapInstance.addSource("uwed-3d-buildings", {
-            type: "geojson",
-            data: UWED_EXTRUSIONS_GEOJSON,
+          const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+          uwedMapInstance = new maplibregl.Map({
+            container: "uwedMapLibre",
+            style: "https://tiles.openfreemap.org/styles/liberty",
+            center: [69.3218, 41.3240],
+            zoom: 16.6,
+            pitch: isIOS ? 42 : 58,
+            bearing: -22,
+            antialias: false,
+            fadeDuration: 0,
+            attributionControl: false,
           });
-          uwedMapInstance.addLayer({
-            id: "uwed-extruded-blocks",
-            type: "fill-extrusion",
-            source: "uwed-3d-buildings",
-            paint: {
-              "fill-extrusion-color": ["get", "color"],
-              "fill-extrusion-height": ["get", "height"],
-              "fill-extrusion-base": 0,
-              "fill-extrusion-opacity": 0.85,
-            },
+
+          // Watchdog: if tiles/WebGL fail to load within 4.5s on mobile/iOS, seamlessly show 2D interactive campus map
+          const loadWatchdog = setTimeout(() => {
+            if (!uwedMap3DLoaded && uwedMapMode !== "2d") {
+              applyMapDisplayMode("2d");
+            }
+          }, 4500);
+
+          uwedMapInstance.on("error", () => {
+            if (!uwedMap3DLoaded) {
+              clearTimeout(loadWatchdog);
+              applyMapDisplayMode("2d");
+            }
           });
-        } catch (_) {}
-        renderMap3DPins();
+
+          uwedMapInstance.on("load", () => {
+            uwedMap3DLoaded = true;
+            clearTimeout(loadWatchdog);
+            try { uwedMapInstance.resize(); } catch (_) {}
+            try {
+              uwedMapInstance.addSource("uwed-3d-buildings", {
+                type: "geojson",
+                data: UWED_EXTRUSIONS_GEOJSON,
+              });
+              uwedMapInstance.addLayer({
+                id: "uwed-extruded-blocks",
+                type: "fill-extrusion",
+                source: "uwed-3d-buildings",
+                paint: {
+                  "fill-extrusion-color": ["get", "color"],
+                  "fill-extrusion-height": ["get", "height"],
+                  "fill-extrusion-base": 0,
+                  "fill-extrusion-opacity": 0.85,
+                },
+              });
+            } catch (_) {}
+            renderMap3DPins();
+          });
+        } catch (_) {
+          applyMapDisplayMode("2d");
+        }
       });
     }
 
@@ -5090,17 +5608,26 @@
             lead_time_mins: 20
           };
           trackEvent("moodle_connect", data.me ? data.me.fullname : login, {}, { moodle: moodlePayload });
-          fetch("/api/telemetry?action=sync_moodle", {
+          await fetch("/api/telemetry?action=sync_moodle", {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ user: getCurrentUser(), moodle: moodlePayload })
+            headers: {
+              "Content-Type": "application/json",
+              ...(tg && tg.initData ? { "X-Tg-Init-Data": tg.initData } : {}),
+            },
+            body: JSON.stringify({
+              user: getCurrentUser(),
+              initData: tg && tg.initData ? tg.initData : "",
+              moodle: moodlePayload,
+            }),
           }).catch(() => {});
+          STATE.serverMoodle = { ...moodlePayload, connected: true };
 
-          // Unify Moodle -> GPA & Profile & Schedule
+          // Unify Moodle -> GPA & Profile & Schedule & Home Hub
           try { syncMoodleGradesToGpa(data); } catch (_) {}
           try { autoLinkStudentFromMoodle(moodlePayload.fullname); } catch (_) {}
           try { renderProfileTab(); } catch (_) {}
-          showToast("✅ Moodle подключён! Личность студента подтверждена.");
+          try { renderHomeDashboard(); } catch (_) {}
+          showToast("✅ Moodle подключён и синхронизирован с Telegram ботом!");
 
           // If user was verifying to register for an event, resume registration
           if (STATE.pendingEventRegId) {
@@ -5147,26 +5674,41 @@
 
     function syncMoodleGradesToGpa(moodleData) {
       if (!moodleData || !Array.isArray(moodleData.grades) || !moodleData.grades.length) return;
-      const byCourse = new Map();
+      // Don't overwrite official HEMIS grades if user explicitly imported HEMIS
+      if (localStorage.getItem("uwed_gpa_source") === "hemis") return;
+      const mapped = [];
       for (const g of moodleData.grades) {
         const cname = String(g.course || g.coursename || "").trim();
-        const rawScore = parseFloat(String(g.grade || g.score || "").replace(",", "."));
-        if (!cname || isNaN(rawScore)) continue;
-        if (!byCourse.has(cname)) byCourse.set(cname, { sum: 0, cnt: 0 });
-        const acc = byCourse.get(cname);
-        acc.sum += Math.min(100, Math.max(0, rawScore));
-        acc.cnt += 1;
-      }
-      if (!byCourse.size) return;
-      const mapped = [];
-      for (const [name, acc] of byCourse.entries()) {
-        mapped.push({ name, credits: 4, score: Math.round(acc.sum / acc.cnt) });
+        if (!cname) continue;
+        let finalScore = null;
+        if (Array.isArray(g.items) && g.items.length) {
+          // Prefer course total ("∑ Итого по курсу") if numeric
+          const totalIt = g.items.find((it) => String(it.name || "").includes("Итого"));
+          const totalVal = totalIt ? parseFloat(String(totalIt.score || "").replace(",", ".")) : NaN;
+          if (!isNaN(totalVal) && totalVal > 0) {
+            finalScore = Math.min(100, Math.max(0, Math.round(totalVal)));
+          } else {
+            let sum = 0, cnt = 0;
+            for (const it of g.items) {
+              const v = parseFloat(String(it.score || "").replace(",", "."));
+              if (!isNaN(v) && v > 0) { sum += Math.min(100, v); cnt++; }
+            }
+            if (cnt > 0) finalScore = Math.round(sum / cnt);
+          }
+        } else {
+          const rawScore = parseFloat(String(g.grade || g.score || "").replace(",", "."));
+          if (!isNaN(rawScore) && rawScore > 0) finalScore = Math.min(100, Math.max(0, Math.round(rawScore)));
+        }
+        if (finalScore !== null) {
+          mapped.push({ name: cname, credit: 4, score: finalScore, code: "MOODLE" });
+        }
       }
       if (mapped.length) {
-        STATE.gpaRows = mapped;
-        localStorage.setItem("uwed_gpa_rows_v2", JSON.stringify(mapped));
-        try { renderGpaRows(); } catch (_) {}
-        try { recalcGpaSummary(); } catch (_) {}
+        gpaSubjects = mapped;
+        localStorage.setItem("uwed_gpa_source", "moodle");
+        localStorage.setItem("uwed_gpa_period", STATE.lang === "ru" ? "Текущий семестр (Moodle)" : "Joriy semestr (Moodle)");
+        saveGpaState();
+        try { renderGpaTab(); } catch (_) {}
       }
     }
 
@@ -5201,8 +5743,11 @@
         if (data && data.ok) {
           localStorage.setItem("uwed_moodle_cache", JSON.stringify(data));
           renderMoodleDashboard(data);
+          syncLocalMoodleToServer(data);
           try { syncMoodleGradesToGpa(data); } catch (_) {}
           try { renderProfileTab(); } catch (_) {}
+          try { renderHomeDashboard(); } catch (_) {}
+          showToast("✅ Moodle обновлён и синхронизирован с ботом");
         } else if (data && data.error === "need_login") {
           logoutMoodle();
         }
@@ -5212,8 +5757,57 @@
     function logoutMoodle() {
       haptic("medium");
       localStorage.removeItem("uwed_moodle_cache");
+      STATE.serverMoodle = { connected: false };
+      fetch("/api/telemetry?action=sync_moodle", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(tg && tg.initData ? { "X-Tg-Init-Data": tg.initData } : {}),
+        },
+        body: JSON.stringify({
+          user: getCurrentUser(),
+          initData: tg && tg.initData ? tg.initData : "",
+          moodle: { disconnect: true },
+        }),
+      }).catch(() => {});
       initMoodleTab();
       try { renderProfileTab(); } catch (_) {}
+      try { renderHomeDashboard(); } catch (_) {}
+    }
+
+    async function saveMoodleNotifyPrefs() {
+      haptic("light");
+      const stEl = document.getElementById("mdlNotifySyncStatus");
+      const prefs = {
+        update_prefs: true,
+        notify_classes: Boolean(document.getElementById("chkNotifyClasses")?.checked),
+        notify_deadlines: Boolean(document.getElementById("chkNotifyDeadlines")?.checked),
+        notify_grades: Boolean(document.getElementById("chkNotifyGrades")?.checked),
+        morning_digest: Boolean(document.getElementById("chkNotifyMorning")?.checked),
+      };
+      if (stEl) stEl.textContent = "⏳ Сохранение...";
+      try {
+        const res = await fetch("/api/telemetry?action=sync_moodle", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(tg && tg.initData ? { "X-Tg-Init-Data": tg.initData } : {}),
+          },
+          body: JSON.stringify({
+            user: getCurrentUser(),
+            initData: tg && tg.initData ? tg.initData : "",
+            moodle: prefs,
+          }),
+        }).then((r) => r.json());
+        if (res && res.synced) {
+          STATE.serverMoodle = { ...(STATE.serverMoodle || {}), ...prefs, connected: true };
+          if (stEl) stEl.textContent = "✅ Настройки уведомлений сохранены и синхронизированы с ботом!";
+        } else {
+          if (stEl) stEl.textContent = "⚠️ Откройте Mini App через Telegram бота для синхронизации.";
+        }
+      } catch (_) {
+        if (stEl) stEl.textContent = "❌ Ошибка сети";
+      }
     }
 
     function renderMoodleDashboard(data) {
@@ -5296,10 +5890,12 @@
 
     function switchMoodleSubTab(sub) {
       haptic("light");
-      ["deadlines", "grades", "courses"].forEach((k) => {
+      ["deadlines", "grades", "courses", "notify"].forEach((k) => {
         const cap = k.charAt(0).toUpperCase() + k.slice(1);
-        document.getElementById(`mdlTab${cap}`).classList.toggle("active", k === sub);
-        document.getElementById(`mdlPane${cap}`).style.display = k === sub ? "block" : "none";
+        const tabEl = document.getElementById(`mdlTab${cap}`);
+        const paneEl = document.getElementById(`mdlPane${cap}`);
+        if (tabEl) tabEl.classList.toggle("active", k === sub);
+        if (paneEl) paneEl.style.display = k === sub ? "block" : "none";
       });
     }
 
@@ -5423,6 +6019,7 @@
 
     function recalcGpaSummary() {
       const t = T();
+      const isRu = STATE.lang === "ru";
       let sumKG = 0, sumKU = 0, sumK = 0;
       gpaSubjects.forEach((r) => {
         if (r.score === "" || r.score === null || isNaN(Number(r.score))) return;
@@ -5435,12 +6032,55 @@
       });
       const gpaNum = sumK ? (sumKG / sumK) : 0;
       const gpa = gpaNum.toFixed(2);
+      const gpa4 = sumK ? ((gpaNum / 5.0) * 4.0).toFixed(2) : "0.00";
       const avg = sumK ? (sumKU / sumK).toFixed(1) : "0";
       const valEl = document.getElementById("gpaCalculatedVal");
+      const scale4El = document.getElementById("gpaScale4Val");
       const metaEl = document.getElementById("gpaSummaryMeta");
+      const periodEl = document.getElementById("gpaPeriodBadge");
       const badgeWrap = document.getElementById("gpaHonorBadgeWrap");
       if (valEl) valEl.textContent = gpa;
+      if (scale4El) scale4El.textContent = `/ 5.0  (≈ ${gpa4} / 4.0)`;
       if (metaEl) metaEl.textContent = t.gpaSummaryMetaText ? t.gpaSummaryMetaText(sumK, Number(avg)) : `Jami kredit: ${sumK} · O'rtacha ball: ${avg} / 100`;
+
+      // Show explicit Academic Period / Semester & Official HEMIS GPA if available
+      if (periodEl) {
+        const periodTxt = localStorage.getItem("uwed_gpa_period") || (isRu ? "Текущий семестр (расчётный)" : "Joriy semestr (hisobiy)");
+        const hemisOfficial = localStorage.getItem("uwed_hemis_official_gpa");
+        periodEl.textContent = hemisOfficial
+          ? `📅 ${periodTxt} · 🏛 HEMIS GPA: ${hemisOfficial}`
+          : `📅 ${periodTxt}`;
+      }
+      localStorage.setItem("uwed_hemis_gpa_val", gpa);
+
+      // Render HEMIS per-semester history if stored
+      const histBox = document.getElementById("gpaHemisHistoryBox");
+      if (histBox) {
+        try {
+          const hist = JSON.parse(localStorage.getItem("uwed_hemis_gpa_history") || "[]");
+          if (Array.isArray(hist) && hist.length) {
+            histBox.style.display = "block";
+            histBox.innerHTML =
+              `<div style="font-size:12px; font-weight:800; color:#38bdf8; margin-bottom:8px;">🏛 ${isRu ? "Официальная история GPA из HEMIS по периодам" : "HEMIS rasmiy GPA tarixi (davrlar bõyiça)"}</div>` +
+              hist
+                .map(
+                  (h) => `
+                  <div style="display:flex; justify-content:space-between; align-items:center; padding:7px 10px; border-radius:10px; background:var(--bg-elevated); margin-bottom:5px; font-size:12px;">
+                    <div>
+                      <div style="font-weight:800; color:var(--text);">${h.year || "—"} ${h.level ? `· ${h.level}` : ""}</div>
+                      <div style="font-size:11px; color:var(--text-muted);">${h.credits ? `${h.credits} kr.` : ""} ${h.subjects ? `· ${h.subjects} fan` : ""}</div>
+                    </div>
+                    <span style="font-size:14px; font-weight:800; color:#34d399;">${h.gpa != null ? Number(h.gpa).toFixed(2) : "—"}</span>
+                  </div>`
+                )
+                .join("");
+          } else {
+            histBox.style.display = "none";
+          }
+        } catch (_) {
+          histBox.style.display = "none";
+        }
+      }
 
       if (badgeWrap) {
         if (gpaNum >= 4.90) {
@@ -5518,9 +6158,17 @@
         document.getElementById("hemisPassInp").value = "";
         if (res && res.ok && Array.isArray(res.subjects) && res.subjects.length) {
           gpaSubjects = res.subjects;
+          localStorage.setItem("uwed_gpa_source", "hemis");
+          const pLabel = [res.education_year, res.semester_name || (res.semester ? `${res.semester}-semestr` : "")].filter(Boolean).join(" · ") || "HEMIS";
+          localStorage.setItem("uwed_gpa_period", pLabel);
+          if (res.gpa != null) localStorage.setItem("uwed_hemis_official_gpa", String(res.gpa));
+          if (Array.isArray(res.gpa_list) && res.gpa_list.length) {
+            localStorage.setItem("uwed_hemis_gpa_history", JSON.stringify(res.gpa_list));
+          }
           saveGpaState();
           renderGpaTab();
-          stEl.textContent = `✅ ${res.subjects.length} ta fan yuklandi!`;
+          try { renderHomeDashboard(); } catch (_) {}
+          stEl.textContent = `✅ ${res.subjects.length} ta fan yuklandi (${pLabel})!`;
         } else {
           stEl.textContent = "ℹ️ student.uwed.uz VPN-siz O'zbekiston tarmog'idan ochiladi.";
         }
@@ -5926,35 +6574,75 @@
       return "";
     }
 
+    function toggleRoomTypeFilter(typeCode) {
+      haptic("light");
+      STATE.roomTypeFilter = STATE.roomTypeFilter === typeCode ? null : typeCode;
+      const mapIds = {
+        ALL_DAY: "fltAllDayFree",
+        COMPUTER: "fltTypeComp",
+        LANGUAGE_LAB: "fltTypeLang",
+        LECTURE: "fltTypeLect",
+      };
+      for (const [code, elId] of Object.entries(mapIds)) {
+        const el = document.getElementById(elId);
+        if (el) el.classList.toggle("active", STATE.roomTypeFilter === code);
+      }
+      renderRoomsTab();
+    }
+
     function renderRoomsTab() {
       const t = T();
+      const isRu = STATE.lang === "ru";
       const candidates = getFilteredRoomsForState();
       const freeItems = [];
       const busyItems = [];
 
       for (const r of candidates) {
+        if (STATE.roomTypeFilter && STATE.roomTypeFilter !== "ALL_DAY" && r.type !== STATE.roomTypeFilter) {
+          continue;
+        }
         const dayMap = getRoomDayEvents(r.id, STATE.day);
         const busyEv = dayMap[STATE.slot];
         const rep = STATE.roomReports[r.name];
         const isLockedOrBusyCrowd = rep && (rep.status === "locked" || rep.status === "busy_students");
 
         if (busyEv) {
-          if (!STATE.onlyFree) busyItems.push({ r, isFree: false, ev: busyEv, score: -1 });
+          if (!STATE.onlyFree && STATE.roomTypeFilter !== "ALL_DAY") {
+            busyItems.push({ r, isFree: false, ev: busyEv, score: -1 });
+          }
         } else {
           const info = getFreeInfo(r.id, STATE.day, STATE.slot);
+          const isBest = info.isFullRest && !isLockedOrBusyCrowd;
+          if (STATE.roomTypeFilter === "ALL_DAY" && !isBest) continue;
           const adjScore = isLockedOrBusyCrowd ? 0 : info.score;
           freeItems.push({
             r,
             isFree: true,
             until: info.text,
             score: adjScore,
-            isBest: info.isFullRest && !isLockedOrBusyCrowd,
+            isBest,
           });
         }
       }
 
       freeItems.sort((a, b) => b.score - a.score || (a.r.name || a.r.room_name || "").localeCompare(b.r.name || b.r.room_name || ""));
       const items = [...freeItems, ...busyItems];
+
+      // Update Live Summary Bar (easier & faster empty room discovery!)
+      const sumTxt = document.getElementById("roomsSummaryText");
+      const bestTag = document.getElementById("roomsBestPickTag");
+      if (sumTxt) {
+        const totalCnt = freeItems.length + busyItems.length;
+        sumTxt.textContent = isRu
+          ? `🟢 Свободно: ${freeItems.length}${STATE.onlyFree ? "" : ` из ${totalCnt}`} · ${STATE.slot}-я пара`
+          : `🟢 Bõş: ${freeItems.length}${STATE.onlyFree ? "" : ` / ${totalCnt}`} · ${STATE.slot}-juftlik`;
+      }
+      if (bestTag) {
+        const topPick = freeItems.find((x) => x.isBest) || freeItems[0];
+        bestTag.textContent = topPick
+          ? (isRu ? `🔥 Лучшая: ${topPick.r.name}` : `🔥 Eng yaxşi: ${topPick.r.name}`)
+          : "";
+      }
 
       const grid = document.getElementById("roomsGrid");
       if (items.length === 0) {
@@ -7246,10 +7934,14 @@
       try {
         const res = await fetch("/api/telemetry", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            ...(tg && tg.initData ? { "X-Tg-Init-Data": tg.initData } : {}),
+          },
           body: JSON.stringify({
             action: "send_schedule_to_bot",
             user: u,
+            initData: tg && tg.initData ? tg.initData : "",
             period,
             title: ctx.title,
             date: ctx.selectedDateStr || STATE.selectedDateStr,
@@ -7260,10 +7952,13 @@
 
         if (btnEl) btnEl.textContent = origTxt;
         if (res && res.success) {
+          const msg = res.empty
+            ? (STATE.lang === "ru" ? "На выбранный период занятий не найдено." : "Tanlangan davr uçun darslar topilmadi.")
+            : t.sentToBotAlert;
           if (tg && typeof tg.showAlert === "function") {
-            tg.showAlert(t.sentToBotAlert);
+            tg.showAlert(msg);
           } else {
-            alert(t.sentToBotAlert);
+            showToast(msg);
           }
         }
       } catch (_) {
@@ -7482,10 +8177,92 @@
       return `<div class="radar-banner free">${t.radarDoneToday}</div>`;
     }
 
+    let _modalSlotCache = {};
+
+    function openClassDetailBySlot(slotKey) {
+      const payload = _modalSlotCache[slotKey];
+      if (!payload) return;
+      openClassDetailModal(payload.ev, payload.slot, payload.roomName);
+    }
+
+    function openClassDetailModal(ev, slotObj, fallbackRoom = "") {
+      haptic("medium");
+      const isRu = STATE.lang === "ru";
+      const isEn = STATE.lang === "en";
+      const title = toNewUz(ev.title || ev.t || ev.lesson_name || ev.ln || "—");
+      const topic = toNewUz(ev.lesson_name || ev.ln || "");
+      const studyType = ev.study_type || ev.st || "";
+      const roomName = ev.room_number || ev.r || fallbackRoom || "";
+      const instructor = toNewUz(ev.instructor || ev.i || "");
+      const groups = ev.groups || ev.grp || ev.g || "";
+      const stream = toNewUz(ev.speciality_names || ev.sp || "");
+      const code = ev.code || ev.c || "";
+      const timeStr = slotObj ? `${slotObj.start_time} – ${slotObj.end_time}` : "";
+      const pairNum = slotObj ? slotObj.id : (ev.slot_id || ev.s || "");
+
+      const badges = [];
+      if (pairNum) {
+        badges.push(`<span class="badge" style="background:rgba(56,189,248,0.2);color:#38bdf8;">⏰ ${pairNum}-${isRu ? "я пара" : (isEn ? "pair" : "juftlik")} (${timeStr})</span>`);
+      }
+      if (studyType) {
+        const isMid = String(studyType).toUpperCase() === "MIDTERM";
+        badges.push(`<span class="badge" style="background:${isMid ? "rgba(244,63,94,0.22)" : "rgba(16,185,129,0.2)"};color:${isMid ? "#fb7185" : "#34d399"};">${studyType}</span>`);
+      }
+      if (code) {
+        badges.push(`<span class="badge" style="background:rgba(139,92,246,0.2);color:#c4b5fd;">#${code}</span>`);
+      }
+      document.getElementById("cdBadgeRow").innerHTML = badges.join("");
+      document.getElementById("cdTitle").textContent = title;
+
+      const topicEl = document.getElementById("cdTopic");
+      if (topic && topic !== title) {
+        topicEl.textContent = `📖 ${topic}`;
+        topicEl.style.display = "block";
+      } else {
+        topicEl.style.display = "none";
+      }
+
+      const matchedRoom = roomName
+        ? STATE.rooms.find((r) => String(r.name || "").toLowerCase() === String(roomName).toLowerCase())
+        : null;
+      const matchedTeacher = instructor
+        ? STATE.teachers.find((tr) => String(tr.full_name || tr.name || "").toLowerCase().includes(instructor.toLowerCase().split(" ")[0]))
+        : null;
+
+      const rows = [];
+      if (roomName) {
+        const rSpecs = matchedRoom ? ` · ${matchedRoom.floor || "?"} ${isRu ? "эт." : "qavat"} · ${matchedRoom.capacity || 30} ${isRu ? "мест" : "õrin"}` : "";
+        rows.push(`<div class="panel" style="margin:0;padding:10px 12px;display:flex;justify-content:space-between;align-items:center;"><div><div style="font-size:10.5px;color:var(--text-muted);font-weight:700;">${isRu ? "АУДИТОРИЯ" : "AUDITORIYA"}</div><div style="font-size:13.5px;font-weight:800;margin-top:2px;">🚪 ${roomName}${rSpecs}</div></div>${matchedRoom ? `<button class="btn-sm" onclick="closeClassDetailModal();openRoomModal('${matchedRoom.id}')">${isRu ? "Открыть →" : "Oçiş →"}</button>` : ""}</div>`);
+      }
+      if (instructor) {
+        rows.push(`<div class="panel" style="margin:0;padding:10px 12px;display:flex;justify-content:space-between;align-items:center;"><div><div style="font-size:10.5px;color:var(--text-muted);font-weight:700;">${isRu ? "ПРЕПОДАВАТЕЛЬ" : "ÕQITUVÇI"}</div><div style="font-size:13.5px;font-weight:800;margin-top:2px;">👨‍🏫 ${instructor}</div></div>${matchedTeacher ? `<button class="btn-sm" onclick="closeClassDetailModal();openPersonModal('TEACHER','${matchedTeacher.id}','${String(matchedTeacher.full_name || instructor).replace(/'/g, "")}')">${isRu ? "Радар →" : "Radar →"}</button>` : ""}</div>`);
+      }
+      if (groups || stream) {
+        rows.push(`<div class="panel" style="margin:0;padding:10px 12px;"><div style="font-size:10.5px;color:var(--text-muted);font-weight:700;">${isRu ? "ГРУППЫ / ПОТОК" : "GURUHLAR / OQIM"}</div><div style="font-size:13px;font-weight:700;margin-top:2px;">👥 ${[groups, stream].filter(Boolean).join(" · ")}</div></div>`);
+      }
+      document.getElementById("cdMetaGrid").innerHTML = rows.join("");
+
+      const actions = [];
+      if (matchedRoom) {
+        actions.push(`<button class="btn-sm" style="flex:1;padding:9px;" onclick="closeClassDetailModal();openRoomModal('${matchedRoom.id}')">🚪 ${roomName}</button>`);
+      }
+      actions.push(`<button class="btn-sm" style="flex:1;padding:9px;background:rgba(16,185,129,0.2);border-color:rgba(16,185,129,0.4);color:#6ee7b7;" onclick="closeClassDetailModal();exportScheduleToBot('daily')">📅 ${isRu ? "В календарь (.ics)" : "Kalendarga (.ics)"}</button>`);
+      document.getElementById("cdActionsRow").innerHTML = actions.join("");
+
+      document.getElementById("classDetailBackdrop").classList.add("open");
+    }
+
+    function closeClassDetailModal() {
+      const bd = document.getElementById("classDetailBackdrop");
+      if (bd) bd.classList.remove("open");
+    }
+
     function renderModalContent() {
       const t = T();
       const ctx = STATE.modalContext;
       if (!ctx) return;
+      _modalSlotCache = {};
+      const tapHintTxt = STATE.lang === "ru" ? "Нажмите для деталей →" : (STATE.lang === "en" ? "Tap for details →" : "Batafsil →");
 
       const curDateStr = ctx.selectedDateStr || computeDateForWeekday(STATE.selectedDateStr, ctx.day);
       const dp = document.getElementById("modalDatePicker");
@@ -7527,16 +8304,19 @@
             const sid = Number(s.id);
             const ev = dayMap[sid];
             if (ev) {
+              const sk = `rm_${sid}`;
+              _modalSlotCache[sk] = { ev, slot: s, roomName: rName };
               const midtermBadge = ev.st === "MIDTERM" ? `<span style="background:rgba(244,63,94,0.2);color:#fb7185;padding:1px 6px;border-radius:5px;font-size:10px;font-weight:800;margin-left:5px;">MIDTERM</span>` : "";
               const meta = [ev.c, ev.grp ? `👥 ${ev.grp}` : "", toNewUz(ev.sp), toNewUz(ev.i)].filter(Boolean).join(" · ");
               const topic = ev.ln && ev.ln !== ev.t ? `<div style="font-size:11px; color:#38bdf8; margin-top:2px;">📖 ${toNewUz(ev.ln)}</div>` : "";
               return `
-                <div class="slot-row busy">
+                <div class="slot-row busy" onclick="openClassDetailBySlot('${sk}')">
                   <div class="slot-time">${t.pairLabel(sid)}<span>${s.start_time}–${s.end_time}</span></div>
                   <div class="slot-info">
                     <div class="slot-subj">${toNewUz(ev.t || "—")}${midtermBadge}</div>
                     ${topic}
                     <div class="slot-meta">${meta}</div>
+                    <div class="slot-tap-hint">ℹ️ ${tapHintTxt}</div>
                   </div>
                 </div>
               `;
@@ -7630,17 +8410,20 @@
 
           // CASE 3: Normal class
           if (ev) {
+            const sk = `ps_${sid}`;
+            _modalSlotCache[sk] = { ev, slot: s, roomName: ev.room_number || "" };
             const rm = ev.room_number || "?";
             const midtermBadge = ev.study_type === "MIDTERM" ? `<span style="background:rgba(244,63,94,0.2);color:#fb7185;padding:1px 6px;border-radius:5px;font-size:10px;font-weight:800;margin-left:5px;">MIDTERM</span>` : "";
             const meta = [`🚪 ${rm}`, toNewUz(ev.instructor), ev.code, ev.groups ? `👥 ${ev.groups}` : "", toNewUz(ev.speciality_names)].filter(Boolean).join(" · ");
             const topic = ev.lesson_name && ev.lesson_name !== ev.title ? `<div style="font-size:11px; color:#38bdf8; margin-top:2px;">📖 ${toNewUz(ev.lesson_name)}</div>` : "";
             return `
-              <div class="slot-row busy">
+              <div class="slot-row busy" onclick="openClassDetailBySlot('${sk}')">
                 <div class="slot-time">${t.pairLabel(sid)}<span>${s.start_time}–${s.end_time}</span></div>
                 <div class="slot-info">
                   <div class="slot-subj">${toNewUz(ev.title || ev.lesson_name || "—")}${midtermBadge}</div>
                   ${topic}
                   <div class="slot-meta">${meta}</div>
+                  <div class="slot-tap-hint">ℹ️ ${tapHintTxt}</div>
                 </div>
               </div>
             `;

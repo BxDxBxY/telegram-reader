@@ -122,34 +122,56 @@ function sendTelegramDocument(chatId, filename, contentStr, captionHtml) {
   });
 }
 
+function escapeIcsText(str) {
+  return String(str || "")
+    .replace(/\\/g, "\\\\")
+    .replace(/\r?\n/g, "\\n")
+    .replace(/,/g, "\\,")
+    .replace(/;/g, "\\;");
+}
+
 function buildScheduleIcs({ title, period, baseDateStr, events = [], attendingEvents = [] }) {
   const SLOT_TIMES = {
-    1: ["090000", "102000"],
-    2: ["103000", "115000"],
-    3: ["120000", "132000"],
-    4: ["140000", "152000"],
-    5: ["153000", "165000"],
-    6: ["170000", "182000"],
+    1: ["083000", "094000", "08:30–09:40"],
+    2: ["095500", "110500", "09:55–11:05"],
+    3: ["112000", "123000", "11:20–12:30"],
+    4: ["124500", "135500", "12:45–13:55"],
+    5: ["143000", "154000", "14:30–15:40"],
+    6: ["155500", "170500", "15:55–17:05"],
+    7: ["172000", "183000", "17:20–18:30"],
+    8: ["184500", "195500", "18:45–19:55"],
   };
+  const dtstamp = new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
   const lines = [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
-    "PRODID:-//UWED Helpdesk//Schedule Export//EN",
+    "PRODID:-//UWED Helpdesk//Schedule Export 2.0//EN",
     "CALSCALE:GREGORIAN",
     "METHOD:PUBLISH",
-    `X-WR-CALNAME:UWED - ${title}`,
+    `X-WR-CALNAME:${escapeIcsText("UWED - " + title)}`,
     "X-WR-TIMEZONE:Asia/Tashkent",
+    "BEGIN:VTIMEZONE",
+    "TZID:Asia/Tashkent",
+    "BEGIN:STANDARD",
+    "DTSTART:19700101T000000",
+    "TZOFFSETFROM:+0500",
+    "TZOFFSETTO:+0500",
+    "TZNAME:UZT",
+    "END:STANDARD",
+    "END:VTIMEZONE",
   ];
 
-  const baseDt = baseDateStr ? new Date(`${baseDateStr}T00:00:00Z`) : new Date(Date.now() + 5 * 3600 * 1000);
-  let targetWday = baseDt.getUTCDay();
-  if (targetWday === 0) targetWday = 1;
-  const diffToMon = targetWday === 0 ? -6 : 1 - targetWday;
+  const baseDt = baseDateStr ? new Date(`${baseDateStr}T12:00:00Z`) : new Date(Date.now() + 5 * 3600 * 1000);
+  const rawWday = baseDt.getUTCDay(); // 0=Sun, 1=Mon..6=Sat
+  const targetWday = rawWday === 0 ? 1 : rawWday;
+  const diffToMon = rawWday === 0 ? 1 : 1 - rawWday; // If Sun, jump to upcoming Monday
 
   const seen = new Set();
+  const summaryLines = [];
+  let count = 0;
   for (const ev of events) {
-    const wday = Number(ev.week_day);
-    const sid = Number(ev.slot_id);
+    const wday = Number(ev.week_day || ev.d || 0);
+    const sid = Number(ev.slot_id || ev.s || 0);
     if (!wday || !sid || !SLOT_TIMES[sid]) continue;
     if (period === "daily" && wday !== targetWday) continue;
     const key = `${wday}_${sid}`;
@@ -159,22 +181,31 @@ function buildScheduleIcs({ title, period, baseDateStr, events = [], attendingEv
     const d = new Date(baseDt);
     d.setUTCDate(baseDt.getUTCDate() + diffToMon + (wday - 1));
     const ymd = d.toISOString().slice(0, 10).replace(/-/g, "");
-    const [st, et] = SLOT_TIMES[sid];
-    const subj = String(ev.title || ev.lesson_name || "UWED Class").replace(/[\r\n,;]/g, " ");
-    const rm = String(ev.room_number || "UWED").replace(/[\r\n,;]/g, " ");
-    const desc = [ev.instructor, ev.code, ev.groups].filter(Boolean).join(" | ").replace(/[\r\n,;]/g, " ");
+    const [st, et, timeLabel] = SLOT_TIMES[sid];
+    const subjRaw = String(ev.title || ev.t || ev.lesson_name || ev.ln || "UWED Class").trim();
+    const rmRaw = String(ev.room_number || ev.r || "UWED").trim();
+    const instrRaw = String(ev.instructor || ev.i || "").trim();
+    const descParts = [instrRaw, ev.code || ev.c, ev.groups || ev.grp || ev.g, ev.lesson_name || ev.ln].filter(Boolean);
 
     lines.push("BEGIN:VEVENT");
-    lines.push(`UID:uwed_${period}_${wday}_${sid}_${ymd}@uwed.uz`);
+    lines.push(`UID:uwed-${period}-${wday}-${sid}-${ymd}@uwed.uz`);
+    lines.push(`DTSTAMP:${dtstamp}`);
     lines.push(`DTSTART;TZID=Asia/Tashkent:${ymd}T${st}`);
     lines.push(`DTEND;TZID=Asia/Tashkent:${ymd}T${et}`);
     if (period === "monthly") {
       lines.push("RRULE:FREQ=WEEKLY;COUNT=4");
     }
-    lines.push(`SUMMARY:${subj} (${rm})`);
-    lines.push(`LOCATION:UWED Room ${rm}`);
-    lines.push(`DESCRIPTION:${desc}`);
+    lines.push("STATUS:CONFIRMED");
+    lines.push(`SUMMARY:${escapeIcsText(`${subjRaw} (${rmRaw})`)}`);
+    lines.push(`LOCATION:${escapeIcsText(`UWED Room ${rmRaw}`)}`);
+    if (descParts.length) {
+      lines.push(`DESCRIPTION:${escapeIcsText(descParts.join(" | "))}`);
+    }
     lines.push("END:VEVENT");
+    count++;
+    if (summaryLines.length < 10) {
+      summaryLines.push(`• <code>${timeLabel}</code> <b>${subjRaw}</b> (${rmRaw})`);
+    }
   }
 
   // Also include user's registered Campus Events inside the .ics file
@@ -182,22 +213,26 @@ function buildScheduleIcs({ title, period, baseDateStr, events = [], attendingEv
     if (!cev || !cev.date) continue;
     if (period === "daily" && baseDateStr && cev.date !== baseDateStr) continue;
     const ymd = String(cev.date).replace(/-/g, "");
-    const cleanHm = String(cev.time || "14:00").replace(":", "");
-    const st = `${cleanHm.padEnd(4, "0")}00`;
-    const hr = Math.min(23, ( parseInt(cleanHm.slice(0, 2), 10) || 14 ) + 1);
-    const et = `${String(hr).padStart(2, "0")}${cleanHm.slice(2, 4) || "00"}00`;
+    if (!/^\d{8}$/.test(ymd)) continue;
+    const cleanHm = String(cev.time || "14:00").replace(":", "").replace(/\D/g, "");
+    const st = `${cleanHm.padEnd(4, "0").slice(0, 4)}00`;
+    const hr = Math.min(23, (parseInt(cleanHm.slice(0, 2), 10) || 14) + 1);
+    const et = `${String(hr).padStart(2, "0")}${cleanHm.slice(2, 4).padEnd(2, "0")}00`;
     lines.push("BEGIN:VEVENT");
-    lines.push(`UID:uwed_ev_${cev.id}@uwed.uz`);
+    lines.push(`UID:uwed-ev-${String(cev.id || count).replace(/[^a-zA-Z0-9_-]/g, "")}@uwed.uz`);
+    lines.push(`DTSTAMP:${dtstamp}`);
     lines.push(`DTSTART;TZID=Asia/Tashkent:${ymd}T${st}`);
     lines.push(`DTEND;TZID=Asia/Tashkent:${ymd}T${et}`);
-    lines.push(`SUMMARY:[EVENT] ${String(cev.title || "").replace(/[\r\n,;]/g, " ")}`);
-    lines.push(`LOCATION:${String(cev.location || "UWED").replace(/[\r\n,;]/g, " ")}`);
-    lines.push(`DESCRIPTION:Telegram Post: ${cev.tg_link || ""}`);
+    lines.push("STATUS:CONFIRMED");
+    lines.push(`SUMMARY:${escapeIcsText(`[EVENT] ${cev.title || ""}`)}`);
+    lines.push(`LOCATION:${escapeIcsText(cev.location || "UWED")}`);
+    lines.push(`DESCRIPTION:${escapeIcsText(`Telegram Post: ${cev.tg_link || ""}`)}`);
     lines.push("END:VEVENT");
+    count++;
   }
 
   lines.push("END:VCALENDAR");
-  return lines.join("\r\n");
+  return { ics: lines.join("\r\n") + "\r\n", count, summaryLines };
 }
 
 function verifyTelegramInitData(initDataRaw) {
@@ -246,25 +281,54 @@ module.exports = async (req, res) => {
     return res.status(200).end();
   }
 
-  // Proactive background alerts check (classes in 15-30 min, morning digest)
+  // Proactive background alerts check (classes in 15-30 min, morning digest, Moodle deadlines & grades)
   if (req.query.action === "cron_alerts" || (req.body && req.body.action === "cron_alerts")) {
+    const forceRefresh = req.query.force === "1" || Boolean(req.body && req.body.force);
     const snap = await loadSnapshotFromDb();
-    const result = await checkAndDispatchAlerts(snap, (method, payload) => {
-      if (method === "sendMessage") {
-        return sendTelegramMessage(payload.chat_id, payload.text, payload.reply_markup);
-      }
-      return Promise.resolve({ ok: true });
+    const result = await checkAndDispatchAlerts(
+      snap,
+      (method, payload) => {
+        if (method === "sendMessage") {
+          return sendTelegramMessage(payload.chat_id, payload.text, payload.reply_markup);
+        }
+        return Promise.resolve({ ok: true });
+      },
+      { forceRefresh }
+    );
+    return res.status(200).json({
+      success: true,
+      alerts_dispatched: result.count,
+      checked_subs: result.checked_subs || 0,
+      checked_moodle: result.checked_moodle || 0,
+      refreshed_moodle: result.refreshed_moodle || 0,
     });
-    return res.status(200).json({ success: true, alerts_dispatched: result.count });
   }
 
-  // Moodle session & settings sync from Mini App
+  // Moodle session & settings sync from Mini App (verifies X-Tg-Init-Data so Bot & Mini App ALWAYS share the same Telegram UID!)
   if (req.query.action === "sync_moodle" || (req.body && req.body.action === "sync_moodle")) {
-    const b = req.body || {};
-    const user = b.user || {};
+    const b = typeof req.body === "string" ? JSON.parse(req.body || "{}") : (req.body || {});
+    const initDataHdr = req.headers["x-tg-init-data"] || b.initData || "";
+    const verifiedTgUser = verifyTelegramInitData(initDataHdr);
+    const rawUser = b.user || {};
+    const mergedUser = {
+      ...rawUser,
+      ...(verifiedTgUser
+        ? {
+            id: verifiedTgUser.id,
+            first_name: verifiedTgUser.first_name || rawUser.first_name || "",
+            last_name: verifiedTgUser.last_name || rawUser.last_name || "",
+            username: verifiedTgUser.username || rawUser.username || "",
+            language_code: verifiedTgUser.language_code || rawUser.language_code || "",
+          }
+        : {}),
+    };
+    const uidStr = String(mergedUser.id || "").trim();
+    if (!/^\d+$/.test(uidStr)) {
+      return res.status(200).json({ success: false, synced: false, error: "telegram_user_required" });
+    }
     const moodle = b.moodle || {};
-    await recordTelemetry({ user, action: "sync_moodle", moodle, source: "miniapp" });
-    return res.status(200).json({ success: true, synced: true });
+    await recordTelemetry({ user: mergedUser, action: "sync_moodle", detail: moodle.fullname || moodle.username || "prefs", moodle, source: "miniapp" });
+    return res.status(200).json({ success: true, synced: true, uid: uidStr });
   }
 
 
@@ -361,6 +425,21 @@ module.exports = async (req, res) => {
     const channelPosts = Array.isArray(db.channel_posts) ? db.channel_posts : [];
     const mergedEvents = [...channelPosts, ...manualEvents];
 
+    const myMoodleRaw = (uid && db.moodle_users && db.moodle_users[uid]) || (qUid && db.moodle_users && db.moodle_users[qUid]) || null;
+    const myMoodleSafe = myMoodleRaw
+      ? {
+          connected: Boolean(myMoodleRaw.token),
+          username: myMoodleRaw.username || "",
+          fullname: myMoodleRaw.fullname || "",
+          notify_classes: myMoodleRaw.notify_classes !== false,
+          notify_deadlines: myMoodleRaw.notify_deadlines !== false,
+          notify_grades: myMoodleRaw.notify_grades !== false,
+          morning_digest: myMoodleRaw.morning_digest !== false,
+          lead_time_mins: Number(myMoodleRaw.lead_time_mins) || 20,
+          updated_at: myMoodleRaw.updated_at || null,
+        }
+      : { connected: false };
+
     return res.status(200).json({
       success: true,
       maintenance_mode: Boolean(db.maintenance_mode !== false),
@@ -375,12 +454,13 @@ module.exports = async (req, res) => {
       campus_events: mergedEvents,
       attending_events: userRecord && Array.isArray(userRecord.attending_events) ? userRecord.attending_events : [],
       my_subscription: uid && db.subscriptions ? db.subscriptions[uid] || null : null,
+      my_moodle: myMoodleSafe,
       campus_snapshot_meta: db.campus_snapshot_meta || {
         updated_at: 1793715471368,
         source: "system",
         slots_count: 8,
-        rooms_count: 231,
-        teachers_count: 477,
+        rooms_count: 233,
+        teachers_count: 546,
       },
     });
   }
@@ -396,6 +476,22 @@ module.exports = async (req, res) => {
       .filter((u) => String(u.id) !== "12345")
       .sort((a, b) => String(b.last_seen || "").localeCompare(String(a.last_seen || "")));
 
+    const moodleUsersSafe = {};
+    for (const [mUid, mRec] of Object.entries(db.moodle_users || {})) {
+      if (!mRec) continue;
+      moodleUsersSafe[mUid] = {
+        connected: Boolean(mRec.token),
+        username: mRec.username || "",
+        fullname: mRec.fullname || "",
+        courses_count: Array.isArray(mRec.courses) ? mRec.courses.length : 0,
+        deadlines_count: Array.isArray(mRec.deadlines) ? mRec.deadlines.length : 0,
+        notify_classes: mRec.notify_classes !== false,
+        notify_deadlines: mRec.notify_deadlines !== false,
+        notify_grades: mRec.notify_grades !== false,
+        updated_at: mRec.updated_at || null,
+      };
+    }
+
     return res.status(200).json({
       success: true,
       summary: {
@@ -407,8 +503,13 @@ module.exports = async (req, res) => {
         total_feedbacks: (db.feedbacks || []).length,
         active_room_reports: Object.keys(db.room_reports || {}).length,
         total_subscriptions: Object.keys(db.subscriptions || {}).length,
+        moodle_connected: Object.values(moodleUsersSafe).filter((m) => m.connected).length,
       },
       users: usersList,
+      moodle_users: moodleUsersSafe,
+      campus_relay_url: db.campus_relay_url || null,
+      campus_relay_updated_at: db.campus_relay_updated_at || null,
+      campus_snapshot_meta: db.campus_snapshot_meta || null,
       counters: db.counters || {},
       feedbacks: db.feedbacks || [],
       room_reports: db.room_reports || {},
@@ -505,9 +606,11 @@ module.exports = async (req, res) => {
       return res.status(200).json({ success: true, updated: false, cached: true });
     }
 
-    // 1. Send Daily / Weekly / Monthly Schedule directly inside Telegram Bot (No Vercel links exposed!)
+    // 1. Send Daily / Weekly / Monthly Schedule directly inside Telegram Bot (iOS & Android compatible .ics + readable summary!)
     if (body.action === "send_schedule_to_bot") {
-      const u = body.user || {};
+      const initDataHdr = req.headers["x-tg-init-data"] || body.initData || "";
+      const verifiedTgUser = verifyTelegramInitData(initDataHdr);
+      const u = { ...(body.user || {}), ...(verifiedTgUser ? { id: verifiedTgUser.id } : {}) };
       const uid = String(u.id || "").trim();
       if (!/^\d+$/.test(uid)) {
         return res.status(400).json({ success: false, error: "Telegram chat required" });
@@ -516,11 +619,12 @@ module.exports = async (req, res) => {
       const title = String(body.title || "UWED Schedule");
       const baseDateStr = String(body.date || new Date(Date.now() + 5 * 3600 * 1000).toISOString().slice(0, 10));
       const events = Array.isArray(body.events) ? body.events : [];
+      const lang = body.lang || "ru";
       const db = await loadDb();
       const userRec = db.users && db.users[uid] ? db.users[uid] : null;
       const attendingEvents = userRec && Array.isArray(userRec.attending_events) ? userRec.attending_events : [];
 
-      const icsContent = buildScheduleIcs({
+      const { ics: icsContent, count: icsCount, summaryLines } = buildScheduleIcs({
         title,
         period,
         baseDateStr,
@@ -530,16 +634,32 @@ module.exports = async (req, res) => {
 
       const periodLabel =
         period === "daily"
-          ? `📅 Daily (${baseDateStr})`
+          ? `📅 ${lang === "uz" ? "Kunlik" : "На день"} (${baseDateStr})`
           : period === "monthly"
-          ? "🗓 Monthly (4 Weeks)"
-          : "📆 Weekly (Mon–Sat)";
+          ? `🗓 ${lang === "uz" ? "Oylik (4 hafta)" : "На месяц (4 недели)"}`
+          : `📆 ${lang === "uz" ? "Haftalik (Du–Şa)" : "На неделю (Пн–Сб)"}`;
+
+      if (icsCount === 0) {
+        const emptyMsg =
+          lang === "uz"
+            ? `🏛 <b>UWED Helpdesk — ${periodLabel}</b>\n👤 <b>${title}</b>\n\nℹ️ Tanlangan davr uçun darslar topilmadi. Boshqa kunni yoki haftalik jadvalni tanlab kõring.`
+            : `🏛 <b>UWED Helpdesk — ${periodLabel}</b>\n👤 <b>${title}</b>\n\nℹ️ На выбранный период занятий не найдено. Выберите другой день или экспорт на неделю.`;
+        await sendTelegramMessage(uid, emptyMsg);
+        return res.status(200).json({ success: true, empty: true });
+      }
+
+      const summaryBlock = summaryLines.length
+        ? `\n\n${summaryLines.join("\n")}${icsCount > summaryLines.length ? `\n<i>+${icsCount - summaryLines.length} ещё...</i>` : ""}`
+        : "";
 
       const caption = [
         `🏛 <b>UWED Helpdesk — ${periodLabel}</b>`,
-        `👤 <b>${title}</b>`,
+        `👤 <b>${title}</b> (${icsCount} ${lang === "uz" ? "ta dars" : "занятий"})`,
+        summaryBlock,
         ``,
-        `📥 Tap the attached <code>.ics</code> file above to add directly to Apple / Google / Outlook Calendar.`,
+        lang === "uz"
+          ? `📥 Faylni bosib Apple / Google / Outlook kalendariga qõşing.`
+          : `📥 Нажмите на файл <code>.ics</code>, чтобы добавить в Apple / Google / Outlook Календарь.`,
       ].join("\n");
 
       const tgRes = await sendTelegramDocument(
@@ -558,6 +678,7 @@ module.exports = async (req, res) => {
 
       return res.status(200).json({
         success: Boolean(tgRes && tgRes.ok),
+        count: icsCount,
       });
     }
 
@@ -740,7 +861,7 @@ module.exports = async (req, res) => {
     }
 
     const db = await recordTelemetry({
-      user: body.user || {},
+      user: { ...(body.user || {}), ...(postTgUser ? { id: postTgUser.id, first_name: postTgUser.first_name || (body.user && body.user.first_name) || "", username: postTgUser.username || (body.user && body.user.username) || "" } : {}) },
       action: body.action || "app_event",
       detail: body.detail || "",
       meta: body.meta || {},
@@ -750,6 +871,7 @@ module.exports = async (req, res) => {
       subscription: body.subscription || null,
       campus_event: body.campus_event || null,
       event_attendance: body.event_attendance || null,
+      moodle: body.moodle || null,
     });
     return res.status(200).json({
       success: true,

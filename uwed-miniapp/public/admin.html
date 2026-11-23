@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>UWED Helpdesk • Admin</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -207,10 +207,25 @@
 
     <div class="kpis">
       <div class="kpi"><div class="kpi-num" id="kpiUsers">-</div><div class="kpi-lbl">Total Users</div></div>
-      <div class="kpi"><div class="kpi-num" id="kpiBlocked" style="color:#fb7185;">0</div><div class="kpi-lbl">Blocked Users</div></div>
+      <div class="kpi"><div class="kpi-num" id="kpiMoodle" style="color:#a78bfa;">0</div><div class="kpi-lbl">🎓 Moodle Linked</div></div>
       <div class="kpi"><div class="kpi-num" id="kpiSubs" style="color:#34d399;">0</div><div class="kpi-lbl">Subscribed (/my)</div></div>
+      <div class="kpi"><div class="kpi-num" id="kpiBlocked" style="color:#fb7185;">0</div><div class="kpi-lbl">Blocked Users</div></div>
       <div class="kpi"><div class="kpi-num" id="kpiEvents">-</div><div class="kpi-lbl">Logged Actions</div></div>
       <div class="kpi"><div class="kpi-num" id="kpiFeedbacks">-</div><div class="kpi-lbl">Feedbacks</div></div>
+    </div>
+
+    <!-- System Health, Moodle Sync & Notifications Engine -->
+    <div class="panel" style="border: 1px solid rgba(56, 189, 248, 0.35); background: rgba(56, 189, 248, 0.05);">
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+        <div>
+          <h3 style="margin-bottom:4px;">⚡ Notifications Engine & Campus Relay Status</h3>
+          <div style="font-size:12px; color:var(--muted);" id="sysHealthMeta">Loading system status...</div>
+        </div>
+        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+          <button id="btnRunAlerts" class="btn" onclick="triggerAlertsNow()">🔔 Run Alerts & Moodle Sync</button>
+        </div>
+      </div>
+      <div id="alertsRunResult" style="font-size:12px; color:#34d399; margin-top:8px; display:none;"></div>
     </div>
 
     <!-- Maintenance / Technical Mode Panel -->
@@ -256,7 +271,18 @@
 
     <!-- Users Control Table -->
     <div class="panel">
-      <h3>👥 User Control & Management (Click "Inspect / Msg" to view all actions or message user)</h3>
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:10px;">
+        <h3 style="margin-bottom:0;">👥 User Control & Management</h3>
+        <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
+          <button class="btn-sm" id="ufAll" onclick="setUserFilter('all')">All</button>
+          <button class="btn-sm" id="ufMoodle" onclick="setUserFilter('moodle')">🎓 Moodle</button>
+          <button class="btn-sm" id="ufSubs" onclick="setUserFilter('subs')">📅 Subs</button>
+          <button class="btn-sm" id="ufBlocked" onclick="setUserFilter('blocked')">🚫 Blocked</button>
+        </div>
+      </div>
+      <div style="margin-bottom:10px;">
+        <input type="text" class="input" id="userSearchInput" placeholder="🔎 Search user by name, @username, or Telegram ID..." oninput="renderUsersTable()" />
+      </div>
       <table>
         <thead>
           <tr>
@@ -441,10 +467,19 @@
         document.getElementById("adminRoot").style.display = "block";
         updateMaintUI(d.summary ? d.summary.maintenance_mode : true);
         document.getElementById("kpiUsers").textContent = (d.users || []).length;
+        document.getElementById("kpiMoodle").textContent = (d.summary && d.summary.moodle_connected) || Object.values(d.moodle_users || {}).filter((m) => m.connected).length;
         document.getElementById("kpiBlocked").textContent = (d.users || []).filter((u) => u.blocked).length;
         document.getElementById("kpiSubs").textContent = Object.keys(d.subscriptions || {}).length;
         document.getElementById("kpiEvents").textContent = (d.events || []).length;
         document.getElementById("kpiFeedbacks").textContent = (d.feedbacks || []).length;
+
+        const healthEl = document.getElementById("sysHealthMeta");
+        if (healthEl) {
+          const relayTxt = d.campus_relay_url ? `🟢 Relay: <code>${d.campus_relay_url}</code>` : `🟡 Relay: Offline (using Snapshot CDN)`;
+          const snapMeta = d.campus_snapshot_meta || {};
+          const snapTime = snapMeta.updated_at ? new Date(snapMeta.updated_at).toLocaleString() : "—";
+          healthEl.innerHTML = `${relayTxt} · 📸 Snapshot: <b>${snapMeta.rooms_count || 233}</b> rooms, <b>${snapMeta.teachers_count || 546}</b> teachers (${snapTime})`;
+        }
 
         document.getElementById("topRooms").innerHTML = renderCounterPills(d.counters && d.counters.rooms);
         document.getElementById("topSearches").innerHTML = renderCounterPills(d.counters && d.counters.searches);
@@ -485,8 +520,45 @@
       }
     }
 
+    let USER_FILTER = "all";
+    function setUserFilter(f) {
+      USER_FILTER = f;
+      renderUsersTable();
+    }
+
+    async function triggerAlertsNow() {
+      const btn = document.getElementById("btnRunAlerts");
+      const out = document.getElementById("alertsRunResult");
+      if (btn) { btn.disabled = true; btn.textContent = "⏳ Checking Moodle & Alerts..."; }
+      try {
+        const res = await fetch("/api/telemetry?action=cron_alerts&force=1", { headers: getAuthHeaders() }).then((r) => r.json());
+        if (out) {
+          out.style.display = "block";
+          out.textContent = res && res.success
+            ? `✅ Done! Dispatched: ${res.alerts_dispatched} alerts · Checked ${res.checked_subs} subs · Refreshed ${res.refreshed_moodle}/${res.checked_moodle} Moodle accounts.`
+            : "❌ Failed to run alerts check.";
+        }
+      } catch (_) {
+        if (out) { out.style.display = "block"; out.textContent = "❌ Network error"; }
+      }
+      if (btn) { btn.disabled = false; btn.textContent = "🔔 Run Alerts & Moodle Sync"; }
+    }
+
     function renderUsersTable() {
-      const list = ADMIN_DATA.users || [];
+      const q = ((document.getElementById("userSearchInput") && document.getElementById("userSearchInput").value) || "").trim().toLowerCase();
+      const mMap = ADMIN_DATA.moodle_users || {};
+      const sMap = ADMIN_DATA.subscriptions || {};
+      const list = (ADMIN_DATA.users || []).filter((u) => {
+        const uid = String(u.id);
+        if (USER_FILTER === "moodle" && !(mMap[uid] && mMap[uid].connected)) return false;
+        if (USER_FILTER === "subs" && !sMap[uid]) return false;
+        if (USER_FILTER === "blocked" && !u.blocked) return false;
+        if (q) {
+          const hay = `${uid} ${u.first_name || ""} ${u.last_name || ""} ${u.username || ""} ${u.phone || ""}`.toLowerCase();
+          if (!hay.includes(q)) return false;
+        }
+        return true;
+      });
       document.getElementById("usersTable").innerHTML =
         list
           .map((u) => {
@@ -497,13 +569,19 @@
             const statusHtml = u.blocked
               ? `<span class="status-blk">🚫 BLOCKED</span>`
               : `<span class="status-ok">✅ ALLOWED</span>`;
+            const mdlBadge = mMap[String(u.id)] && mMap[String(u.id)].connected
+              ? `<span class="pill" style="background:rgba(167,139,250,0.2);color:#c4b5fd;">🎓 Moodle</span>`
+              : "";
+            const subBadge = sMap[String(u.id)]
+              ? `<span class="pill" style="background:rgba(16,185,129,0.18);color:#34d399;">📅 Sub</span>`
+              : "";
             const noteHtml = u.admin_note ? `<div style="font-size:11px;color:#fbbf24;margin-top:2px;">📝 ${u.admin_note}</div>` : "";
             const blockBtn = u.blocked
               ? `<button class="btn-sm btn-success" onclick="quickToggleBlock('${u.id}', false)">✅ Allow</button>`
               : `<button class="btn-sm btn-danger" onclick="quickToggleBlock('${u.id}', true)">🚫 Block</button>`;
             return `
             <tr>
-              <td>${statusHtml}</td>
+              <td>${statusHtml}<div style="margin-top:3px;">${mdlBadge}${subBadge}</div></td>
               <td>
                 <b>${[u.first_name, u.last_name].filter(Boolean).join(" ") || "Guest"}</b>
                 <div style="font-size:11px;color:var(--muted);">ID: <code>${u.id}</code> · ${u.language_code || "uz"}</div>

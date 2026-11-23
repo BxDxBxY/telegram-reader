@@ -720,15 +720,27 @@ async function recordTelemetry({
     }
 
     // 5.5 Moodle Session & Verified Identity Sync (NEVER persists plaintext passwords)
-    if (moodle && (moodle.token || moodle.username)) {
+    if (moodle && moodle.disconnect) {
+      if (db.moodle_users && db.moodle_users[uid]) {
+        delete db.moodle_users[uid];
+      }
+      if (existing.moodle) {
+        existing.moodle.verified = false;
+        existing.moodle.updated_at = nowIso;
+      }
+    } else if (moodle && (moodle.token || moodle.username || moodle.update_prefs)) {
       if (!db.moodle_users) db.moodle_users = {};
       if (!db.verified_moodle_links) db.verified_moodle_links = {};
       const prevM = db.moodle_users[uid] || {};
       const hasToken = Boolean(moodle.token || prevM.token);
       const mUserId = moodle.userid || prevM.userid || null;
+      const nextGrades = Array.isArray(moodle.grades) ? moodle.grades : prevM.grades || [];
+      const prevLastGrades = Array.isArray(prevM.last_grades) && prevM.last_grades.length
+        ? prevM.last_grades
+        : normalizeMoodleGrades(nextGrades);
       db.moodle_users[uid] = {
         uid,
-        chat_id: user.chat_id || uid,
+        chat_id: user.chat_id || (/^\d+$/.test(uid) ? uid : prevM.chat_id || ""),
         token: moodle.token || prevM.token || "",
         username: moodle.username || prevM.username || "",
         fullname: moodle.fullname || prevM.fullname || moodle.username || "",
@@ -737,8 +749,8 @@ async function recordTelemetry({
         verified_at: prevM.verified_at || (hasToken ? nowIso : null),
         courses: Array.isArray(moodle.courses) ? moodle.courses : prevM.courses || [],
         deadlines: Array.isArray(moodle.deadlines) ? moodle.deadlines : prevM.deadlines || [],
-        grades: Array.isArray(moodle.grades) ? moodle.grades : prevM.grades || [],
-        last_grades: Array.isArray(prevM.last_grades) ? prevM.last_grades : (Array.isArray(moodle.grades) ? moodle.grades : []),
+        grades: nextGrades,
+        last_grades: prevLastGrades,
         notified_deadlines: prevM.notified_deadlines || {},
         notify_classes: moodle.notify_classes != null ? Boolean(moodle.notify_classes) : (prevM.notify_classes !== false),
         notify_grades: moodle.notify_grades != null ? Boolean(moodle.notify_grades) : (prevM.notify_grades !== false),
@@ -747,6 +759,7 @@ async function recordTelemetry({
         lead_time_mins: Number(moodle.lead_time_mins) || prevM.lead_time_mins || 20,
         last_notified_slot: prevM.last_notified_slot || null,
         last_morning_digest: prevM.last_morning_digest || null,
+        last_moodle_poll_ts: prevM.last_moodle_poll_ts || Date.now(),
         updated_at: nowIso,
       };
       if (hasToken && mUserId) {
@@ -900,11 +913,155 @@ async function saveSnapshotToDb(snapshotData, source = "office_pc") {
 }
 
 
-async function checkAndDispatchAlerts(snap, tgSender) {
-  if (typeof tgSender !== "function") return { count: 0 };
-  const db = await loadDb();
-  if (!db) return { count: 0 };
+function moodleWsPost(pathStr, formObj, timeoutMs = 6500) {
+  return new Promise((resolve) => {
+    try {
+      const postData = new URLSearchParams(formObj).toString();
+      const req = https.request(
+        {
+          hostname: "moodle.uwed.uz",
+          port: 443,
+          path: pathStr,
+          method: "POST",
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+            "Content-Length": Buffer.byteLength(postData),
+            "User-Agent": "MoodleMobile 4.4.0",
+          },
+          timeout: timeoutMs,
+        },
+        (res) => {
+          const chunks = [];
+          res.on("data", (c) => chunks.push(c));
+          res.on("end", () => {
+            try {
+              resolve(JSON.parse(Buffer.concat(chunks).toString("utf-8")));
+            } catch (_) {
+              resolve(null);
+            }
+          });
+        }
+      );
+      req.on("error", () => resolve(null));
+      req.on("timeout", () => {
+        req.destroy();
+        resolve(null);
+      });
+      req.write(postData);
+      req.end();
+    } catch (_) {
+      resolve(null);
+    }
+  });
+}
 
+function normalizeMoodleGrades(rawGrades) {
+  const out = [];
+  if (!Array.isArray(rawGrades)) return out;
+  for (const g of rawGrades) {
+    if (!g) continue;
+    const course = String(g.course || g.coursename || "Moodle").trim();
+    if (Array.isArray(g.items)) {
+      for (const it of g.items) {
+        if (!it) continue;
+        const item = String(it.name || it.item || "").trim();
+        const score = String(it.score != null ? it.score : (it.grade != null ? it.grade : "")).trim();
+        if (item) out.push({ course, item, score });
+      }
+    } else {
+      const item = String(g.item || g.name || "").trim();
+      const score = String(g.grade != null ? g.grade : (g.score != null ? g.score : "")).trim();
+      if (item || score) out.push({ course, item: item || "Оценка", score });
+    }
+  }
+  return out;
+}
+
+async function refreshMoodleForUser(mUser) {
+  if (!mUser || !mUser.token) return false;
+  const callWs = (wsfunction, extra = {}) =>
+    moodleWsPost("/webservice/rest/server.php", {
+      wstoken: mUser.token,
+      moodlewsrestformat: "json",
+      wsfunction,
+      ...extra,
+    });
+
+  let userid = mUser.userid;
+  if (!userid) {
+    const info = await callWs("core_webservice_get_site_info");
+    if (!info || info.exception || !info.userid) return false;
+    userid = info.userid;
+    mUser.userid = userid;
+    if (info.fullname) mUser.fullname = info.fullname;
+  }
+
+  const nowSec = Math.floor(Date.now() / 1000);
+  const [coursesRaw, calRaw] = await Promise.all([
+    callWs("core_enrol_get_users_courses", { userid }),
+    callWs("core_calendar_get_action_events_by_timesort", {
+      timesortfrom: nowSec - 2 * 86400,
+      limitnum: 30,
+    }),
+  ]);
+
+  if (Array.isArray(coursesRaw) && coursesRaw.length) {
+    mUser.courses = coursesRaw.map((c) => ({
+      id: c.id,
+      name: c.fullname || c.shortname || `Course #${c.id}`,
+      progress: c.progress != null ? Math.round(c.progress) : null,
+    }));
+  }
+
+  if (calRaw && Array.isArray(calRaw.events)) {
+    mUser.deadlines = calRaw.events
+      .map((ev) => ({
+        id: ev.id,
+        name: ev.name || "Assignment",
+        course: (ev.course && ev.course.fullname) || "",
+        time: ev.timestart || ev.usermidnight || nowSec,
+        url: ev.url || "",
+      }))
+      .sort((a, b) => a.time - b.time);
+  }
+
+  const courseList = Array.isArray(mUser.courses) ? mUser.courses.slice(0, 8) : [];
+  if (courseList.length) {
+    const freshGrades = [];
+    await Promise.all(
+      courseList.map(async (c) => {
+        try {
+          const gRes = await callWs("gradereport_user_get_grade_items", { courseid: c.id, userid });
+          const itemsRaw =
+            (gRes && gRes.usergrades && gRes.usergrades[0] && gRes.usergrades[0].gradeitems) || [];
+          const items = itemsRaw
+            .filter((it) => it.itemname || it.itemtype === "course")
+            .map((it) => ({
+              name: it.itemtype === "course" ? "∑ Итого по курсу" : it.itemname,
+              score:
+                it.gradeformatted && it.gradeformatted !== "-"
+                  ? String(it.gradeformatted).replace(/<[^>]+>/g, "").trim()
+                  : "—",
+            }));
+          if (items.length) freshGrades.push({ course: c.name, items });
+        } catch (_) {}
+      })
+    );
+    if (freshGrades.length) {
+      mUser.grades = freshGrades;
+    }
+  }
+
+  mUser.last_moodle_poll_ts = Date.now();
+  return true;
+}
+
+async function checkAndDispatchAlerts(snap, tgSender, opts = {}) {
+  if (typeof tgSender !== "function") return { count: 0, checked_subs: 0, checked_moodle: 0, refreshed_moodle: 0 };
+  const db = await loadDb(true);
+  if (!db) return { count: 0, checked_subs: 0, checked_moodle: 0, refreshed_moodle: 0 };
+
+  const forceRefresh = Boolean(opts && opts.forceRefresh);
   const nowTashkent = new Date(Date.now() + 5 * 3600 * 1000);
   const day = nowTashkent.getUTCDay(); // 0=Sun, 1=Mon, ..., 6=Sat
   const hh = nowTashkent.getUTCHours();
@@ -924,72 +1081,95 @@ async function checkAndDispatchAlerts(snap, tgSender) {
   ];
 
   let dispatchedCount = 0;
+  let checkedSubs = 0;
+  let checkedMoodle = 0;
+  let refreshedMoodle = 0;
   let dbDirty = false;
 
   const isUserBlocked = (uId) => Boolean(uId && String(uId) !== "6906730753" && db.users && db.users[String(uId)] && db.users[String(uId)].blocked);
 
+  // Build quick student -> group map from snapshot so student UUID subscriptions match cleanly
+  const studentGroupById = new Map();
+  const studentGroupByName = new Map();
+  if (snap && Array.isArray(snap.students)) {
+    for (const st of snap.students) {
+      const grp = String(st.group || st.group_name || "").trim().toLowerCase();
+      if (st.id && grp) studentGroupById.set(String(st.id), grp);
+      const fn = String(st.full_name || st.name || "").trim().toLowerCase();
+      if (fn && grp) studentGroupByName.set(fn, grp);
+    }
+  }
+
+  const findSlotEventForSub = (sub, targetDay, slotId) => {
+    if (!snap || !snap.events) return null;
+    if (sub.kind === "TEACHER") {
+      const tName = String(sub.title || "").trim().toLowerCase();
+      if (!tName) return null;
+      for (const elist of Object.values(snap.events)) {
+        for (const e of elist) {
+          if (Number(e.d) === targetDay && Number(e.s) === slotId && e.i && e.i.toLowerCase().includes(tName)) {
+            return e;
+          }
+        }
+      }
+      return null;
+    }
+    if (sub.kind === "ROOM") {
+      const rEvents = snap.events[sub.target_id] || [];
+      return rEvents.find((e) => Number(e.d) === targetDay && Number(e.s) === slotId) || null;
+    }
+    const rawTarget = String(sub.target_id || "").trim();
+    const rawTitle = String(sub.title || "").trim().toLowerCase();
+    const resolvedGrp =
+      studentGroupById.get(rawTarget) ||
+      studentGroupByName.get(rawTitle) ||
+      (rawTarget || rawTitle)
+        .replace(/^grp[:_]/i, "")
+        .replace(/^(guruh|группа|group):?\s*/i, "")
+        .trim()
+        .toLowerCase();
+    if (!resolvedGrp) return null;
+    for (const elist of Object.values(snap.events)) {
+      for (const e of elist) {
+        if (Number(e.d) === targetDay && Number(e.s) === slotId) {
+          const eg = String(e.g || e.grp || "").toLowerCase();
+          if (eg && (eg.includes(resolvedGrp) || resolvedGrp.includes(eg))) {
+            return e;
+          }
+        }
+      }
+    }
+    return null;
+  };
+
   // 1. CLASS REMINDERS (15–30 min before pair starts, Monday to Saturday)
+  const activeSubs = Object.values(db.subscriptions || {});
+  checkedSubs = activeSubs.length;
   if (day >= 1 && day <= 6) {
-    const activeSubs = Object.values(db.subscriptions || {});
     for (const sub of activeSubs) {
       if (!sub || !sub.chat_id || sub.notify === false || isUserBlocked(sub.uid) || isUserBlocked(sub.chat_id)) continue;
       const mUser = (db.moodle_users && db.moodle_users[sub.uid]) || {};
       if (mUser.notify_classes === false) continue;
-      const leadTime = mUser.lead_time_mins || 20;
+      const leadTime = Number(mUser.lead_time_mins) || 20;
 
       for (const slot of SLOT_CONFIG) {
         const diff = slot.startMins - curMins;
-        if (diff >= leadTime - 6 && diff <= leadTime + 6) {
+        if (diff >= leadTime - 7 && diff <= leadTime + 7) {
           const notifyKey = `${todayStr}_slot_${slot.id}`;
           if (sub.last_notified_slot === notifyKey) continue;
 
-          let matchedEvent = null;
-          if (snap && snap.events) {
-            if (sub.kind === "TEACHER") {
-              const tName = (sub.title || "").toLowerCase();
-              for (const elist of Object.values(snap.events)) {
-                for (const e of elist) {
-                  if (Number(e.d) === day && Number(e.s) === slot.id && e.i && e.i.toLowerCase().includes(tName)) {
-                    matchedEvent = e;
-                    break;
-                  }
-                }
-                if (matchedEvent) break;
-              }
-            } else if (sub.kind === "ROOM") {
-              const rEvents = snap.events[sub.target_id] || [];
-              matchedEvent = rEvents.find((e) => Number(e.d) === day && Number(e.s) === slot.id);
-            } else {
-              const sTarget = (sub.target_id || sub.title || "")
-                .replace(/^grp[:_]/i, "")
-                .replace(/^(Guruh|Группа):?\s*/i, "")
-                .trim()
-                .toLowerCase();
-              for (const elist of Object.values(snap.events)) {
-                for (const e of elist) {
-                  if (Number(e.d) === day && Number(e.s) === slot.id) {
-                    if (sTarget && e.g && (e.g.toLowerCase().includes(sTarget) || sTarget.includes(e.g.toLowerCase()))) {
-                      matchedEvent = e;
-                      break;
-                    }
-                  }
-                }
-                if (matchedEvent) break;
-              }
-            }
-          }
-
+          const matchedEvent = findSlotEventForSub(sub, day, slot.id);
           if (matchedEvent) {
-            const lang = sub.lang || "ru";
+            const lang = sub.lang || (db.users && db.users[sub.uid] && db.users[sub.uid].preferred_lang) || "ru";
             const msg =
               lang === "uz"
-                ? `🔔 <b>Dars eslatmasi (taxminan ${diff} daqiqadan so'ng)!</b>\n\n` +
+                ? `🔔 <b>Dars eslatmasi (taxminan ${diff} daqiqadan sõng)!</b>\n\n` +
                   `📚 <b>${matchedEvent.t || "Dars"}</b>\n` +
                   `🚪 Xona: <b>${matchedEvent.r || "—"}</b>\n` +
-                  `👨‍🏫 O'qituvchi: <i>${matchedEvent.i || "—"}</i>\n` +
+                  `👨‍🏫 Õqituvçi: <i>${matchedEvent.i || "—"}</i>\n` +
                   `⏰ Vaqt: <code>${slot.start} – ${slot.end}</code> (${slot.id}-para)\n\n` +
-                  `📍 <i>Darsga kechikmang! Moodle materiallarini tekshiring.</i>`
-                : `🔔 <b>Напоминание о паре (через ${diff} минут)!</b>\n\n` +
+                  `📍 <i>Darsga keçikmang! Moodle materiallarini tekşiring.</i>`
+                : `🔔 <b>Напоминание о паре (через ${diff} мин)!</b>\n\n` +
                   `📚 <b>${matchedEvent.t || "Занятие"}</b>\n` +
                   `🚪 Аудитория: <b>${matchedEvent.r || "—"}</b>\n` +
                   `👨‍🏫 Преподаватель: <i>${matchedEvent.i || "—"}</i>\n` +
@@ -1012,40 +1192,21 @@ async function checkAndDispatchAlerts(snap, tgSender) {
 
   // 2. DAILY MORNING DIGEST (07:30 - 08:30 Tashkent time, 450-510 mins)
   if (curMins >= 450 && curMins <= 510 && day >= 1 && day <= 6) {
-    const activeSubs = Object.values(db.subscriptions || {});
     for (const sub of activeSubs) {
       if (!sub || !sub.chat_id || sub.last_morning_digest === todayStr || isUserBlocked(sub.uid) || isUserBlocked(sub.chat_id)) continue;
       const mUser = (db.moodle_users && db.moodle_users[sub.uid]) || {};
       if (mUser.morning_digest === false) continue;
 
       const todayClasses = [];
-      if (snap && snap.events) {
-        const target = (sub.title || sub.target_id || "").toLowerCase();
-        for (const slot of SLOT_CONFIG) {
-          let foundEv = null;
-          for (const elist of Object.values(snap.events)) {
-            for (const e of elist) {
-              if (Number(e.d) === day && Number(e.s) === slot.id) {
-                if (sub.kind === "TEACHER" && e.i && e.i.toLowerCase().includes(target)) {
-                  foundEv = e;
-                  break;
-                }
-                if (e.g && (e.g.toLowerCase().includes(target) || target.includes(e.g.toLowerCase()))) {
-                  foundEv = e;
-                  break;
-                }
-              }
-            }
-            if (foundEv) break;
-          }
-          if (foundEv) {
-            todayClasses.push({ slot: slot.id, time: `${slot.start}–${slot.end}`, title: foundEv.t, room: foundEv.r });
-          }
+      for (const slot of SLOT_CONFIG) {
+        const foundEv = findSlotEventForSub(sub, day, slot.id);
+        if (foundEv) {
+          todayClasses.push({ slot: slot.id, time: `${slot.start}–${slot.end}`, title: foundEv.t, room: foundEv.r });
         }
       }
 
       if (todayClasses.length > 0 || (Array.isArray(mUser.deadlines) && mUser.deadlines.length > 0)) {
-        const lang = sub.lang || "ru";
+        const lang = sub.lang || (db.users && db.users[sub.uid] && db.users[sub.uid].preferred_lang) || "ru";
         const nowSec = Math.floor(Date.now() / 1000);
         const soonDl = (mUser.deadlines || []).filter((d) => d.time && d.time > nowSec && d.time - nowSec <= 48 * 3600);
         const classLines = todayClasses.length
@@ -1072,67 +1233,101 @@ async function checkAndDispatchAlerts(snap, tgSender) {
     }
   }
 
-  // 3. MOODLE DEADLINE ALERTS (<24h and <3h warnings, deduplicated)
+  // 3. LIVE MOODLE REFRESH + DEADLINE & GRADE ALERTS
   const nowSecAll = Math.floor(Date.now() / 1000);
-  for (const mUser of Object.values(db.moodle_users || {})) {
-    if (!mUser || !mUser.chat_id || isUserBlocked(mUser.uid) || isUserBlocked(mUser.chat_id)) continue;
-    const lang = (db.subscriptions && db.subscriptions[mUser.uid] && db.subscriptions[mUser.uid].lang) || "ru";
-    if (mUser.notify_deadlines !== false) {
-    if (!mUser.notified_deadlines) mUser.notified_deadlines = {};
-    for (const dl of mUser.deadlines || []) {
-      if (!dl || !dl.time) continue;
-      const secsLeft = dl.time - nowSecAll;
-      if (secsLeft <= 0 || secsLeft > 24 * 3600) continue;
-      const bucket = secsLeft <= 3 * 3600 ? "3h" : "24h";
-      const dlKey = `${dl.id || dl.name}_${dl.time}_${bucket}`;
-      if (mUser.notified_deadlines[dlKey]) continue;
-      const hrs = Math.max(1, Math.round(secsLeft / 3600));
-      const msg =
-        lang === "uz"
-          ? `⏳ <b>Moodle dedlayn eslatmasi (${hrs} soat qoldi)!</b>\n\n📝 <b>${dl.name || dl.title || "Topshiriq"}</b>\n📚 Kurs: <i>${dl.course || "Moodle"}</i>`
-          : `⏳ <b>Скоро дедлайн в Moodle (осталось ~${hrs} ч.)!</b>\n\n📝 <b>${dl.name || dl.title || "Задание"}</b>\n📚 Курс: <i>${dl.course || "Moodle"}</i>`;
-      await tgSender("sendMessage", { chat_id: mUser.chat_id, text: msg, parse_mode: "HTML" });
-      mUser.notified_deadlines[dlKey] = nowSecAll;
-      dbDirty = true;
-      dispatchedCount++;
-    }
+  const nowMsAll = Date.now();
+  const moodleUsersList = Object.values(db.moodle_users || {});
+  checkedMoodle = moodleUsersList.length;
+
+  for (const mUser of moodleUsersList) {
+    if (!mUser || !mUser.chat_id || !/^\d+$/.test(String(mUser.chat_id)) || isUserBlocked(mUser.uid) || isUserBlocked(mUser.chat_id)) continue;
+
+    // Poll Moodle live at most every 20 minutes per user (or immediately on forceRefresh)
+    if (mUser.token && (forceRefresh || nowMsAll - (mUser.last_moodle_poll_ts || 0) >= 20 * 60 * 1000)) {
+      const okRef = await refreshMoodleForUser(mUser);
+      if (okRef) {
+        refreshedMoodle++;
+        dbDirty = true;
+      }
     }
 
-    // 4. MOODLE GRADE CHANGE ALERTS
-    if (mUser.notify_grades !== false && Array.isArray(mUser.grades) && mUser.grades.length > 0) {
-      const prevMap = new Map();
-      for (const g of mUser.last_grades || []) {
-        prevMap.set(`${g.course || ""}|${g.item || g.name || ""}`, String(g.grade || g.score || ""));
-      }
-      const changed = [];
-      for (const g of mUser.grades) {
-        const k = `${g.course || ""}|${g.item || g.name || ""}`;
-        const val = String(g.grade || g.score || "").trim();
-        if (val && val !== "-" && prevMap.has(k) && prevMap.get(k) !== val) {
-          changed.push({ course: g.course || "Moodle", item: g.item || g.name || "Оценка", prev: prevMap.get(k), next: val });
-        }
-      }
-      if (changed.length > 0) {
-        const lines = changed.slice(0, 6).map((c) => `• <b>${c.course}</b> — ${c.item}: <code>${c.next}</code>`).join("\n");
+    const lang =
+      (db.users && db.users[mUser.uid] && db.users[mUser.uid].preferred_lang) ||
+      (db.subscriptions && db.subscriptions[mUser.uid] && db.subscriptions[mUser.uid].lang) ||
+      "ru";
+
+    // 3A. MOODLE DEADLINE ALERTS (<24h and <3h warnings, deduplicated)
+    if (mUser.notify_deadlines !== false) {
+      if (!mUser.notified_deadlines) mUser.notified_deadlines = {};
+      for (const dl of mUser.deadlines || []) {
+        if (!dl || !dl.time) continue;
+        const secsLeft = dl.time - nowSecAll;
+        if (secsLeft <= 0 || secsLeft > 24 * 3600) continue;
+        const bucket = secsLeft <= 3 * 3600 ? "3h" : "24h";
+        const dlKey = `${dl.id || dl.name}_${dl.time}_${bucket}`;
+        if (mUser.notified_deadlines[dlKey]) continue;
+        const hrs = Math.max(1, Math.round(secsLeft / 3600));
+        const dlDt = new Date((dl.time + 5 * 3600) * 1000).toISOString().replace("T", " ").slice(5, 16);
         const msg =
           lang === "uz"
-            ? `🎓 <b>Moodle'da yangi baho qõyildi!</b>\n\n${lines}`
-            : `🎓 <b>Преподаватель выставил оценку в Moodle!</b>\n\n${lines}`;
-        await tgSender("sendMessage", { chat_id: mUser.chat_id, text: msg, parse_mode: "HTML" });
-        mUser.last_grades = mUser.grades;
+            ? `⏳ <b>Moodle dedlayn eslatmasi (${hrs} soat qoldi)!</b>\n\n📝 <b>${dl.name || dl.title || "Topşiriq"}</b>\n📚 Kurs: <i>${dl.course || "Moodle"}</i>\n🕒 Muddat: <code>${dlDt}</code>`
+            : `⏳ <b>Скоро дедлайн в Moodle (осталось ~${hrs} ч.)!</b>\n\n📝 <b>${dl.name || dl.title || "Задание"}</b>\n📚 Курс: <i>${dl.course || "Moodle"}</i>\n🕒 Срок: <code>${dlDt}</code>`;
+        const replyMarkup = dl.url
+          ? { inline_keyboard: [[{ text: lang === "uz" ? "🔗 Moodle'da oçiş" : "🔗 Открыть в Moodle", url: dl.url }]] }
+          : undefined;
+        await tgSender("sendMessage", { chat_id: mUser.chat_id, text: msg, parse_mode: "HTML", reply_markup: replyMarkup });
+        mUser.notified_deadlines[dlKey] = nowSecAll;
         dbDirty = true;
         dispatchedCount++;
-      } else if (!Array.isArray(mUser.last_grades) || mUser.last_grades.length === 0) {
-        mUser.last_grades = mUser.grades;
+      }
+    }
+
+    // 3B. MOODLE GRADE CHANGE ALERTS (handles both nested {course, items} and flat formats)
+    if (mUser.notify_grades !== false && Array.isArray(mUser.grades) && mUser.grades.length > 0) {
+      const curFlat = normalizeMoodleGrades(mUser.grades);
+      const prevFlat = normalizeMoodleGrades(mUser.last_grades || []);
+      const prevMap = new Map();
+      for (const g of prevFlat) {
+        prevMap.set(`${g.course}|${g.item}`, g.score);
+      }
+
+      if (prevFlat.length === 0) {
+        // First baseline snapshot — save without spamming old grades
+        mUser.last_grades = curFlat;
         dbDirty = true;
+      } else {
+        const changed = [];
+        for (const g of curFlat) {
+          const k = `${g.course}|${g.item}`;
+          const val = String(g.score || "").trim();
+          if (!val || val === "-" || val === "—") continue;
+          const prevVal = prevMap.has(k) ? String(prevMap.get(k) || "").trim() : "";
+          if (prevVal !== val) {
+            changed.push({ course: g.course, item: g.item, prev: prevVal || "—", next: val });
+          }
+        }
+        if (changed.length > 0) {
+          const lines = changed
+            .slice(0, 8)
+            .map((c) => `• <b>${c.course}</b> — ${c.item}: <code>${c.next}</code>${c.prev && c.prev !== "—" && c.prev !== "-" ? ` (было ${c.prev})` : ""}`)
+            .join("\n");
+          const msg =
+            lang === "uz"
+              ? `🎓 <b>Moodle'da yangi baho qõyildi!</b>\n\n${lines}`
+              : `🎓 <b>Новая оценка в Moodle!</b>\n\n${lines}`;
+          await tgSender("sendMessage", { chat_id: mUser.chat_id, text: msg, parse_mode: "HTML" });
+          mUser.last_grades = curFlat;
+          dbDirty = true;
+          dispatchedCount++;
+        }
       }
     }
   }
 
   if (dbDirty) {
-    await saveDb(db, false);
+    await saveDb(db, true);
   }
-  return { count: dispatchedCount };
+  return { count: dispatchedCount, checked_subs: checkedSubs, checked_moodle: checkedMoodle, refreshed_moodle: refreshedMoodle };
 }
 
 module.exports = {

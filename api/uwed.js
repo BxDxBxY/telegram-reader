@@ -558,6 +558,15 @@ module.exports = async (req, res) => {
         "METHOD:PUBLISH",
         `X-WR-CALNAME:${escapeIcs(title)}`,
         "X-WR-TIMEZONE:Asia/Tashkent",
+        "BEGIN:VTIMEZONE",
+        "TZID:Asia/Tashkent",
+        "BEGIN:STANDARD",
+        "DTSTART:19700101T000000",
+        "TZOFFSETFROM:+0500",
+        "TZOFFSETTO:+0500",
+        "TZNAME:UZT",
+        "END:STANDARD",
+        "END:VTIMEZONE",
       ];
 
       if (type === "CAMPUS_EVENT") {
@@ -957,8 +966,20 @@ module.exports = async (req, res) => {
       const semsData = Array.isArray(semsRes.json && semsRes.json.data)
         ? semsRes.json.data
         : [];
-      const curSem = semsData.find((s) => s.current) || semsData[semsData.length - 1] || {};
+      const reqSemester = String(body.semester || req.query.semester || "").trim();
+      const curSem =
+        (reqSemester && semsData.find((s) => String(s.code || s.id || "") === reqSemester)) ||
+        semsData.find((s) => s.current) ||
+        semsData[semsData.length - 1] ||
+        {};
       const semCode = String(curSem.code || curSem.id || "");
+      const semName =
+        curSem.name ||
+        (curSem.education_year && curSem.education_year.name ? `${semCode}-semestr (${curSem.education_year.name})` : semCode);
+      const eduYear =
+        (curSem.education_year && (curSem.education_year.name || curSem.education_year.code)) ||
+        (curSem.educationYear && curSem.educationYear.name) ||
+        "";
       const subjRes = await hemisReq(
         `/education/subject-list${semCode ? `?semester=${encodeURIComponent(semCode)}` : ""}`,
         "GET",
@@ -968,13 +989,42 @@ module.exports = async (req, res) => {
       const subjList = Array.isArray(subjRes.json && subjRes.json.data)
         ? subjRes.json.data
         : [];
-      const gpaList = Array.isArray(gpaRes.json && gpaRes.json.data) ? gpaRes.json.data : [];
+      const gpaListRaw = Array.isArray(gpaRes.json && gpaRes.json.data) ? gpaRes.json.data : [];
+      const gpaList = gpaListRaw.map((g) => ({
+        year: (g.educationYear && g.educationYear.name) || g.education_year || "",
+        level: (g.level && g.level.name) || "",
+        gpa: g.gpa != null ? Number(g.gpa) : null,
+        credits: g.credit_sum != null ? Number(g.credit_sum) : null,
+        subjects: g.subjects != null ? Number(g.subjects) : null,
+      }));
       const latestGpa = gpaList.length ? gpaList[gpaList.length - 1].gpa : null;
 
-      const subjects = subjList.map((s) => ({
-        name: (s.curriculumSubject && s.curriculumSubject.subject && s.curriculumSubject.subject.name) || s.name || "Subject",
-        credit: Number((s.curriculumSubject && s.curriculumSubject.credit) || s.credit || 4),
-        score: Number((s.overallScore && s.overallScore.grade) || s.total_acload || 0),
+      const subjects = subjList.map((s) => {
+        const os = s.overallScore || {};
+        const rawGrade =
+          os.grade != null ? Number(os.grade) :
+          os.percent != null ? Number(os.percent) :
+          s.overall_score != null ? Number(s.overall_score) :
+          0;
+        const maxBall = Number(os.max_ball || 100);
+        const normalized100 = maxBall > 0 && maxBall !== 100 && rawGrade > 0
+          ? Math.round((rawGrade / maxBall) * 100)
+          : Math.round(rawGrade);
+        return {
+          name: (s.curriculumSubject && s.curriculumSubject.subject && s.curriculumSubject.subject.name) || s.name || "Subject",
+          code: (s.curriculumSubject && s.curriculumSubject.subject && s.curriculumSubject.subject.code) || "",
+          credit: Number((s.curriculumSubject && s.curriculumSubject.credit) || s.credit || 4),
+          score: Math.max(0, Math.min(100, isNaN(normalized100) ? 0 : normalized100)),
+          raw_score: rawGrade,
+          max_ball: maxBall,
+        };
+      });
+
+      const semesters = semsData.map((s) => ({
+        code: String(s.code || s.id || ""),
+        name: s.name || `Semestr ${s.code || s.id || ""}`,
+        year: (s.education_year && s.education_year.name) || (s.educationYear && s.educationYear.name) || "",
+        current: Boolean(s.current),
       }));
 
       return res.status(200).json({
@@ -985,7 +1035,11 @@ module.exports = async (req, res) => {
           group: (meData.group && meData.group.name) || "",
         },
         gpa: latestGpa,
+        gpa_list: gpaList,
         semester: semCode,
+        semester_name: semName,
+        education_year: eduYear,
+        semesters,
         subjects,
       });
     }
