@@ -890,6 +890,81 @@ module.exports = async (req, res) => {
       });
     }
 
+    // ─── MOODLE COURSE MATERIALS / MODULES (core_course_get_contents) ───
+    if (action === "moodle_course_contents") {
+      res.setHeader("Cache-Control", "no-store");
+      let body = {};
+      if (req.method === "POST") {
+        body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : req.body || {};
+      }
+      const token = (body.token || req.query.token || "").trim();
+      const courseid = Number(body.courseid || req.query.courseid || 0);
+      if (!token || !courseid) {
+        return res.status(200).json({ ok: false, error: "missing_params" });
+      }
+      const postData = new URLSearchParams({
+        wstoken: token,
+        moodlewsrestformat: "json",
+        wsfunction: "core_course_get_contents",
+        courseid: String(courseid),
+      }).toString();
+      const sectionsRaw = await new Promise((resolve) => {
+        const r = https.request(
+          {
+            hostname: "moodle.uwed.uz",
+            port: 443,
+            path: "/webservice/rest/server.php",
+            method: "POST",
+            headers: {
+              "Content-Type": "application/x-www-form-urlencoded",
+              "Content-Length": Buffer.byteLength(postData),
+              "User-Agent": "MoodleMobile 4.4.0",
+            },
+            timeout: 10000,
+          },
+          (resp) => {
+            const chunks = [];
+            resp.on("data", (c) => chunks.push(c));
+            resp.on("end", () => {
+              try {
+                resolve(JSON.parse(Buffer.concat(chunks).toString("utf-8")));
+              } catch (_) {
+                resolve(null);
+              }
+            });
+          }
+        );
+        r.on("error", () => resolve(null));
+        r.on("timeout", () => { r.destroy(); resolve(null); });
+        r.write(postData);
+        r.end();
+      });
+      if (!Array.isArray(sectionsRaw)) {
+        return res.status(200).json({ ok: false, error: "unavailable", sections: [] });
+      }
+      const sections = sectionsRaw
+        .map((sec) => ({
+          id: sec.id,
+          name: sec.name || "Раздел",
+          modules: (Array.isArray(sec.modules) ? sec.modules : [])
+            .filter((m) => m && m.name)
+            .map((m) => ({
+              id: m.id,
+              name: m.name,
+              modname: m.modname || "resource",
+              url: m.url || "",
+              files: (Array.isArray(m.contents) ? m.contents : [])
+                .slice(0, 4)
+                .map((f) => ({
+                  filename: f.filename || "file",
+                  fileurl: f.fileurl ? `${f.fileurl}${f.fileurl.includes("?") ? "&" : "?"}token=${encodeURIComponent(token)}` : "",
+                })),
+            })),
+        }))
+        .filter((s) => s.modules.length > 0);
+      return res.status(200).json({ ok: true, courseid, sections });
+    }
+
     // ─── HEMIS SERVER FALLBACK (student.uwed.uz/rest/v1) ───
     if (action === "hemis_login") {
       res.setHeader("Cache-Control", "no-store");
@@ -957,11 +1032,13 @@ module.exports = async (req, res) => {
         });
       }
 
-      const [meRes, semsRes, gpaRes, attRes] = await Promise.all([
+      const [meRes, semsRes, gpaRes, attRes, examRes, contractRes] = await Promise.all([
         hemisReq("/account/me", "GET", null, token).catch(() => ({})),
         hemisReq("/education/semesters", "GET", null, token).catch(() => ({})),
         hemisReq("/education/gpa-list", "GET", null, token).catch(() => ({})),
         hemisReq("/education/attendance", "GET", null, token).catch(() => ({})),
+        hemisReq("/education/exam-table", "GET", null, token).catch(() => ({})),
+        hemisReq("/student/contract", "GET", null, token).catch(() => ({})),
       ]);
       const meData = (meRes.json && meRes.json.data) || {};
       const semsData = Array.isArray(semsRes.json && semsRes.json.data)
@@ -1037,6 +1114,25 @@ module.exports = async (req, res) => {
         else attUnexcused += Number(a.absent_off || hrs);
       }
 
+      const examsRaw = Array.isArray(examRes && examRes.json && examRes.json.data) ? examRes.json.data : [];
+      const exams = examsRaw.slice(0, 20).map((ex) => ({
+        subject: (ex.subject && ex.subject.name) || ex.name || "Экзамен",
+        type: (ex.examType && ex.examType.name) || ex.exam_type || "",
+        date: ex.examDate ? new Date(ex.examDate * 1000).toISOString().slice(0, 10) : (ex.date || ""),
+        time: (ex.lessonPair && ex.lessonPair.start_time) || ex.time || "",
+        room: (ex.auditorium && ex.auditorium.name) || ex.room || "",
+        teacher: (ex.employee && ex.employee.name) || "",
+      }));
+
+      const contractData = (contractRes && contractRes.json && contractRes.json.data) || null;
+      const contract = contractData && (contractData.summa || contractData.contract_sum || contractData.paid_credit_amount != null)
+        ? {
+            total: Number(contractData.summa || contractData.contract_sum || 0),
+            paid: Number(contractData.paid_credit_amount || contractData.paid_sum || 0),
+            debt: Number(contractData.debt || contractData.debt_sum || 0),
+          }
+        : null;
+
       return res.status(200).json({
         ok: true,
         me: {
@@ -1055,6 +1151,8 @@ module.exports = async (req, res) => {
           unexcused_hours: attUnexcused,
           records_count: attRaw.length,
         },
+        exams,
+        contract,
         semester: semCode,
         semester_name: semName,
         education_year: eduYear,

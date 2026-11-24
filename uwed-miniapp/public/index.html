@@ -2078,7 +2078,7 @@
         <!-- Global Search Bar across Rooms, Teachers, Students, Buildings, Leadership & Docs -->
         <div class="hero-search-wrap">
           <svg style="position:absolute;left:13px;top:50%;transform:translateY(-50%);width:16px;height:16px;color:#38bdf8;pointer-events:none;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-          <input type="text" class="hero-search-input" id="heroGlobalSearchInput" placeholder="..." oninput="onHeroGlobalSearch(this.value)" />
+          <input type="text" class="hero-search-input" id="heroGlobalSearchInput" placeholder="..." oninput="onHeroGlobalSearch(this.value)" onfocus="onHeroGlobalSearchFocus()" />
           <div class="hero-search-results" id="heroGlobalSearchResults"></div>
         </div>
 
@@ -2711,6 +2711,8 @@
 
       <!-- HEMIS Official Per-Semester GPA History (shown when imported from HEMIS) -->
       <div id="gpaHemisHistoryBox" class="panel" style="display:none; margin-bottom:10px; border-color:rgba(56,189,248,0.35);"></div>
+      <!-- HEMIS Exams / Midterms & Contract Summary -->
+      <div id="gpaHemisExtrasBox" class="panel" style="display:none; margin-bottom:10px; border-color:rgba(16,185,129,0.35);"></div>
 
       <div class="panel" style="margin-bottom:10px; padding:11px 14px; display:flex; justify-content:space-between; align-items:center;">
         <div>
@@ -2963,6 +2965,7 @@
           <div style="font-size: 11.5px; color: var(--text-muted); margin-top: 2px;" id="modalSubtitle"></div>
         </div>
         <div style="display:flex; gap:6px; align-items:center; flex-shrink:0;">
+          <button class="btn-sm" id="modalRenameBtn" style="display:none; background:rgba(56,189,248,0.16); border-color:rgba(56,189,248,0.35); color:#38bdf8;" onclick="renameCurrentStudentModal()">✏️ Имя</button>
           <button class="btn-sm" id="modalPinBtn" style="display:none;"></button>
           <button class="modal-close" onclick="closeModal()">✕</button>
         </div>
@@ -5109,12 +5112,171 @@
       trackEvent("navigate_tab", tab);
     }
 
+    /* ─── SEARCH HISTORY & STUDENT FULL NAME ALIASES ─── */
+    function getStudentAliases() {
+      try {
+        return JSON.parse(localStorage.getItem("uwed_student_aliases") || "{}") || {};
+      } catch (_) {
+        return {};
+      }
+    }
+    function getStudentAlias(id) {
+      if (!id) return "";
+      return getStudentAliases()[String(id)] || "";
+    }
+    function setStudentAlias(id, name) {
+      if (!id) return;
+      const map = getStudentAliases();
+      const clean = String(name || "").trim();
+      if (clean) map[String(id)] = clean;
+      else delete map[String(id)];
+      try {
+        localStorage.setItem("uwed_student_aliases", JSON.stringify(map));
+      } catch (_) {}
+    }
+
+    function resolveStudentDisplayName(s) {
+      if (!s) return { name: "", sub: "", isNumericOnly: false, rawId: "" };
+      const sid = String(s.id || "");
+      const alias = getStudentAlias(sid);
+      const rawFull = String(s.full_name || s.name || "").trim();
+      const partsName = [s.last_name || s.surname, s.first_name, s.middle_name || s.patronymic]
+        .map((x) => String(x || "").trim())
+        .filter(Boolean)
+        .join(" ");
+      const group = String(s.group_name || s.group || s.academic_group || "").trim();
+      const idNum = String(s.student_id_number || s.code || (rawFull && /^\d+$/.test(rawFull) ? rawFull : "")).trim();
+
+      // Check if this student matches the user's own HEMIS/Moodle identity
+      let ownName = "";
+      try {
+        const hp = JSON.parse(localStorage.getItem("uwed_hemis_profile") || "null");
+        const mdl = JSON.parse(localStorage.getItem("uwed_moodle_cache") || "null");
+        const pinned = JSON.parse(localStorage.getItem("uwed_pinned_profile") || "null");
+        if (pinned && String(pinned.id) === sid) {
+          if (hp && hp.full_name) ownName = hp.full_name;
+          else if (mdl && mdl.user && mdl.user.fullname) ownName = mdl.user.fullname;
+        }
+        if (!ownName && hp && hp.student_id_number && idNum && String(hp.student_id_number) === idNum && hp.full_name) {
+          ownName = hp.full_name;
+        }
+      } catch (_) {}
+
+      const bestTextName = alias || ownName || (partsName && !/^\d+$/.test(partsName) ? partsName : "") || (rawFull && !/^\d+$/.test(rawFull) ? rawFull : "");
+      const isNumericOnly = !bestTextName;
+      const displayName = bestTextName
+        ? (idNum && !bestTextName.includes(idNum) ? `${toNewUz(bestTextName)} (${idNum})` : toNewUz(bestTextName))
+        : toNewUz(rawFull || idNum || sid);
+      const subParts = [];
+      if (group) subParts.push(group);
+      if (alias) subParts.push(STATE.lang === "ru" ? "Имя сохранено" : "Ism saqlangan");
+      else if (isNumericOnly) subParts.push(STATE.lang === "ru" ? "ID студента (нажмите, чтобы открыть и подписать имя)" : "Talaba ID (ochib ism qo'shish mumkin)");
+      return { name: displayName, sub: subParts.join(" · "), isNumericOnly, rawId: idNum || rawFull };
+    }
+
+    function getSearchHistory() {
+      try {
+        const arr = JSON.parse(localStorage.getItem("uwed_search_history_v1") || "[]");
+        return Array.isArray(arr) ? arr : [];
+      } catch (_) {
+        return [];
+      }
+    }
+
+    function addToSearchHistory(entry) {
+      if (!entry || !entry.kind || !entry.id) return;
+      try {
+        const list = getSearchHistory().filter((x) => !(x.kind === entry.kind && String(x.id) === String(entry.id)));
+        list.unshift({
+          kind: entry.kind,
+          id: String(entry.id),
+          title: String(entry.title || entry.id).slice(0, 80),
+          sub: String(entry.sub || "").slice(0, 60),
+          ts: Date.now(),
+        });
+        localStorage.setItem("uwed_search_history_v1", JSON.stringify(list.slice(0, 12)));
+      } catch (_) {}
+    }
+
+    function clearSearchHistory() {
+      haptic("light");
+      try { localStorage.removeItem("uwed_search_history_v1"); } catch (_) {}
+      const hBox = document.getElementById("heroGlobalSearchResults");
+      if (hBox) hBox.style.display = "none";
+      if (STATE.currentTab === "students") renderStudentsDefault();
+      showToast(STATE.lang === "ru" ? "История поиска очищена" : "Qidiruv tarixi tozalandi");
+    }
+
+    function openHistoryEntry(kind, id, title) {
+      const hBox = document.getElementById("heroGlobalSearchResults");
+      if (hBox) hBox.style.display = "none";
+      if (kind === "ROOM") openRoomModal(id);
+      else if (kind === "STREAM") openStreamModal(id);
+      else openPersonModal(kind, id, title);
+    }
+
+    function renderSearchHistoryHtml(filterKind = null) {
+      const isRu = STATE.lang === "ru";
+      let list = getSearchHistory();
+      if (filterKind) list = list.filter((x) => x.kind === filterKind);
+      if (!list.length) return "";
+      const iconFor = (k) => (k === "ROOM" ? "🚪" : k === "TEACHER" ? "👨‍🏫" : k === "STREAM" ? "📚" : "🎓");
+      return `
+        <div style="margin-bottom:10px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; padding:4px 4px 6px;">
+            <span style="font-size:11.5px; font-weight:800; color:var(--text-muted); text-transform:uppercase;">🕘 ${isRu ? "История поиска" : "Qidiruv tarixi"}</span>
+            <button onclick="clearSearchHistory()" style="background:none; border:none; color:#fb7185; font-size:11.5px; font-weight:700; cursor:pointer; padding:2px 6px;">${isRu ? "Очистить" : "Tozalash"}</button>
+          </div>
+          <div style="display:flex; flex-direction:column; gap:6px;">
+            ${list
+              .slice(0, 8)
+              .map((h) => {
+                const alias = h.kind === "STUDENT" ? getStudentAlias(h.id) : "";
+                const dispTitle = alias ? `${alias} (${h.title.replace(/^🎓\s*/, "").replace(/^Talaba:\s*/i, "").replace(/^Студент:\s*/i, "")})` : h.title;
+                const safeT = dispTitle.replace(/'/g, "\\'");
+                return `
+                  <div class="list-item" style="padding:9px 12px;" onclick="openHistoryEntry('${h.kind}', '${h.id}', '${safeT}')">
+                    <div class="list-main">
+                      <div class="list-title" style="font-size:13px;">${iconFor(h.kind)} ${dispTitle}</div>
+                      ${h.sub ? `<div class="list-sub" style="font-size:11px;">${h.sub}</div>` : ""}
+                    </div>
+                    <span style="color:var(--text-muted); font-size:16px;">›</span>
+                  </div>`;
+              })
+              .join("")}
+          </div>
+        </div>`;
+    }
+
+    function onHeroGlobalSearchFocus() {
+      const inp = document.getElementById("heroGlobalSearchInput");
+      const box = document.getElementById("heroGlobalSearchResults");
+      if (!box || !inp) return;
+      if ((inp.value || "").trim().length >= 2) {
+        onHeroGlobalSearch(inp.value);
+        return;
+      }
+      const histHtml = renderSearchHistoryHtml(null);
+      if (histHtml) {
+        box.innerHTML = `<div style="padding:6px 4px;">${histHtml}</div>`;
+        box.style.display = "block";
+      }
+    }
+
+    document.addEventListener("click", (e) => {
+      const wrap = document.querySelector(".hero-search-wrap");
+      const box = document.getElementById("heroGlobalSearchResults");
+      if (wrap && box && !wrap.contains(e.target)) {
+        box.style.display = "none";
+      }
+    });
+
     /* ─── GLOBAL HERO SEARCH (Rooms, Teachers, Buildings, Leadership, Docs) ─── */
     function onHeroGlobalSearch(rawQ) {
       const box = document.getElementById("heroGlobalSearchResults");
       const q = (rawQ || "").trim().toLowerCase();
       if (q.length < 2) {
-        box.style.display = "none";
+        onHeroGlobalSearchFocus();
         return;
       }
       const hits = [];
@@ -6135,13 +6297,84 @@
         ? cs
             .map(
               (c) => `
-              <div class="panel" style="margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">
-                <div style="font-size:13px;font-weight:700;color:var(--text);">🎓 ${c.name}</div>
-                ${c.progress != null ? `<span class="bento-tag">${c.progress}%</span>` : ""}
+              <div class="panel" style="margin-bottom:8px; padding:12px;">
+                <div onclick="toggleMoodleCourseContents(${c.id})" style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;gap:8px;">
+                  <div style="font-size:13px;font-weight:700;color:var(--text);min-width:0;flex:1;">🎓 ${c.name}</div>
+                  <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
+                    ${c.progress != null ? `<span class="bento-tag">${c.progress}%</span>` : ""}
+                    <span id="mdlCourseChevron_${c.id}" style="color:#38bdf8;font-size:13px;font-weight:800;">▾</span>
+                  </div>
+                </div>
+                <div id="mdlCourseBody_${c.id}" style="display:none; margin-top:10px; padding-top:8px; border-top:1px solid rgba(255,255,255,0.08);"></div>
               </div>`
             )
             .join("")
         : `<div class="empty-msg">${t.mdlNoCourses || "Kurslar topilmadi."}</div>`;
+    }
+
+    async function toggleMoodleCourseContents(courseId) {
+      haptic("light");
+      const bodyEl = document.getElementById(`mdlCourseBody_${courseId}`);
+      const chevEl = document.getElementById(`mdlCourseChevron_${courseId}`);
+      if (!bodyEl) return;
+      if (bodyEl.style.display === "block") {
+        bodyEl.style.display = "none";
+        if (chevEl) chevEl.textContent = "▾";
+        return;
+      }
+      bodyEl.style.display = "block";
+      if (chevEl) chevEl.textContent = "▴";
+      if (bodyEl.dataset.loaded === "1") return;
+
+      const isRu = STATE.lang === "ru";
+      const token = localStorage.getItem("uwed_moodle_token");
+      if (!token) {
+        bodyEl.innerHTML = `<div style="font-size:12px;color:var(--text-muted);">${isRu ? "Войдите в Moodle для просмотра материалов." : "Materiallarni ko'rish uchun Moodle ga kiring."}</div>`;
+        return;
+      }
+      bodyEl.innerHTML = `<div style="font-size:12px;color:var(--text-muted);">⏳ ${isRu ? "Загрузка лекций и файлов..." : "Ma'ruza va fayllar yuklanmoqda..."}</div>`;
+      try {
+        const res = await fetch("/api/uwed?action=moodle_course_contents", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token, courseid: courseId }),
+        }).then((r) => r.json());
+        if (!res.ok || !Array.isArray(res.sections) || !res.sections.length) {
+          bodyEl.innerHTML = `<div style="font-size:12px;color:var(--text-muted);">${isRu ? "Материалы курса пока не опубликованы." : "Kurs materiallari hali yuklanmagan."}</div>`;
+          return;
+        }
+        bodyEl.dataset.loaded = "1";
+        const iconForMod = (m) =>
+          m === "assign" ? "📝" : m === "quiz" ? "✅" : m === "resource" ? "📄" : m === "folder" ? "📁" : m === "url" ? "🔗" : m === "forum" ? "💬" : "📌";
+        bodyEl.innerHTML = res.sections
+          .map(
+            (sec) => `
+            <div style="margin-bottom:8px;">
+              <div style="font-size:11.5px;font-weight:800;color:#38bdf8;margin-bottom:4px;">${sec.name}</div>
+              ${(sec.modules || [])
+                .map((m) => {
+                  const filesHtml = (m.files || [])
+                    .map(
+                      (f) =>
+                        `<a href="${f.fileurl}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:#34d399;text-decoration:none;background:rgba(16,185,129,0.12);padding:3px 7px;border-radius:6px;margin-top:4px;margin-right:4px;">⬇️ ${f.filename}</a>`
+                    )
+                    .join("");
+                  return `
+                    <div style="padding:6px 8px;border-radius:8px;background:var(--bg-elevated);margin-bottom:4px;">
+                      <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;">
+                        <span style="font-size:12px;font-weight:600;color:var(--text);">${iconForMod(m.modname)} ${m.name}</span>
+                        ${m.url ? `<a href="${m.url}" target="_blank" rel="noopener" style="font-size:11px;font-weight:700;color:#38bdf8;text-decoration:none;flex-shrink:0;">Открыть ↗</a>` : ""}
+                      </div>
+                      ${filesHtml ? `<div>${filesHtml}</div>` : ""}
+                    </div>`;
+                })
+                .join("")}
+            </div>`
+          )
+          .join("");
+      } catch (_) {
+        bodyEl.innerHTML = `<div style="font-size:12px;color:#fb7185;">⚠️ ${isRu ? "Не удалось загрузить материалы." : "Materiallarni yuklab bo'lmadi."}</div>`;
+      }
     }
 
     function switchMoodleSubTab(sub) {
@@ -6338,6 +6571,53 @@
         }
       }
 
+      // Render HEMIS Exams / Midterms & Contract status if available
+      const extrasBox = document.getElementById("gpaHemisExtrasBox");
+      if (extrasBox) {
+        try {
+          const hp = JSON.parse(localStorage.getItem("uwed_hemis_profile") || "null");
+          const exams = (hp && Array.isArray(hp.exams) ? hp.exams : []) || [];
+          const contract = (hp && hp.contract) || null;
+          let exHtml = "";
+          if (exams.length) {
+            exHtml += `<div style="font-size:12px; font-weight:800; color:#34d399; margin-bottom:6px;">📝 ${isRu ? "Экзамены и мидтермы (HEMIS)" : "Imtihonlar va nazoratlar (HEMIS)"} (${exams.length})</div>`;
+            exHtml += exams
+              .slice(0, 8)
+              .map(
+                (ex) => `
+                <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; padding:7px 10px; border-radius:10px; background:var(--bg-elevated); margin-bottom:5px; font-size:12px;">
+                  <div style="min-width:0; flex:1;">
+                    <div style="font-weight:700; color:var(--text);">${toNewUz(ex.subject || "—")}</div>
+                    <div style="font-size:11px; color:var(--text-muted);">${[ex.exam_type, ex.auditorium, ex.teacher].filter(Boolean).join(" · ")}</div>
+                  </div>
+                  <div style="text-align:right; flex-shrink:0; font-size:11px; font-weight:800; color:#38bdf8;">${ex.date || ""}<br/>${ex.time || ""}</div>
+                </div>`
+              )
+              .join("");
+          }
+          if (contract && (contract.summa || contract.edu_year)) {
+            const fmtNum = (n) => (n != null && !isNaN(Number(n)) ? Number(n).toLocaleString("ru-RU") : "—");
+            exHtml += `
+              <div style="margin-top:${exams.length ? "10px" : "0"}; padding:9px 11px; border-radius:10px; background:rgba(56,189,248,0.08); border:1px solid rgba(56,189,248,0.22); font-size:12px;">
+                <div style="font-weight:800; color:#38bdf8; margin-bottom:4px;">💳 ${isRu ? "Контракт (HEMIS)" : "Kontrakt (HEMIS)"}${contract.edu_year ? ` · ${contract.edu_year}` : ""}</div>
+                <div style="display:flex; justify-content:space-between; flex-wrap:wrap; gap:6px; color:var(--text-sec);">
+                  <span>${isRu ? "Сумма" : "Summa"}: <b style="color:var(--text);">${fmtNum(contract.summa)}</b></span>
+                  <span>${isRu ? "Оплачено" : "Tõlangan"}: <b style="color:#34d399;">${fmtNum(contract.paid)}</b></span>
+                  ${contract.debt ? `<span>${isRu ? "Долг" : "Qarz"}: <b style="color:#fb7185;">${fmtNum(contract.debt)}</b></span>` : ""}
+                </div>
+              </div>`;
+          }
+          if (exHtml) {
+            extrasBox.style.display = "block";
+            extrasBox.innerHTML = exHtml;
+          } else {
+            extrasBox.style.display = "none";
+          }
+        } catch (_) {
+          extrasBox.style.display = "none";
+        }
+      }
+
       if (badgeWrap) {
         if (gpaNum >= 4.90) {
           badgeWrap.innerHTML = `<span class="gpa-honor-badge honor-alo">${t.gpaHonorAlo || "🌟 A'lochi (Stipendiya 5.0)"}</span>`;
@@ -6422,7 +6702,15 @@
             localStorage.setItem("uwed_hemis_gpa_history", JSON.stringify(res.gpa_list));
           }
           if (res.me) {
-            localStorage.setItem("uwed_hemis_profile", JSON.stringify({ ...res.me, attendance: res.attendance || null }));
+            localStorage.setItem(
+              "uwed_hemis_profile",
+              JSON.stringify({
+                ...res.me,
+                attendance: res.attendance || null,
+                exams: Array.isArray(res.exams) ? res.exams : [],
+                contract: res.contract || null,
+              })
+            );
             // Automatically link student's schedule from HEMIS to Profile & Telegram Bot!
             try { autoLinkStudentFromMoodle(res.me.full_name, res.me.group); } catch (_) {}
           }
@@ -7174,7 +7462,9 @@
     /* Students Tab */
     let studentSearchTimer = null;
     function renderStudentsDefault() {
-      document.getElementById("studentsList").innerHTML = `<div class="empty-msg">${T().studentDefault}</div>`;
+      const histHtml = renderSearchHistoryHtml("STUDENT");
+      document.getElementById("studentsList").innerHTML =
+        histHtml + `<div class="empty-msg">${T().studentDefault}</div>`;
     }
 
     function onStudentSearchInput() {
@@ -7201,13 +7491,14 @@
         const data = await res.json();
         const students = Array.isArray(data.data) ? data.data : [];
         for (const s of students.slice(0, 25)) {
-          const disp = toNewUz(s.full_name || "");
-          const safeName = disp.replace(/'/g, "\\'");
+          const resolved = resolveStudentDisplayName(s);
+          const safeName = resolved.name.replace(/'/g, "\\'");
+          const subTxt = resolved.sub || t.studentSub;
           html += `
             <div class="list-item" onclick="openPersonModal('STUDENT', '${s.id}', '${t.studentItem}: ${safeName}')">
               <div class="list-main">
-                <div class="list-title">🎓 ${t.studentItem} ${disp}</div>
-                <div class="list-sub">${t.studentSub}</div>
+                <div class="list-title">🎓 ${resolved.name}</div>
+                <div class="list-sub">${subTxt}</div>
               </div>
               <span style="color:var(--text-muted); font-size:18px;">›</span>
             </div>
@@ -7431,7 +7722,8 @@
           for (const s of (sRes.data || []).slice(0, 5)) {
             if (!seenIds.has(`S:${s.id}`)) {
               seenIds.add(`S:${s.id}`);
-              items.push({ kind: "STUDENT", id: s.id, title: `🎓 ${toNewUz(s.full_name)}` });
+              const resolved = resolveStudentDisplayName(s);
+              items.push({ kind: "STUDENT", id: s.id, title: `🎓 ${resolved.name}` });
             }
           }
         } catch (_) {}
@@ -8526,6 +8818,14 @@
       document.getElementById("modalTitle").textContent = t.roomTitle(room.name);
       document.getElementById("modalSubtitle").textContent = `${t.types[room.type] || room.type} · ${room.capacity || "?"} ${t.seats} · ${room.building}, ${room.floor || "?"}${t.floorSuffix}`;
       document.getElementById("modalPinBtn").style.display = "none";
+      const renBtnRoom = document.getElementById("modalRenameBtn");
+      if (renBtnRoom) renBtnRoom.style.display = "none";
+      addToSearchHistory({
+        kind: "ROOM",
+        id: roomId,
+        title: t.roomTitle(room.name),
+        sub: `${room.building}, ${room.floor || "?"}${t.floorSuffix}`,
+      });
       const dp = document.getElementById("modalDatePicker");
       if (dp) dp.value = dateForDay;
       document.getElementById("detailModal").classList.add("open");
@@ -8541,26 +8841,71 @@
       } catch (_) {}
     }
 
+    function renameCurrentStudentModal() {
+      const ctx = STATE.modalContext;
+      if (!ctx || ctx.kind !== "STUDENT") return;
+      haptic("light");
+      const isRu = STATE.lang === "ru";
+      const cur = getStudentAlias(ctx.id) || "";
+      const entered = window.prompt(
+        isRu
+          ? "Введите полное ФИО студента (сохранится для поиска, истории и общих окон):"
+          : "Talabaning to'liq F.I.Sh. ni kiriting (qidiruv va tarixda saqlanadi):",
+        cur
+      );
+      if (entered === null) return;
+      const clean = entered.trim();
+      setStudentAlias(ctx.id, clean);
+      const rawClean = String(ctx.rawTitle || ctx.title || "").replace(/^Talaba:\s*/i, "").replace(/^Студент:\s*/i, "");
+      const newTitle = clean ? `${clean}${rawClean && !clean.includes(rawClean) ? ` (${rawClean})` : ""}` : ctx.rawTitle || ctx.title;
+      ctx.title = newTitle;
+      document.getElementById("modalTitle").textContent = newTitle;
+      const pinBtn = document.getElementById("modalPinBtn");
+      if (pinBtn) pinBtn.onclick = () => savePinnedProfile(ctx.kind, ctx.id, newTitle);
+      addToSearchHistory({ kind: "STUDENT", id: ctx.id, title: newTitle, sub: ctx.resolvedGroup || "" });
+      showToast(clean ? (isRu ? `✅ Имя сохранено: ${clean}` : `✅ Ism saqlandi: ${clean}`) : (isRu ? "Имя сброшено" : "Ism o'chirildi"));
+    }
+
     async function openPersonModal(type, id, title) {
       haptic("medium");
       const t = T();
-      trackEvent(type === "TEACHER" ? "open_teacher" : "open_student", title);
+      const alias = type === "STUDENT" ? getStudentAlias(id) : "";
+      const rawTitle = title;
+      const cleanRaw = String(title || "").replace(/^Talaba:\s*/i, "").replace(/^Студент:\s*/i, "").trim();
+      let displayTitle = alias
+        ? (cleanRaw && !alias.includes(cleanRaw) ? `${alias} (${cleanRaw})` : alias)
+        : title;
+      trackEvent(type === "TEACHER" ? "open_teacher" : "open_student", displayTitle);
       const dateForDay = computeDateForWeekday(STATE.selectedDateStr, STATE.day);
       STATE.modalContext = {
         kind: type,
         id,
-        title,
+        title: displayTitle,
+        rawTitle,
         day: STATE.day,
         selectedDateStr: dateForDay,
         events: null,
         loading: true,
+        resolvedGroup: "",
       };
-      document.getElementById("modalTitle").textContent = title;
+      document.getElementById("modalTitle").textContent = displayTitle;
       document.getElementById("modalSubtitle").textContent = t.loadingLive;
       const pinBtn = document.getElementById("modalPinBtn");
       pinBtn.style.display = "inline-block";
       pinBtn.textContent = t.pinBtn;
-      pinBtn.onclick = () => savePinnedProfile(type, id, title);
+      pinBtn.onclick = () => savePinnedProfile(type, id, STATE.modalContext.title);
+      const renBtn = document.getElementById("modalRenameBtn");
+      if (renBtn) {
+        const isStuId = type === "STUDENT" && !String(id).startsWith("grp:");
+        renBtn.style.display = isStuId ? "inline-block" : "none";
+        renBtn.textContent = alias ? (STATE.lang === "ru" ? "✏️ Изм." : "✏️ Tahrir") : (STATE.lang === "ru" ? "✏️ Имя" : "✏️ Ism");
+      }
+      addToSearchHistory({
+        kind: type,
+        id,
+        title: displayTitle,
+        sub: type === "TEACHER" ? (STATE.lang === "ru" ? "Преподаватель" : "O'qituvchi") : (STATE.lang === "ru" ? "Студент" : "Talaba"),
+      });
       const dp = document.getElementById("modalDatePicker");
       if (dp) dp.value = dateForDay;
       document.getElementById("detailModal").classList.add("open");
@@ -8594,7 +8939,43 @@
         }
         STATE.modalContext.events = evList;
         STATE.modalContext.loading = false;
-        document.getElementById("modalSubtitle").textContent = T().liveLoaded(evList.length);
+
+        // Enrich student metadata from API events (full name if present, group, speciality)
+        let extraMeta = "";
+        if (type === "STUDENT" && evList.length) {
+          const sample = evList[0] || {};
+          const grpSet = new Set();
+          const specSet = new Set();
+          let apiFullName = "";
+          for (const ev of evList) {
+            if (!apiFullName && ev.student_name && !/^\d+$/.test(String(ev.student_name).trim())) apiFullName = String(ev.student_name).trim();
+            if (!apiFullName && ev.student_full_name && !/^\d+$/.test(String(ev.student_full_name).trim())) apiFullName = String(ev.student_full_name).trim();
+            if (ev.groups) {
+              const gStr = Array.isArray(ev.groups) ? ev.groups.join(", ") : String(ev.groups);
+              if (gStr.trim()) grpSet.add(gStr.trim());
+            }
+            if (ev.speciality_names) {
+              const spStr = Array.isArray(ev.speciality_names) ? ev.speciality_names[0] : String(ev.speciality_names);
+              if (spStr && spStr.trim()) specSet.add(spStr.trim());
+            }
+          }
+          const grpLabel = Array.from(grpSet).slice(0, 2).join(", ");
+          const specLabel = Array.from(specSet)[0] || "";
+          STATE.modalContext.resolvedGroup = grpLabel;
+          if (apiFullName && !alias) {
+            setStudentAlias(id, apiFullName);
+            const enrichedTitle = cleanRaw && !apiFullName.includes(cleanRaw) ? `${toNewUz(apiFullName)} (${cleanRaw})` : toNewUz(apiFullName);
+            STATE.modalContext.title = enrichedTitle;
+            document.getElementById("modalTitle").textContent = enrichedTitle;
+          }
+          extraMeta = [grpLabel ? `👥 ${grpLabel}` : "", specLabel ? toNewUz(specLabel).slice(0, 32) : ""].filter(Boolean).join(" · ");
+          if (grpLabel) {
+            addToSearchHistory({ kind: "STUDENT", id, title: STATE.modalContext.title, sub: grpLabel });
+          }
+        }
+        document.getElementById("modalSubtitle").textContent = extraMeta
+          ? `${extraMeta} · ${T().liveLoaded(evList.length)}`
+          : T().liveLoaded(evList.length);
         renderModalContent();
       } catch (_) {
         STATE.modalContext.loading = false;
