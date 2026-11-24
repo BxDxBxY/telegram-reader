@@ -2784,32 +2784,34 @@
 
       <div id="lfListContainer" class="list-stack"></div>
     </section>
-    <!-- 14. PERSONAL USER PROFILE VIEW (tab-profile) -->
+    <!-- 14. PERSONAL USER PROFILE / DIGITAL STUDENT CABINET (tab-profile) -->
     <section id="tab-profile" style="display: none;">
       <div class="sub-bar">
         <button class="back-pill" onclick="switchTab('home')" id="backFromProfile">← Asosiy</button>
+        <button class="row-link" onclick="openPinnedWeekFromProfile()">🗓 Моя неделя</button>
       </div>
 
-      <!-- Profile Identity Card -->
+      <!-- Digital Student ID Card -->
       <div class="panel profile-hero-card">
-        <div style="display:flex; align-items:center; gap:14px; margin-bottom:12px;">
+        <div style="display:flex; align-items:center; gap:13px; margin-bottom:10px;">
           <div class="profile-avatar" id="profAvatar">UW</div>
           <div style="min-width:0; flex:1;">
-            <div style="font-size:17px; font-weight:800; color:var(--text);" id="profFullName">Talaba</div>
-            <div style="font-size:12px; color:#38bdf8; font-weight:700;" id="profUsername">@username</div>
-            <div style="font-size:11px; color:var(--text-muted); margin-top:2px;" id="profTgId">TG-ID: —</div>
+            <div style="font-size:17px; font-weight:800; color:var(--text); line-height:1.2;" id="profFullName">Talaba</div>
+            <div style="font-size:12px; color:#38bdf8; font-weight:700; margin-top:2px;" id="profUsername">@username</div>
+            <div style="font-size:11px; color:var(--text-muted); margin-top:2px;" id="profAcademicMeta">TG-ID: —</div>
           </div>
           <span class="bento-tag" id="profRoleBadge" style="align-self:flex-start;">TALABA</span>
         </div>
 
-        <!-- Moodle Verification Status Bar -->
-        <div id="profVerifyBanner" style="display:flex; align-items:center; justify-content:space-between; gap:8px; padding:9px 12px; border-radius:12px; margin-bottom:10px; background:rgba(245,158,11,0.12); border:1px solid rgba(245,158,11,0.32); cursor:pointer;" onclick="switchTab('moodle')">
-          <div style="font-size:12px; font-weight:700; color:#fbbf24;" id="profVerifyText">🔒 Не верифицирован — войдите через Moodle</div>
-          <span style="font-size:11px; font-weight:800; color:#38bdf8;">Moodle →</span>
+        <!-- Unified 3-System Sync Status Pills (Moodle · HEMIS · Telegram Bot) -->
+        <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px;">
+          <span id="profPillMoodle" onclick="switchTab('moodle')" style="cursor:pointer; font-size:11px; font-weight:800; padding:4px 9px; border-radius:99px; background:rgba(245,158,11,0.14); border:1px solid rgba(245,158,11,0.35); color:#fbbf24;">🎓 Moodle: —</span>
+          <span id="profPillHemis" onclick="switchTab('gpa'); toggleHemisImportBox();" style="cursor:pointer; font-size:11px; font-weight:800; padding:4px 9px; border-radius:99px; background:rgba(56,189,248,0.12); border:1px solid rgba(56,189,248,0.32); color:#38bdf8;">🏛 HEMIS: —</span>
+          <span id="profPillBot" onclick="switchProfileSubTab('notify')" style="cursor:pointer; font-size:11px; font-weight:800; padding:4px 9px; border-radius:99px; background:rgba(16,185,129,0.12); border:1px solid rgba(16,185,129,0.32); color:#34d399;">🤖 Бот: —</span>
         </div>
 
-        <!-- Unified Academic, Schedule & Moodle Snapshot -->
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:6px;">
+        <!-- 4 Compact Academic KPI Tiles -->
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
           <div style="background:var(--bg-elevated); border:1px solid var(--border); border-radius:12px; padding:10px; cursor:pointer;" onclick="openPinnedProfileFromAnywhere()">
             <div style="display:flex; justify-content:space-between; align-items:center;">
               <div style="font-size:10.5px; color:var(--text-muted); font-weight:700;" id="profLblPinned">Моё расписание</div>
@@ -2818,121 +2820,136 @@
             <div style="font-size:13px; font-weight:800; color:#10b981; margin-top:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" id="profPinnedVal">—</div>
           </div>
           <div style="background:var(--bg-elevated); border:1px solid var(--border); border-radius:12px; padding:10px; cursor:pointer;" onclick="switchTab('gpa')">
-            <div style="font-size:10.5px; color:var(--text-muted); font-weight:700;" id="profLblGpa">Официальный GPA</div>
+            <div style="font-size:10.5px; color:var(--text-muted); font-weight:700;" id="profLblGpa">GPA · HEMIS</div>
             <div style="font-size:13px; font-weight:800; color:#0ea5e9; margin-top:3px;" id="profGpaVal">0.00 / 5.0</div>
           </div>
           <div style="background:var(--bg-elevated); border:1px solid var(--border); border-radius:12px; padding:10px; cursor:pointer;" onclick="switchTab('moodle')">
             <div style="font-size:10.5px; color:var(--text-muted); font-weight:700;" id="profLblMoodleDl">Moodle · Дедлайны</div>
             <div style="font-size:13px; font-weight:800; color:#f59e0b; margin-top:3px;" id="profMoodleDlVal">Не подключён</div>
           </div>
-          <div style="background:var(--bg-elevated); border:1px solid var(--border); border-radius:12px; padding:10px; cursor:pointer;" onclick="switchTab('overlap')">
-            <div style="font-size:10.5px; color:var(--text-muted); font-weight:700;" id="profLblOverlap">Общие пары и окна</div>
-            <div style="font-size:13px; font-weight:800; color:#8b5cf6; margin-top:3px;">🤝 Сравнить →</div>
+          <div style="background:var(--bg-elevated); border:1px solid var(--border); border-radius:12px; padding:10px; cursor:pointer;" onclick="switchTab('gpa')">
+            <div style="font-size:10.5px; color:var(--text-muted); font-weight:700;" id="profLblAtt">Посещаемость (NB)</div>
+            <div style="font-size:13px; font-weight:800; color:#a78bfa; margin-top:3px;" id="profAttVal">Войти в HEMIS →</div>
           </div>
         </div>
       </div>
 
-      <!-- Interactive Personal Calendar right inside Profile -->
-      <div class="panel" id="profCalendarPanel">
-        <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:10px; flex-wrap:wrap;">
-          <div>
-            <div style="font-size:14.5px; font-weight:800;" id="profCalTitle">📅 Мой календарь</div>
-            <div style="font-size:11px; color:var(--text-muted);" id="profCalSub">Пары, дедлайны Moodle и мероприятия на день</div>
-          </div>
-          <div style="display:flex; gap:6px; align-items:center;">
+      <!-- Clean 3-Tab Sub-Navigation inside Profile (Zero Clutter!) -->
+      <div class="seg-grid" style="grid-template-columns: repeat(3, 1fr); margin-bottom:12px;" id="profSubTabs">
+        <div class="pill active" id="profSubCal" onclick="switchProfileSubTab('cal')">📅 Календарь</div>
+        <div class="pill" id="profSubNotify" onclick="switchProfileSubTab('notify')">🔔 Уведомления</div>
+        <div class="pill" id="profSubSettings" onclick="switchProfileSubTab('settings')">⚙️ Настройки</div>
+      </div>
+
+      <!-- SUB-PANE 1: INTERACTIVE PERSONAL CALENDAR -->
+      <div id="profPaneCal">
+        <div class="panel" id="profCalendarPanel">
+          <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:10px; flex-wrap:wrap;">
+            <div>
+              <div style="font-size:14.5px; font-weight:800;" id="profCalTitle">📅 Мой календарь</div>
+              <div style="font-size:11px; color:var(--text-muted);" id="profCalSub">Пары, дедлайны Moodle и мероприятия</div>
+            </div>
             <input type="date" id="profCalDatePicker" onchange="onProfileCalDatePick(this.value)" style="background:var(--bg-elevated); color:var(--text); border:1px solid var(--border); border-radius:9px; padding:4px 8px; font-size:12px; font-weight:700;" />
           </div>
+          <div class="chips-scroll" id="profCalDayStrip" style="margin-bottom:10px;"></div>
+          <div id="profCalDayItems" class="list-stack"></div>
+          <div style="display:flex; gap:6px; margin-top:10px; flex-wrap:wrap;">
+            <button class="btn-sm" style="flex:1;" onclick="openPinnedWeekFromProfile()">🗓 Вся неделя</button>
+            <button class="btn-sm" style="flex:1;" onclick="exportPinnedProfileIcs('daily')">📥 .ICS день</button>
+            <button class="btn-sm" style="flex:1;" onclick="exportPinnedProfileIcs('weekly')">📆 .ICS неделя</button>
+          </div>
         </div>
-        <div class="chips-scroll" id="profCalDayStrip" style="margin-bottom:10px;"></div>
-        <div id="profCalDayItems" class="list-stack"></div>
-        <div style="display:flex; gap:6px; margin-top:10px; flex-wrap:wrap;">
-          <button class="btn-sm" style="flex:1;" onclick="exportPinnedProfileIcs('daily')">📥 .ICS на день</button>
-          <button class="btn-sm" style="flex:1;" onclick="exportPinnedProfileIcs('weekly')">📆 .ICS на неделю</button>
+
+        <!-- My Saved Events -->
+        <div class="panel">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+            <div style="font-size:14px; font-weight:800;" id="profSavedEvTitle">⭐ Мои мероприятия</div>
+            <span id="profSavedEvCount" style="font-size:11px; font-weight:800; color:#38bdf8;">0 ta</span>
+          </div>
+          <div id="profSavedEvList" class="list-stack"></div>
         </div>
       </div>
 
-      <!-- Custom Digest Time & Class Reminder Settings right inside Profile -->
-      <div class="panel" id="profAlertsPrefsPanel">
-        <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:8px;">
-          <div style="font-size:14px; font-weight:800;" id="profAlertsTitle">🔔 Время сводки и уведомлений</div>
-          <span style="font-size:11px; color:#34d399; font-weight:700;" id="profDigestSavedBadge"></span>
-        </div>
-        <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:8px;">
-          <span style="font-size:12px; color:var(--text-sec); font-weight:700;">🌅 Ежедневная сводка в:</span>
-          <input type="time" id="profDigestTimeInp" value="07:45" onchange="onCustomDigestTimeChange(this.value)" style="background:var(--bg-elevated); color:var(--text); border:1px solid var(--border-glow); border-radius:9px; padding:5px 9px; font-weight:800; font-size:13px;" />
-        </div>
-        <div class="chips-scroll" style="margin-bottom:8px;" id="profDigestQuickChips">
-          <div class="pill pill-sm" onclick="setDigestTimePreset('07:00')">07:00</div>
-          <div class="pill pill-sm" onclick="setDigestTimePreset('07:30')">07:30</div>
-          <div class="pill pill-sm active" onclick="setDigestTimePreset('07:45')">07:45</div>
-          <div class="pill pill-sm" onclick="setDigestTimePreset('08:00')">08:00</div>
-          <div class="pill pill-sm" onclick="setDigestTimePreset('08:30')">08:30</div>
-          <div class="pill pill-sm" onclick="setDigestTimePreset('09:00')">09:00</div>
-        </div>
-        <div style="font-size:11.5px; color:var(--text-muted); margin-bottom:6px;">⏰ Напоминание перед каждой парой:</div>
-        <div class="chips-scroll" id="profLeadQuickChips">
-          <div class="pill pill-sm" data-lead="10" onclick="setLeadTimePreset(10)">10 мин</div>
-          <div class="pill pill-sm" data-lead="15" onclick="setLeadTimePreset(15)">15 мин</div>
-          <div class="pill pill-sm active" data-lead="20" onclick="setLeadTimePreset(20)">20 мин</div>
-          <div class="pill pill-sm" data-lead="30" onclick="setLeadTimePreset(30)">30 мин</div>
-          <div class="pill pill-sm" data-lead="45" onclick="setLeadTimePreset(45)">45 мин</div>
-        </div>
-        <button class="btn-sm" style="width:100%; margin-top:10px; padding:8px; background:rgba(16,185,129,0.18); border-color:rgba(16,185,129,0.4); color:#6ee7b7;" onclick="testMyAlertsNow(this)">🧪 Отправить тест уведомлений в Telegram бот</button>
-      </div>
+      <!-- SUB-PANE 2: UNIFIED NOTIFICATIONS & CUSTOM DIGEST TIME -->
+      <div id="profPaneNotify" style="display:none;">
+        <div class="panel" id="profAlertsPrefsPanel">
+          <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:10px;">
+            <div style="font-size:14.5px; font-weight:800;" id="profAlertsTitle">🔔 Центр уведомлений бота</div>
+            <span style="font-size:11px; color:#34d399; font-weight:700;" id="profDigestSavedBadge"></span>
+          </div>
 
-      <!-- App Preferences (Theme & Language) -->
-      <div class="panel">
-        <div style="font-size:14px; font-weight:800; margin-bottom:12px;" id="profPrefsTitle">⚙️ Ilova sozlamalari</div>
+          <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:8px;">
+            <span style="font-size:12.5px; color:var(--text-sec); font-weight:700;">🌅 Время ежедневной сводки:</span>
+            <input type="time" id="profDigestTimeInp" value="07:45" onchange="onCustomDigestTimeChange(this.value)" style="background:var(--bg-elevated); color:var(--text); border:1px solid var(--border-glow); border-radius:9px; padding:5px 9px; font-weight:800; font-size:13px;" />
+          </div>
+          <div class="chips-scroll" style="margin-bottom:10px;" id="profDigestQuickChips">
+            <div class="pill pill-sm" onclick="setDigestTimePreset('07:00')">07:00</div>
+            <div class="pill pill-sm" onclick="setDigestTimePreset('07:30')">07:30</div>
+            <div class="pill pill-sm active" onclick="setDigestTimePreset('07:45')">07:45</div>
+            <div class="pill pill-sm" onclick="setDigestTimePreset('08:00')">08:00</div>
+            <div class="pill pill-sm" onclick="setDigestTimePreset('08:30')">08:30</div>
+            <div class="pill pill-sm" onclick="setDigestTimePreset('09:00')">09:00</div>
+          </div>
 
-        <!-- Theme Switcher -->
-        <div style="display:flex; justify-content:space-between; align-items:center; padding:9px 0; border-bottom:1px solid var(--border);">
-          <div>
-            <div style="font-size:13px; font-weight:700;" id="profThemeTitle">Mavzu (Theme)</div>
-            <div style="font-size:11px; color:var(--text-muted);" id="profThemeSub">Qorong'u yoki yorug' rejim</div>
+          <div style="font-size:12px; color:var(--text-muted); margin-bottom:6px; font-weight:700;">⏰ Напоминание перед каждой парой за:</div>
+          <div class="chips-scroll" id="profLeadQuickChips" style="margin-bottom:12px;">
+            <div class="pill pill-sm" data-lead="10" onclick="setLeadTimePreset(10)">10 мин</div>
+            <div class="pill pill-sm" data-lead="15" onclick="setLeadTimePreset(15)">15 мин</div>
+            <div class="pill pill-sm active" data-lead="20" onclick="setLeadTimePreset(20)">20 мин</div>
+            <div class="pill pill-sm" data-lead="30" onclick="setLeadTimePreset(30)">30 мин</div>
+            <div class="pill pill-sm" data-lead="45" onclick="setLeadTimePreset(45)">45 мин</div>
           </div>
-          <div style="display:flex; gap:6px;">
-            <button class="pill pill-sm" id="profThemeDark" onclick="setThemeMode('dark')">🌙 Dark</button>
-            <button class="pill pill-sm" id="profThemeLight" onclick="setThemeMode('light')">☀️ Light</button>
-          </div>
-        </div>
 
-        <!-- Language Switcher -->
-        <div style="display:flex; justify-content:space-between; align-items:center; padding:9px 0; border-bottom:1px solid var(--border);">
-          <div>
-            <div style="font-size:13px; font-weight:700;" id="profLangTitle">Til (Language)</div>
-            <div style="font-size:11px; color:var(--text-muted);" id="profLangSub">UZ / RU / EN</div>
-          </div>
-          <div class="lang-bar">
-            <button class="lang-btn" id="prof-lang-uz" onclick="setLang('uz')">UZ</button>
-            <button class="lang-btn" id="prof-lang-ru" onclick="setLang('ru')">RU</button>
-            <button class="lang-btn" id="prof-lang-en" onclick="setLang('en')">EN</button>
-          </div>
-        </div>
-
-        <!-- Security & Anti-Scraping Info -->
-        <div style="display:flex; justify-content:space-between; align-items:center; padding:9px 0;">
-          <div>
-            <div style="font-size:13px; font-weight:700;" id="profSecTitle">Xavfsizlik & Anti-Scraping</div>
-            <div style="font-size:11px; color:var(--text-muted);" id="profSecSub">VRIO va shaxsiy ma'lumotlar himoyasi</div>
-          </div>
-          <span style="font-size:11px; font-weight:800; color:#34d399; background:rgba(16,185,129,0.15); padding:4px 8px; border-radius:6px;">FAOL 🛡️</span>
+          <button class="btn-sm" style="width:100%; padding:10px; background:rgba(16,185,129,0.18); border-color:rgba(16,185,129,0.4); color:#6ee7b7; font-size:12.5px;" onclick="testMyAlertsNow(this)">🧪 Отправить тест уведомлений в Telegram бот</button>
         </div>
       </div>
 
-      <!-- My Saved Events -->
-      <div class="panel">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-          <div style="font-size:14px; font-weight:800;" id="profSavedEvTitle">⭐ Mening saqlangan tadbirlarim</div>
-          <span id="profSavedEvCount" style="font-size:11px; font-weight:800; color:#38bdf8;">0 ta</span>
-        </div>
-        <div id="profSavedEvList" class="list-stack"></div>
-      </div>
+      <!-- SUB-PANE 3: SETTINGS & ACCOUNTS -->
+      <div id="profPaneSettings" style="display:none;">
+        <div class="panel">
+          <div style="font-size:14px; font-weight:800; margin-bottom:12px;" id="profPrefsTitle">⚙️ Настройки приложения</div>
 
-      <!-- Reset Cache / Reload -->
-      <div class="panel" style="text-align:center;">
-        <button class="btn-sm" style="background:rgba(244,63,94,0.16); border-color:rgba(244,63,94,0.35); color:#fb7185; width:100%; padding:10px;" onclick="clearLocalDataAndReload()" id="profResetBtn">
-          🗑 Keshni tozalash va qayta yuklash
-        </button>
+          <!-- Theme Switcher -->
+          <div style="display:flex; justify-content:space-between; align-items:center; padding:9px 0; border-bottom:1px solid var(--border);">
+            <div>
+              <div style="font-size:13px; font-weight:700;" id="profThemeTitle">Тема</div>
+              <div style="font-size:11px; color:var(--text-muted);" id="profThemeSub">Тёмный или светлый режим</div>
+            </div>
+            <div style="display:flex; gap:6px;">
+              <button class="pill pill-sm" id="profThemeDark" onclick="setThemeMode('dark')">🌙 Dark</button>
+              <button class="pill pill-sm" id="profThemeLight" onclick="setThemeMode('light')">☀️ Light</button>
+            </div>
+          </div>
+
+          <!-- Language Switcher -->
+          <div style="display:flex; justify-content:space-between; align-items:center; padding:9px 0; border-bottom:1px solid var(--border);">
+            <div>
+              <div style="font-size:13px; font-weight:700;" id="profLangTitle">Язык</div>
+              <div style="font-size:11px; color:var(--text-muted);" id="profLangSub">UZ / RU / EN</div>
+            </div>
+            <div class="lang-bar">
+              <button class="lang-btn" id="prof-lang-uz" onclick="setLang('uz')">UZ</button>
+              <button class="lang-btn" id="prof-lang-ru" onclick="setLang('ru')">RU</button>
+              <button class="lang-btn" id="prof-lang-en" onclick="setLang('en')">EN</button>
+            </div>
+          </div>
+
+          <!-- Quick Shortcuts -->
+          <div style="display:flex; justify-content:space-between; align-items:center; padding:9px 0; border-bottom:1px solid var(--border); cursor:pointer;" onclick="switchTab('overlap')">
+            <div>
+              <div style="font-size:13px; font-weight:700;">🤝 Общее время (+1 участник)</div>
+              <div style="font-size:11px; color:var(--text-muted);">Найти окно с друзьями и профессором</div>
+            </div>
+            <span style="color:#38bdf8; font-weight:800; font-size:12px;">Открыть →</span>
+          </div>
+
+          <!-- Reset Cache -->
+          <div style="padding-top:12px;">
+            <button class="btn-sm" style="background:rgba(244,63,94,0.16); border-color:rgba(244,63,94,0.35); color:#fb7185; width:100%; padding:10px;" onclick="clearLocalDataAndReload()" id="profResetBtn">
+              🗑 Очистить кэш и перезагрузить
+            </button>
+          </div>
+        </div>
       </div>
     </section>
   </main>
@@ -9105,9 +9122,12 @@
       const t = T();
       const u = getCurrentUser();
       const verifiedMoodle = getVerifiedMoodleIdentity();
+      let hemisProf = null;
+      try { hemisProf = JSON.parse(localStorage.getItem("uwed_hemis_profile") || "null"); } catch (_) {}
+
       const av = document.getElementById("profAvatar");
       if (av) {
-        const displayFull = (verifiedMoodle && verifiedMoodle.fullname) || [u.first_name, u.last_name].filter(Boolean).join(" ");
+        const displayFull = (hemisProf && hemisProf.full_name) || (verifiedMoodle && verifiedMoodle.fullname) || [u.first_name, u.last_name].filter(Boolean).join(" ");
         const parts = displayFull.trim().split(/\s+/);
         const init = ((parts[0] || "").charAt(0) + (parts[1] || "").charAt(0)).toUpperCase();
         av.textContent = init || "UW";
@@ -9115,54 +9135,91 @@
       const fn = document.getElementById("profFullName");
       if (fn) {
         fn.textContent =
+          (hemisProf && hemisProf.full_name) ||
           (verifiedMoodle && verifiedMoodle.fullname) ||
           [u.first_name, u.last_name].filter(Boolean).join(" ") ||
           (t.profDefaultStudent || "UWED Talaba");
       }
       const un = document.getElementById("profUsername");
       if (un) un.textContent = u.username ? `@${u.username}` : (verifiedMoodle && verifiedMoodle.username ? `Moodle: ${verifiedMoodle.username}` : (u.phone || "UWED User"));
-      const uid = document.getElementById("profTgId");
-      if (uid) uid.textContent = `TG-ID: ${u.id}`;
+
+      const metaEl = document.getElementById("profAcademicMeta");
+      if (metaEl) {
+        const metaParts = [];
+        if (hemisProf && hemisProf.faculty) metaParts.push(hemisProf.faculty);
+        if (hemisProf && hemisProf.level) metaParts.push(hemisProf.level);
+        if (hemisProf && hemisProf.group) metaParts.push(`Гр. ${hemisProf.group}`);
+        metaParts.push(`TG-ID: ${u.id}`);
+        metaEl.textContent = metaParts.join(" · ");
+      }
+
       const rb = document.getElementById("profRoleBadge");
       if (rb) {
         rb.textContent = STATE.isAdmin
           ? (t.profRoleAdmin || "ADMIN ⚡")
-          : verifiedMoodle
+          : verifiedMoodle || hemisProf
           ? "VERIFIED ✅"
           : (t.profRoleStudent || "TALABA 🎓");
       }
 
-      // Moodle Verification Status Banner + Deadlines Card
-      const vBar = document.getElementById("profVerifyBanner");
-      const vTxt = document.getElementById("profVerifyText");
+      // 3-System Sync Status Pills (Moodle · HEMIS · Bot)
+      const pMdl = document.getElementById("profPillMoodle");
+      const pHem = document.getElementById("profPillHemis");
+      const pBot = document.getElementById("profPillBot");
+      if (pMdl) {
+        if (verifiedMoodle) {
+          pMdl.textContent = "🎓 Moodle ✅";
+          pMdl.style.background = "rgba(16,185,129,0.16)";
+          pMdl.style.borderColor = "rgba(16,185,129,0.4)";
+          pMdl.style.color = "#34d399";
+        } else {
+          pMdl.textContent = "🎓 Moodle: Подключить →";
+          pMdl.style.background = "rgba(245,158,11,0.14)";
+          pMdl.style.borderColor = "rgba(245,158,11,0.35)";
+          pMdl.style.color = "#fbbf24";
+        }
+      }
+      if (pHem) {
+        if (hemisProf) {
+          pHem.textContent = `🏛 HEMIS ✅${hemisProf.group ? ` (${hemisProf.group})` : ""}`;
+          pHem.style.background = "rgba(16,185,129,0.16)";
+          pHem.style.borderColor = "rgba(16,185,129,0.4)";
+          pHem.style.color = "#34d399";
+        } else {
+          pHem.textContent = "🏛 HEMIS: Войти →";
+          pHem.style.background = "rgba(56,189,248,0.12)";
+          pHem.style.borderColor = "rgba(56,189,248,0.32)";
+          pHem.style.color = "#38bdf8";
+        }
+      }
+      if (pBot) {
+        const botSynced = Boolean(STATE.serverMoodle && STATE.serverMoodle.connected);
+        const dt = STATE.digestTime || localStorage.getItem("uwed_digest_time") || "07:45";
+        pBot.textContent = botSynced ? `🤖 Бот ✅ (${dt})` : `🤖 Уведомления (${dt})`;
+      }
+
+      // Moodle Deadlines & HEMIS Attendance KPI tiles
       const dlVal = document.getElementById("profMoodleDlVal");
-      if (verifiedMoodle) {
-        if (vBar) {
-          vBar.style.background = "rgba(16,185,129,0.12)";
-          vBar.style.borderColor = "rgba(16,185,129,0.35)";
-        }
-        if (vTxt) {
-          vTxt.style.color = "#34d399";
-          vTxt.textContent = `✅ Верифицирован через Moodle (${verifiedMoodle.fullname || verifiedMoodle.username})`;
-        }
-        if (dlVal) {
+      if (dlVal) {
+        if (verifiedMoodle) {
           const dlCount = (verifiedMoodle.deadlines || []).length;
           const grCount = (verifiedMoodle.grades || []).length;
           dlVal.style.color = dlCount > 0 ? "#fbbf24" : "#34d399";
           dlVal.textContent = `${dlCount} дедл. · ${grCount} оц.`;
-        }
-      } else {
-        if (vBar) {
-          vBar.style.background = "rgba(245,158,11,0.12)";
-          vBar.style.borderColor = "rgba(245,158,11,0.32)";
-        }
-        if (vTxt) {
-          vTxt.style.color = "#fbbf24";
-          vTxt.textContent = "🔒 Не верифицирован — войдите через Moodle";
-        }
-        if (dlVal) {
+        } else {
           dlVal.style.color = "var(--text-muted)";
           dlVal.textContent = "Подключить →";
+        }
+      }
+      const attVal = document.getElementById("profAttVal");
+      if (attVal) {
+        if (hemisProf && hemisProf.attendance) {
+          const hrs = Number(hemisProf.attendance.total_hours || 0);
+          attVal.style.color = hrs > 20 ? "#fb7185" : hrs > 0 ? "#fbbf24" : "#34d399";
+          attVal.textContent = hrs > 0 ? `${hrs} ч пропусков` : "0 ч (Отлично!)";
+        } else {
+          attVal.style.color = "#a78bfa";
+          attVal.textContent = "Войти в HEMIS →";
         }
       }
 
@@ -9413,6 +9470,24 @@
         showToast("❌ Ошибка сети");
       }
       if (btnEl) { btnEl.disabled = false; btnEl.textContent = orig; }
+    }
+
+    function switchProfileSubTab(tab) {
+      haptic("light");
+      const map = { cal: ["profSubCal", "profPaneCal"], notify: ["profSubNotify", "profPaneNotify"], settings: ["profSubSettings", "profPaneSettings"] };
+      for (const [k, [btnId, paneId]] of Object.entries(map)) {
+        const b = document.getElementById(btnId);
+        const p = document.getElementById(paneId);
+        if (b) b.classList.toggle("active", k === tab);
+        if (p) p.style.display = k === tab ? "block" : "none";
+      }
+      if (tab === "cal") renderProfileCalendar();
+      if (tab === "notify") syncDigestTimeUI();
+    }
+
+    function openPinnedWeekFromProfile() {
+      STATE.modalViewMode = "week";
+      openPinnedProfileFromAnywhere();
     }
 
     function openPinnedProfileFromAnywhere() {
