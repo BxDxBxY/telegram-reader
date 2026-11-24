@@ -1,0 +1,19 @@
+name: UWED Helpdesk Alerts & Moodle Cron
+
+on:
+  schedule:
+    # Runs every 5 minutes 24/7 in GitHub cloud (class reminders, custom daily digest, Moodle deadlines & grades)
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+jobs:
+  dispatch-alerts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Trigger UWED Alerts & Moodle Sync
+        run: |
+          echo "Triggering cron_alerts at $(date -u)"
+          curl -fsS --max-time 28 -H "User-Agent: UWED-GitHub-Cron/1.0" \
+            "https://uwed-miniapp.vercel.app/api/telemetry?action=cron_alerts"
+          echo ""

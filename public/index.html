@@ -2878,6 +2878,7 @@
           <div class="pill pill-sm" data-lead="30" onclick="setLeadTimePreset(30)">30 мин</div>
           <div class="pill pill-sm" data-lead="45" onclick="setLeadTimePreset(45)">45 мин</div>
         </div>
+        <button class="btn-sm" style="width:100%; margin-top:10px; padding:8px; background:rgba(16,185,129,0.18); border-color:rgba(16,185,129,0.4); color:#6ee7b7;" onclick="testMyAlertsNow(this)">🧪 Отправить тест уведомлений в Telegram бот</button>
       </div>
 
       <!-- App Preferences (Theme & Language) -->
@@ -4937,6 +4938,10 @@
       }
 
       trackEvent("open_app", STATE.lang);
+      // Background sync of pinned student schedule so Bot class reminders always have exact classes
+      if (localStorage.getItem("uwed_pinned_profile")) {
+        loadPinnedScheduleEvents().catch(() => {});
+      }
 
       const qTab = urlParams.get("tab");
       if (qTab && ["rooms", "events", "teachers", "students", "overlap", "feedback", "map", "moodle", "gpa", "opps", "docs", "lf", "profile"].includes(qTab)) {
@@ -7661,6 +7666,40 @@
         if (Array.isArray(evs) && evs.length) {
           STATE.pinnedScheduleEvents = evs;
           try { localStorage.setItem(cacheKey, JSON.stringify(evs)); } catch (_) {}
+          // Sync exact personal schedule classes to Bot backend so class reminders work 100% for Student UUIDs too!
+          try {
+            const syncHash = `${p.id}_${evs.length}`;
+            if (STATE._lastSyncedSchedHash !== syncHash) {
+              STATE._lastSyncedSchedHash = syncHash;
+              fetch("/api/telemetry", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  ...(tg && tg.initData ? { "X-Tg-Init-Data": tg.initData } : {}),
+                },
+                body: JSON.stringify({
+                  user: getCurrentUser(),
+                  initData: tg && tg.initData ? tg.initData : "",
+                  action: "sync_schedule_cache",
+                  detail: p.title || p.id,
+                  subscription: {
+                    kind: p.kind,
+                    target_id: p.id,
+                    title: p.title,
+                    lang: STATE.lang,
+                    notify: true,
+                    cached_events: evs.slice(0, 60).map((e) => ({
+                      d: Number(e.week_day || e.d || 0),
+                      s: Number(e.slot_id || e.s || 0),
+                      t: String(e.title || e.t || e.lesson_name || "").slice(0, 90),
+                      r: String(e.room_number || e.r || "").slice(0, 24),
+                      i: String(e.instructor || e.i || "").slice(0, 60),
+                    })),
+                  },
+                }),
+              }).catch(() => {});
+            }
+          } catch (_) {}
         }
         return STATE.pinnedScheduleEvents || [];
       } catch (_) {
@@ -9133,6 +9172,37 @@
       if (res && res.success) {
         showToast(res.empty ? "На выбранный период занятий не найдено." : "✅ Файл .ics отправлен в Telegram бот!");
       }
+    }
+
+    async function testMyAlertsNow(btnEl) {
+      haptic("medium");
+      const orig = btnEl ? btnEl.textContent : "";
+      if (btnEl) { btnEl.disabled = true; btnEl.textContent = "⏳ Отправляем тест в бот..."; }
+      try {
+        if (localStorage.getItem("uwed_pinned_profile")) {
+          await loadPinnedScheduleEvents();
+        }
+        const res = await fetch("/api/telemetry?action=test_my_alerts", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(tg && tg.initData ? { "X-Tg-Init-Data": tg.initData } : {}),
+          },
+          body: JSON.stringify({
+            action: "test_my_alerts",
+            user: getCurrentUser(),
+            initData: tg && tg.initData ? tg.initData : "",
+          }),
+        }).then((r) => r.json());
+        if (res && res.success) {
+          showToast("✅ Тест отправлен! Проверьте чат с @uwedhelpdesk_bot");
+        } else {
+          showToast("⚠️ Откройте Mini App внутри Telegram бота @uwedhelpdesk_bot");
+        }
+      } catch (_) {
+        showToast("❌ Ошибка сети");
+      }
+      if (btnEl) { btnEl.disabled = false; btnEl.textContent = orig; }
     }
 
     function openPinnedProfileFromAnywhere() {

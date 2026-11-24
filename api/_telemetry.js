@@ -701,19 +701,32 @@ async function recordTelemetry({
       }
     }
 
-    // 5. Personal Schedule Subscription
+    // 5. Personal Schedule Subscription (preserves cached_events & last_notified state!)
     if (subscription && subscription.target_id) {
       if (subscription.remove) {
         delete db.subscriptions[uid];
       } else {
+        const prevSub = db.subscriptions[uid] || {};
+        const compactEvents = Array.isArray(subscription.cached_events) && subscription.cached_events.length
+          ? subscription.cached_events.slice(0, 60).map((e) => ({
+              d: Number(e.d || e.week_day || 0),
+              s: Number(e.s || e.slot_id || 0),
+              t: String(e.t || e.title || e.lesson_name || "").slice(0, 90),
+              r: String(e.r || e.room_number || "").slice(0, 24),
+              i: String(e.i || e.instructor || "").slice(0, 60),
+            })).filter((e) => e.d >= 1 && e.d <= 6 && e.s >= 1 && e.s <= 8)
+          : (prevSub.cached_events || []);
         db.subscriptions[uid] = {
           uid,
-          chat_id: user.chat_id || uid,
-          kind: subscription.kind || "STUDENT",
+          chat_id: user.chat_id || (/^\d+$/.test(uid) ? uid : prevSub.chat_id || ""),
+          kind: subscription.kind || prevSub.kind || "STUDENT",
           target_id: String(subscription.target_id),
-          title: String(subscription.title || ""),
-          lang: subscription.lang || existing.preferred_lang || existing.language_code || "uz",
+          title: String(subscription.title || prevSub.title || ""),
+          lang: subscription.lang || existing.preferred_lang || existing.language_code || prevSub.lang || "ru",
           notify: subscription.notify !== false,
+          cached_events: compactEvents,
+          last_notified_slot: prevSub.last_notified_slot || null,
+          last_morning_digest: prevSub.last_morning_digest || null,
           updated_at: nowIso,
         };
       }
@@ -1105,6 +1118,23 @@ async function checkAndDispatchAlerts(snap, tgSender, opts = {}) {
   }
 
   const findSlotEventForSub = (sub, targetDay, slotId) => {
+    // 1. FIRST PRIORITY: Exact cached personal schedule synced from Mini App (works 100% for Student UUIDs, Teachers & Groups!)
+    if (sub && Array.isArray(sub.cached_events) && sub.cached_events.length) {
+      const hit = sub.cached_events.find(
+        (e) => Number(e.d || e.week_day) === targetDay && Number(e.s || e.slot_id) === slotId
+      );
+      if (hit) {
+        return {
+          d: targetDay,
+          s: slotId,
+          t: hit.t || hit.title || "Занятие",
+          r: hit.r || hit.room_number || "—",
+          i: hit.i || hit.instructor || "—",
+        };
+      }
+      return null;
+    }
+
     if (!snap || !snap.events) return null;
     if (sub.kind === "TEACHER") {
       const tName = String(sub.title || "").trim().toLowerCase();
@@ -1124,19 +1154,20 @@ async function checkAndDispatchAlerts(snap, tgSender, opts = {}) {
     }
     const rawTarget = String(sub.target_id || "").trim();
     const rawTitle = String(sub.title || "").trim().toLowerCase();
-    const resolvedGrp =
+    const resolvedGrp = (
       studentGroupById.get(rawTarget) ||
       studentGroupByName.get(rawTitle) ||
       (rawTarget || rawTitle)
         .replace(/^grp[:_]/i, "")
         .replace(/^(guruh|группа|group):?\s*/i, "")
         .trim()
-        .toLowerCase();
+        .toLowerCase()
+    ).replace(/["']/g, "");
     if (!resolvedGrp) return null;
     for (const elist of Object.values(snap.events)) {
       for (const e of elist) {
         if (Number(e.d) === targetDay && Number(e.s) === slotId) {
-          const eg = String(e.g || e.grp || "").toLowerCase();
+          const eg = String(e.g || e.grp || "").replace(/["']/g, "").toLowerCase();
           if (eg && (eg.includes(resolvedGrp) || resolvedGrp.includes(eg))) {
             return e;
           }
@@ -1146,19 +1177,20 @@ async function checkAndDispatchAlerts(snap, tgSender, opts = {}) {
     return null;
   };
 
-  // 1. CLASS REMINDERS (15–30 min before pair starts, Monday to Saturday)
+  // 1. CLASS REMINDERS (leadTime ± 8 min before pair starts, Monday to Saturday)
   const activeSubs = Object.values(db.subscriptions || {});
   checkedSubs = activeSubs.length;
   if (day >= 1 && day <= 6) {
     for (const sub of activeSubs) {
-      if (!sub || !sub.chat_id || sub.notify === false || isUserBlocked(sub.uid) || isUserBlocked(sub.chat_id)) continue;
+      const subChatId = sub && (sub.chat_id || (/^\d+$/.test(String(sub.uid || "")) ? String(sub.uid) : ""));
+      if (!sub || !subChatId || sub.notify === false || isUserBlocked(sub.uid) || isUserBlocked(subChatId)) continue;
       const mUser = (db.moodle_users && db.moodle_users[sub.uid]) || {};
       if (mUser.notify_classes === false) continue;
       const leadTime = Number(mUser.lead_time_mins) || 20;
 
       for (const slot of SLOT_CONFIG) {
         const diff = slot.startMins - curMins;
-        if (diff >= leadTime - 7 && diff <= leadTime + 7) {
+        if (diff >= Math.max(1, leadTime - 8) && diff <= leadTime + 8) {
           const notifyKey = `${todayStr}_slot_${slot.id}`;
           if (sub.last_notified_slot === notifyKey) continue;
 
@@ -1181,7 +1213,7 @@ async function checkAndDispatchAlerts(snap, tgSender, opts = {}) {
                   `📍 <i>Хорошей пары! Проверьте материалы в Moodle.</i>`;
 
             await tgSender("sendMessage", {
-              chat_id: sub.chat_id,
+              chat_id: subChatId,
               text: msg,
               parse_mode: "HTML",
             });
@@ -1253,7 +1285,8 @@ async function checkAndDispatchAlerts(snap, tgSender, opts = {}) {
   checkedMoodle = moodleUsersList.length;
 
   for (const mUser of moodleUsersList) {
-    if (!mUser || !mUser.chat_id || !/^\d+$/.test(String(mUser.chat_id)) || isUserBlocked(mUser.uid) || isUserBlocked(mUser.chat_id)) continue;
+    const mChatId = mUser && (mUser.chat_id || (/^\d+$/.test(String(mUser.uid || "")) ? String(mUser.uid) : ""));
+    if (!mUser || !mChatId || !/^\d+$/.test(String(mChatId)) || isUserBlocked(mUser.uid) || isUserBlocked(mChatId)) continue;
 
     // Poll Moodle live at most every 20 minutes per user (or immediately on forceRefresh)
     if (mUser.token && (forceRefresh || nowMsAll - (mUser.last_moodle_poll_ts || 0) >= 20 * 60 * 1000)) {
@@ -1269,14 +1302,14 @@ async function checkAndDispatchAlerts(snap, tgSender, opts = {}) {
       (db.subscriptions && db.subscriptions[mUser.uid] && db.subscriptions[mUser.uid].lang) ||
       "ru";
 
-    // 3A. MOODLE DEADLINE ALERTS (<24h and <3h warnings, deduplicated)
+    // 3A. MOODLE DEADLINE ALERTS (<48h, <24h, and <3h warnings, deduplicated)
     if (mUser.notify_deadlines !== false) {
       if (!mUser.notified_deadlines) mUser.notified_deadlines = {};
       for (const dl of mUser.deadlines || []) {
         if (!dl || !dl.time) continue;
         const secsLeft = dl.time - nowSecAll;
-        if (secsLeft <= 0 || secsLeft > 24 * 3600) continue;
-        const bucket = secsLeft <= 3 * 3600 ? "3h" : "24h";
+        if (secsLeft <= 0 || secsLeft > 48 * 3600) continue;
+        const bucket = secsLeft <= 3 * 3600 ? "3h" : secsLeft <= 24 * 3600 ? "24h" : "48h";
         const dlKey = `${dl.id || dl.name}_${dl.time}_${bucket}`;
         if (mUser.notified_deadlines[dlKey]) continue;
         const hrs = Math.max(1, Math.round(secsLeft / 3600));
@@ -1288,7 +1321,7 @@ async function checkAndDispatchAlerts(snap, tgSender, opts = {}) {
         const replyMarkup = dl.url
           ? { inline_keyboard: [[{ text: lang === "uz" ? "🔗 Moodle'da oçiş" : "🔗 Открыть в Moodle", url: dl.url }]] }
           : undefined;
-        await tgSender("sendMessage", { chat_id: mUser.chat_id, text: msg, parse_mode: "HTML", reply_markup: replyMarkup });
+        await tgSender("sendMessage", { chat_id: mChatId, text: msg, parse_mode: "HTML", reply_markup: replyMarkup });
         mUser.notified_deadlines[dlKey] = nowSecAll;
         dbDirty = true;
         dispatchedCount++;
@@ -1328,7 +1361,7 @@ async function checkAndDispatchAlerts(snap, tgSender, opts = {}) {
             lang === "uz"
               ? `🎓 <b>Moodle'da yangi baho qõyildi!</b>\n\n${lines}`
               : `🎓 <b>Новая оценка в Moodle!</b>\n\n${lines}`;
-          await tgSender("sendMessage", { chat_id: mUser.chat_id, text: msg, parse_mode: "HTML" });
+          await tgSender("sendMessage", { chat_id: mChatId, text: msg, parse_mode: "HTML" });
           mUser.last_grades = curFlat;
           dbDirty = true;
           dispatchedCount++;

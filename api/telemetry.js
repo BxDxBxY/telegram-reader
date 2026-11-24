@@ -281,6 +281,52 @@ module.exports = async (req, res) => {
     return res.status(200).end();
   }
 
+  // Test & verify personal alerts right now (sends immediate summary of today's classes + upcoming Moodle deadlines to the user's Telegram!)
+  if (req.query.action === "test_my_alerts" || (req.body && req.body.action === "test_my_alerts")) {
+    const b = typeof req.body === "string" ? JSON.parse(req.body || "{}") : (req.body || {});
+    const initDataHdr = req.headers["x-tg-init-data"] || b.initData || "";
+    const verifiedTgUser = verifyTelegramInitData(initDataHdr);
+    const uidStr = String((verifiedTgUser && verifiedTgUser.id) || (b.user && b.user.id) || req.query.uid || "").trim();
+    if (!/^\d+$/.test(uidStr)) {
+      return res.status(200).json({ success: false, error: "telegram_user_required" });
+    }
+    const db = await loadDb(true);
+    const sub = db.subscriptions && db.subscriptions[uidStr] ? db.subscriptions[uidStr] : null;
+    const mUser = db.moodle_users && db.moodle_users[uidStr] ? db.moodle_users[uidStr] : null;
+    const nowTash = new Date(Date.now() + 5 * 3600 * 1000);
+    const todayDay = nowTash.getUTCDay();
+    const nowSec = Math.floor(Date.now() / 1000);
+    const SLOT_TIMES = { 1: "08:30–09:40", 2: "09:55–11:05", 3: "11:20–12:30", 4: "12:45–13:55", 5: "14:30–15:40", 6: "15:55–17:05", 7: "17:20–18:30", 8: "18:45–19:55" };
+
+    const todayEvs = (sub && Array.isArray(sub.cached_events) ? sub.cached_events : [])
+      .filter((e) => Number(e.d) === todayDay)
+      .sort((a, b) => Number(a.s) - Number(b.s));
+    const soonDls = (mUser && Array.isArray(mUser.deadlines) ? mUser.deadlines : [])
+      .filter((d) => d.time && d.time > nowSec)
+      .slice(0, 5);
+
+    const lines = [
+      `✅ <b>Тест уведомлений UWED Helpdesk пройден!</b>`,
+      ``,
+      `📅 <b>Подписка на расписание:</b> ${sub ? `✅ ${sub.title} (${(sub.cached_events || []).length} пар в кэше)` : "⚠️ Не закреплено (выберите себя в Mini App)"}`,
+      `🎓 <b>Moodle:</b> ${mUser && mUser.token ? `✅ ${mUser.fullname || mUser.username}` : "⚠️ Не подключён"}`,
+      `⏰ <b>Сводка:</b> ${(mUser && mUser.morning_digest_time) || "07:45"} · <b>О паре за:</b> ${(mUser && mUser.lead_time_mins) || 20} мин`,
+    ];
+    if (todayEvs.length) {
+      lines.push(``, `📚 <b>Пары сегодня:</b>`);
+      todayEvs.forEach((e) => lines.push(`• <code>${SLOT_TIMES[e.s] || `${e.s}-пара`}</code> <b>${e.t}</b> (${e.r || "—"})`));
+    }
+    if (soonDls.length) {
+      lines.push(``, `⏳ <b>Ближайшие дедлайны Moodle:</b>`);
+      soonDls.forEach((d) => {
+        const hrs = Math.max(1, Math.round((d.time - nowSec) / 3600));
+        lines.push(`• <b>${d.name}</b> (${d.course || "Moodle"}) — через ~${hrs} ч.`);
+      });
+    }
+    const tgRes = await sendTelegramMessage(uidStr, lines.join("\n"));
+    return res.status(200).json({ success: Boolean(tgRes && tgRes.ok), has_sub: Boolean(sub), cached_classes: (sub && sub.cached_events ? sub.cached_events.length : 0), has_moodle: Boolean(mUser && mUser.token) });
+  }
+
   // Proactive background alerts check (classes in 15-30 min, morning digest, Moodle deadlines & grades)
   if (req.query.action === "cron_alerts" || (req.body && req.body.action === "cron_alerts")) {
     const forceRefresh = req.query.force === "1" || Boolean(req.body && req.body.force);
