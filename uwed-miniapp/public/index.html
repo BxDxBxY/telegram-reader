@@ -2366,46 +2366,45 @@
     </section>
 
     <!-- 5. FRIEND / GROUP OVERLAP FINDER VIEW -->
+    <!-- 5. MUTUAL FREE TIME / OVERLAP FINDER (2, 3, 4+ Students / Groups + Professor!) -->
     <section id="tab-overlap" style="display: none;">
       <div class="sub-bar">
         <button class="back-pill" onclick="switchTab('home')" id="backFromOverlap">← Asosiy</button>
         <div style="display:flex; gap:6px;">
-          <button class="btn-sm" onclick="fillOverlapMe()" id="btnOvUseMe">👤 Из профиля</button>
-          <button class="btn-sm" onclick="swapOverlapPeople()" id="btnOvSwap">⇄</button>
-          <button class="btn-sm" onclick="clearOverlapPeople()" id="btnOvClear">✕</button>
+          <button class="btn-sm" onclick="fillOverlapMe()" id="btnOvUseMe">👤 Я из профиля</button>
+          <button class="btn-sm" onclick="clearOverlapPeople()" id="btnOvClear">✕ Очистить</button>
         </div>
       </div>
       <div class="panel">
-        <div style="font-size: 16px; font-weight: 800; margin-bottom: 4px;" id="ovTitle">🤝 Общие пары и общие окна</div>
-        <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px;" id="ovSub">
-          Выберите двух студентов, группы или преподавателей — покажем общие свободные окна и совместные пары!
+        <div style="font-size: 16px; font-weight: 800; margin-bottom: 4px;" id="ovTitle">🤝 Общее время для 2+ человек</div>
+        <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 10px;" id="ovSub">
+          Добавьте студентов из разных групп и профессора (+1) — покажем, когда ВСЕ свободны одновременно!
         </div>
 
-        <div class="panel-row">
-          <div class="row-head">
-            <span class="row-label" id="ovLblP1">1-й участник (Вы или группа)</span>
-            <span id="ovP1Chosen" style="font-size:11.5px; color:#34d399; font-weight:700;"></span>
+        <!-- Selected Participants Chips (Unlimited: 2, 3, 4, 5+ people) -->
+        <div id="ovSelectedList" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px;"></div>
+
+        <!-- Add Participant Search (+1) -->
+        <div class="panel-row" style="margin-bottom:8px;">
+          <div style="display:flex; gap:6px; align-items:center;">
+            <input type="text" class="search-input" style="padding-left:14px; flex:1;" id="ovAddSearch" placeholder="➕ Добавить студента, группу (10a) или профессора..." oninput="onOverlapMultiSearch()" />
+            <button class="btn-sm" style="padding:9px 11px; background:rgba(16,185,129,0.2); border-color:rgba(16,185,129,0.4); color:#6ee7b7; white-space:nowrap;" onclick="document.getElementById('ovAddSearch').focus()">+1</button>
           </div>
-          <input type="text" class="search-input" style="padding-left:14px;" id="ovSearch1" placeholder="Фамилия, группа (10a, 3-10a-26) или преподаватель..." oninput="onOverlapSearch(1)" />
-          <div id="ovResults1" class="list-stack" style="margin-top:6px;"></div>
+          <div id="ovMultiResults" class="list-stack" style="margin-top:6px;"></div>
         </div>
 
-        <div class="panel-row">
-          <div class="row-head">
-            <span class="row-label" id="ovLblP2">2-й участник (Друг, группа или преподаватель)</span>
-            <span id="ovP2Chosen" style="font-size:11.5px; color:#38bdf8; font-weight:700;"></span>
-          </div>
-          <input type="text" class="search-input" style="padding-left:14px;" id="ovSearch2" placeholder="Фамилия, группа (10a, 3-10a-26) или преподаватель..." oninput="onOverlapSearch(2)" />
-          <div id="ovResults2" class="list-stack" style="margin-top:6px;"></div>
+        <!-- Day / Whole Week Mode + Weekday Chips -->
+        <div style="display:flex; gap:6px; margin-bottom:8px;">
+          <div class="pill pill-sm active" id="ovScopeDay" onclick="setOverlapScope('day')">📅 День</div>
+          <div class="pill pill-sm" id="ovScopeWeek" onclick="setOverlapScope('week')">🗓 Вся неделя (Пн–Сб)</div>
         </div>
-
-        <div class="panel-row">
+        <div class="panel-row" id="ovDayChipsWrap">
           <div class="chips-scroll" id="ovDayChips"></div>
         </div>
 
         <div class="chips-scroll" style="margin-top:8px;" id="ovFilterChips">
-          <div class="pill pill-sm active" id="ovFltAll" onclick="setOverlapFilter('all')">Все пары</div>
-          <div class="pill pill-sm" id="ovFltFree" onclick="setOverlapFilter('free')">🟢 Общие окна</div>
+          <div class="pill pill-sm active" id="ovFltFree" onclick="setOverlapFilter('free')">🟢 Все свободны</div>
+          <div class="pill pill-sm" id="ovFltAll" onclick="setOverlapFilter('all')">📋 Все пары</div>
           <div class="pill pill-sm" id="ovFltShared" onclick="setOverlapFilter('shared')">🤝 Общие пары</div>
         </div>
       </div>
@@ -2951,12 +2950,16 @@
           <button class="modal-close" onclick="closeModal()">✕</button>
         </div>
       </div>
-      <!-- Date Picker + Weekday Chips + Direct Bot Export (Daily / Weekly / Monthly) -->
+      <!-- Day / Week Switcher + Date Picker + Weekday Chips + Direct Bot Export -->
       <div style="padding: 10px 16px 8px; border-bottom: 1px solid var(--border); display:flex; flex-direction:column; gap:8px;">
         <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap;">
-          <div class="chips-scroll" id="modalDayChips" style="flex:1;"></div>
+          <div style="display:flex; gap:5px; flex-shrink:0;">
+            <button class="pill pill-sm active" id="modalModeDay" onclick="setModalViewMode('day')">📅 День</button>
+            <button class="pill pill-sm" id="modalModeWeek" onclick="setModalViewMode('week')">🗓 Неделя</button>
+          </div>
           <input type="date" id="modalDatePicker" onchange="onModalDatePick(this.value)" style="background:rgba(15,23,42,0.85); color:var(--text-main); border:1px solid var(--border); border-radius:9px; padding:5px 8px; font-size:11.5px; font-family:inherit; font-weight:700;" />
         </div>
+        <div class="chips-scroll" id="modalDayChips"></div>
         <div id="modalBotDownloadBar" style="display:flex; align-items:center; justify-content:space-between; gap:6px; background:rgba(16,185,129,0.08); border:1px solid rgba(16,185,129,0.25); border-radius:10px; padding:6px 10px;">
           <span style="font-size:11px; font-weight:700; color:#34d399;" id="lblBotExport">📥 Botga yuklaş (.ics):</span>
           <div style="display:flex; gap:5px;">
@@ -5881,19 +5884,33 @@
       }
     }
 
-    async function autoLinkStudentFromMoodle(fullname) {
-      if (!fullname || localStorage.getItem("uwed_pinned_profile")) return;
-      const parts = String(fullname).trim().split(/\s+/);
-      const q = parts.slice(0, 2).join(" ");
-      if (q.length < 3) return;
-      try {
-        const res = await fetch(`/api/uwed?action=search_students&q=${encodeURIComponent(q)}&lang=${encodeURIComponent(STATE.lang)}`);
-        const data = await res.json();
-        const first = Array.isArray(data.data) && data.data.find((s) => !s.is_group);
-        if (first && first.id) {
-          savePinnedProfile("STUDENT", first.id, first.full_name || fullname);
-        }
-      } catch (_) {}
+    async function autoLinkStudentFromMoodle(fullname, groupName = "") {
+      if (!fullname && !groupName) return;
+      if (localStorage.getItem("uwed_pinned_profile")) return;
+      const queries = [];
+      if (fullname) {
+        const parts = String(fullname).trim().split(/\s+/);
+        if (parts.slice(0, 2).join(" ").length >= 3) queries.push(parts.slice(0, 2).join(" "));
+      }
+      if (groupName && String(groupName).trim().length >= 2) {
+        queries.push(String(groupName).trim());
+      }
+      for (const q of queries) {
+        try {
+          const res = await fetch(`/api/uwed?action=search_students&q=${encodeURIComponent(q)}&lang=${encodeURIComponent(STATE.lang)}`);
+          const data = await res.json();
+          const first = Array.isArray(data.data) && (data.data.find((s) => !s.is_group) || data.data[0]);
+          if (first && first.id) {
+            savePinnedProfile("STUDENT", first.id, first.full_name || fullname || groupName);
+            return;
+          }
+        } catch (_) {}
+      }
+      // Fallback: pin group directly if HEMIS gave us a group name
+      if (groupName && String(groupName).trim().length >= 2) {
+        const gClean = String(groupName).trim();
+        savePinnedProfile("STUDENT", `grp:${gClean}`, `Группа ${gClean}`);
+      }
     }
 
     async function refreshMoodleData() {
@@ -6387,10 +6404,17 @@
           if (Array.isArray(res.gpa_list) && res.gpa_list.length) {
             localStorage.setItem("uwed_hemis_gpa_history", JSON.stringify(res.gpa_list));
           }
+          if (res.me) {
+            localStorage.setItem("uwed_hemis_profile", JSON.stringify({ ...res.me, attendance: res.attendance || null }));
+            // Automatically link student's schedule from HEMIS to Profile & Telegram Bot!
+            try { autoLinkStudentFromMoodle(res.me.full_name, res.me.group); } catch (_) {}
+          }
           saveGpaState();
           renderGpaTab();
           try { renderHomeDashboard(); } catch (_) {}
-          stEl.textContent = `✅ ${res.subjects.length} ta fan yuklandi (${pLabel})!`;
+          try { renderProfileTab(); } catch (_) {}
+          const attNote = res.attendance && res.attendance.total_hours ? ` · NB: ${res.attendance.total_hours}ч` : "";
+          stEl.textContent = `✅ ${res.subjects.length} ta fan yuklandi (${pLabel}${attNote})!`;
         } else {
           stEl.textContent = "ℹ️ student.uwed.uz VPN-siz O'zbekiston tarmog'idan ochiladi.";
         }
@@ -6748,9 +6772,8 @@
     function isTeachingRoom(r) {
       if (!r) return false;
       const rType = r.type || r.room_type || "";
-      if (CLASSROOM_TYPES.has(rType)) return true;
-      const evs = STATE.eventsByRoom[r.id];
-      return Array.isArray(evs) && evs.length > 0;
+      if (rType === "OFFICE" || rType === "UNIMPORTANT" || rType === "SPORT_CENTER") return false;
+      return CLASSROOM_TYPES.has(rType);
     }
 
     function getRoomDayEvents(roomId, day) {
@@ -7245,75 +7268,136 @@
       renderOverlapOutput();
     }
 
+    let ovScopeMode = "day"; // "day" | "week"
+    STATE.overlapPeople = STATE.overlapPeople || [];
+
+    function renderOverlapSelectedChips() {
+      const box = document.getElementById("ovSelectedList");
+      if (!box) return;
+      const list = STATE.overlapPeople || [];
+      if (!list.length) {
+        box.innerHTML = `<span style="font-size:11.5px; color:var(--text-muted);">Участники не выбраны — добавьте студентов, группы или профессора ниже</span>`;
+        return;
+      }
+      box.innerHTML = list
+        .map((p, idx) => {
+          const isProf = p.kind === "TEACHER";
+          const bg = isProf ? "rgba(139,92,246,0.18)" : "rgba(56,189,248,0.16)";
+          const brd = isProf ? "rgba(139,92,246,0.45)" : "rgba(56,189,248,0.4)";
+          const clr = isProf ? "#c4b5fd" : "#38bdf8";
+          const loadingTxt = p.loading ? " ⏳" : ` (${(p.events || []).length})`;
+          return `
+            <span style="display:inline-flex; align-items:center; gap:6px; padding:5px 10px; border-radius:99px; background:${bg}; border:1px solid ${brd}; color:${clr}; font-size:12px; font-weight:800;">
+              <span>${p.title}${loadingTxt}</span>
+              <span onclick="removeOverlapPerson(${idx})" style="cursor:pointer; opacity:0.85; padding:0 2px;">✕</span>
+            </span>`;
+        })
+        .join("");
+    }
+
+    function setOverlapScope(scope) {
+      haptic("light");
+      ovScopeMode = scope;
+      const dEl = document.getElementById("ovScopeDay");
+      const wEl = document.getElementById("ovScopeWeek");
+      const chipsWrap = document.getElementById("ovDayChipsWrap");
+      if (dEl) dEl.classList.toggle("active", scope === "day");
+      if (wEl) wEl.classList.toggle("active", scope === "week");
+      if (chipsWrap) chipsWrap.style.display = scope === "day" ? "block" : "none";
+      renderOverlapOutput();
+    }
+
+    async function addOverlapPerson(kind, id, title) {
+      haptic("medium");
+      if (!STATE.overlapPeople) STATE.overlapPeople = [];
+      const key = `${kind}:${id}`;
+      if (STATE.overlapPeople.some((x) => `${x.kind}:${x.id}` === key)) {
+        showToast("Этот участник уже добавлен");
+        return;
+      }
+      const resEl = document.getElementById("ovMultiResults");
+      const srchEl = document.getElementById("ovAddSearch");
+      if (resEl) resEl.innerHTML = "";
+      if (srchEl) srchEl.value = "";
+
+      const entry = { kind, id, title, events: [], loading: true };
+      STATE.overlapPeople.push(entry);
+      renderOverlapSelectedChips();
+      renderOverlapOutput();
+
+      const evs = await fetchPersonScheduleEvents(kind, id);
+      entry.events = evs || [];
+      entry.loading = false;
+      trackEvent("overlap_pick", `${STATE.overlapPeople.length}:${title}`);
+      renderOverlapSelectedChips();
+      renderOverlapOutput();
+    }
+
+    function removeOverlapPerson(idx) {
+      haptic("light");
+      if (!STATE.overlapPeople) return;
+      STATE.overlapPeople.splice(idx, 1);
+      renderOverlapSelectedChips();
+      renderOverlapOutput();
+    }
+
     async function fillOverlapMe() {
       haptic("light");
       try {
         const raw = localStorage.getItem("uwed_pinned_profile");
         if (raw) {
           const p = JSON.parse(raw);
-          await chooseOverlapPerson(1, p.kind, p.id, p.title);
-          showToast("✅ Подставлено ваше расписание из профиля");
+          await addOverlapPerson(p.kind, p.id, `🎓 ${p.title}`);
+          showToast("✅ Вы добавлены в список участников");
           return;
         }
       } catch (_) {}
       showToast("Сначала сохраните своё расписание в разделе «Студенты» или «Профиль»");
     }
 
-    function swapOverlapPeople() {
-      haptic("light");
-      const tmp = STATE.overlap.p1;
-      STATE.overlap.p1 = STATE.overlap.p2;
-      STATE.overlap.p2 = tmp;
-      const c1 = document.getElementById("ovP1Chosen");
-      const c2 = document.getElementById("ovP2Chosen");
-      if (c1) c1.textContent = STATE.overlap.p1 ? `✓ ${STATE.overlap.p1.title}` : "";
-      if (c2) c2.textContent = STATE.overlap.p2 ? `✓ ${STATE.overlap.p2.title}` : "";
-      renderOverlapOutput();
-    }
-
     function clearOverlapPeople() {
       haptic("light");
-      STATE.overlap.p1 = null;
-      STATE.overlap.p2 = null;
-      const c1 = document.getElementById("ovP1Chosen");
-      const c2 = document.getElementById("ovP2Chosen");
-      if (c1) c1.textContent = "";
-      if (c2) c2.textContent = "";
+      STATE.overlapPeople = [];
       const sBar = document.getElementById("overlapSummaryBar");
       if (sBar) sBar.innerHTML = "";
+      renderOverlapSelectedChips();
       renderOverlapOutput();
     }
 
-    function openFreeRoomsForSlot(slotId) {
+    function openFreeRoomsForSlot(slotId, dayNum = null) {
       haptic("medium");
+      if (dayNum) STATE.day = Number(dayNum);
       STATE.slot = Number(slotId) || STATE.slot;
       STATE.onlyFree = true;
       switchTab("rooms");
+      renderDayAndSlotChips();
       renderRoomsTab();
     }
 
     async function initOverlapDefaults() {
-      if (!STATE.overlap.p1) {
+      if (!STATE.overlapPeople || !STATE.overlapPeople.length) {
         try {
           const raw = localStorage.getItem("uwed_pinned_profile");
           if (raw) {
             const p = JSON.parse(raw);
-            await chooseOverlapPerson(1, p.kind, p.id, p.title);
+            await addOverlapPerson(p.kind, p.id, `🎓 ${p.title}`);
           }
         } catch (_) {}
       }
+      renderOverlapSelectedChips();
       renderOverlapOutput();
     }
 
-    function onOverlapSearch(slotNum) {
-      clearTimeout(ovTimers[slotNum]);
-      const q = (document.getElementById(`ovSearch${slotNum}`).value || "").trim();
-      const resBox = document.getElementById(`ovResults${slotNum}`);
+    function onOverlapMultiSearch() {
+      clearTimeout(ovTimers[1]);
+      const q = ((document.getElementById("ovAddSearch") && document.getElementById("ovAddSearch").value) || "").trim();
+      const resBox = document.getElementById("ovMultiResults");
+      if (!resBox) return;
       if (q.length < 2) {
         resBox.innerHTML = "";
         return;
       }
-      ovTimers[slotNum] = setTimeout(async () => {
+      ovTimers[1] = setTimeout(async () => {
         const items = [];
         const seenIds = new Set();
         try {
@@ -7335,7 +7419,6 @@
           }
         } catch (_) {}
 
-        // Offline / local group & stream matching from STATE.eventsByRoom
         const qUp = q.toUpperCase();
         for (const r of STATE.rooms) {
           for (const ev of STATE.eventsByRoom[r.id] || []) {
@@ -7359,15 +7442,14 @@
           if (items.length >= 12) break;
         }
 
-        const chooseTxt = T().ovChooseBtn || "Выбрать →";
         resBox.innerHTML = items.length
           ? items
               .map((it) => {
                 const safeT = it.title.replace(/'/g, "\\'");
                 return `
-                  <div class="list-item" style="padding:9px 12px;" onclick="chooseOverlapPerson(${slotNum}, '${it.kind}', '${it.id}', '${safeT}')">
+                  <div class="list-item" style="padding:9px 12px;" onclick="addOverlapPerson('${it.kind}', '${it.id}', '${safeT}')">
                     <div class="list-title" style="font-size:13px;">${it.title}</div>
-                    <span style="color:#38bdf8; font-size:12px; font-weight:700;">${chooseTxt}</span>
+                    <span style="color:#34d399; font-size:12px; font-weight:800;">+ Добавить</span>
                   </div>
                 `;
               })
@@ -7438,28 +7520,22 @@
 
     function renderOverlapOutput() {
       const t = T();
+      const isRu = STATE.lang === "ru";
       const box = document.getElementById("overlapComparisonOutput");
       const sumBar = document.getElementById("overlapSummaryBar");
       if (!box) return;
-      const p1 = STATE.overlap.p1;
-      const p2 = STATE.overlap.p2;
-      if (!p1 || !p2) {
+
+      const people = STATE.overlapPeople || [];
+      if (people.length < 2) {
         if (sumBar) sumBar.innerHTML = "";
-        box.innerHTML = `<div class="empty-msg">${t.ovSub}</div>`;
+        box.innerHTML = `<div class="empty-msg">${isRu ? "Добавьте минимум 2 участников (например, вас, друзей из других групп и профессора), чтобы найти общее свободное время!" : "Umumiy bõş vaqtni topiş uçun kamida 2 kişi tanlang!"}</div>`;
+        return;
+      }
+      if (people.some((p) => p.loading)) {
+        box.innerHTML = `<div class="empty-msg">⏳ ${isRu ? "Загружаем расписание участников..." : "Jadvallar yuklanmoqda..."}</div>`;
         return;
       }
 
-      const map1 = {};
-      const map2 = {};
-      for (const e of p1.events || []) {
-        if (Number(e.week_day) === Number(STATE.day) && e.slot_id) map1[Number(e.slot_id)] = e;
-      }
-      for (const e of p2.events || []) {
-        if (Number(e.week_day) === Number(STATE.day) && e.slot_id) map2[Number(e.slot_id)] = e;
-      }
-
-      let freeCount = 0;
-      let sharedCount = 0;
       const slotsList = (STATE.slots && STATE.slots.length ? STATE.slots : [
         { id: 1, start_time: "08:30", end_time: "09:40" },
         { id: 2, start_time: "09:55", end_time: "11:05" },
@@ -7471,87 +7547,132 @@
         { id: 8, start_time: "18:45", end_time: "19:55" },
       ]);
 
-      const rows = slotsList.map((s) => {
-        const sid = Number(s.id);
-        const e1 = map1[sid];
-        const e2 = map2[sid];
-        const isFree = !e1 && !e2;
-        const sameRoom = Boolean(e1 && e2 && e1.room_number && e2.room_number && String(e1.room_number).toUpperCase() === String(e2.room_number).toUpperCase());
-        const sameSubj = Boolean(e1 && e2 && e1.title && e2.title && String(e1.title).toLowerCase() === String(e2.title).toLowerCase());
-        const isSharedClass = sameRoom || sameSubj;
-        if (isFree) freeCount++;
-        if (isSharedClass) sharedCount++;
-        return { s, sid, e1, e2, isFree, isSharedClass };
-      });
+      const daysToCheck = ovScopeMode === "week" ? [1, 2, 3, 4, 5, 6] : [Number(STATE.day || 1)];
+      let totalFreeSlots = 0;
+      let totalSharedSlots = 0;
+      const htmlSections = [];
+
+      for (const d of daysToCheck) {
+        const maps = people.map((p) => {
+          const m = {};
+          for (const e of p.events || []) {
+            if (Number(e.week_day || e.d) === d && (e.slot_id || e.s)) {
+              m[Number(e.slot_id || e.s)] = e;
+            }
+          }
+          return m;
+        });
+
+        const dayRows = [];
+        for (const s of slotsList) {
+          const sid = Number(s.id);
+          const evs = maps.map((m) => m[sid] || null);
+          const busyPeople = [];
+          const freePeople = [];
+          evs.forEach((ev, idx) => {
+            if (ev) busyPeople.push({ p: people[idx], ev });
+            else freePeople.push(people[idx]);
+          });
+          const allFree = busyPeople.length === 0;
+          const allSameClass =
+            busyPeople.length === people.length &&
+            busyPeople.every((x) => {
+              const first = busyPeople[0].ev;
+              const r1 = String(first.room_number || first.r || "").toUpperCase();
+              const r2 = String(x.ev.room_number || x.ev.r || "").toUpperCase();
+              const t1 = String(first.title || first.t || "").toLowerCase();
+              const t2 = String(x.ev.title || x.ev.t || "").toLowerCase();
+              return (r1 && r1 === r2) || (t1 && t1 === t2);
+            });
+
+          if (allFree) totalFreeSlots++;
+          if (allSameClass) totalSharedSlots++;
+
+          if (ovFilterMode === "free" && !allFree) continue;
+          if (ovFilterMode === "shared" && !allSameClass) continue;
+          if (ovScopeMode === "week" && ovFilterMode === "all" && !allFree && !allSameClass) continue;
+
+          if (allFree) {
+            dayRows.push(`
+              <div class="slot-row free">
+                <div class="slot-time">${t.pairLabel(sid)}<span>${s.start_time}–${s.end_time}</span></div>
+                <div class="slot-info">
+                  <div class="slot-subj" style="color:#34d399;">🟢 ${isRu ? `Все ${people.length} свободны!` : `Barça (${people.length}) bõş!`}</div>
+                  <div class="slot-meta">${people.map((p) => p.title).join(" · ")}</div>
+                  <button class="btn-sm" style="margin-top:6px; font-size:11px;" onclick="openFreeRoomsForSlot(${sid}, ${d})">🚪 ${isRu ? "Свободные аудитории в это окно" : "Bu vaqtda bõş xonalar"}</button>
+                </div>
+              </div>`);
+          } else if (allSameClass) {
+            const ev0 = busyPeople[0].ev;
+            dayRows.push(`
+              <div class="slot-row" style="border-left:4px solid #38bdf8; background:rgba(56,189,248,0.09);">
+                <div class="slot-time">${t.pairLabel(sid)}<span>${s.start_time}–${s.end_time}</span></div>
+                <div class="slot-info">
+                  <div class="slot-subj" style="color:#38bdf8;">🤝 ${isRu ? "Общая пара!" : "Umumiy dars!"} ${toNewUz(ev0.title || ev0.t || "")}</div>
+                  <div class="slot-meta" style="margin-top:3px;">🚪 Ауд. <b>${ev0.room_number || ev0.r || "—"}</b> · 👨‍🏫 ${toNewUz(ev0.instructor || ev0.i || "—")}</div>
+                </div>
+              </div>`);
+          } else {
+            const cls = busyPeople.length === people.length ? "busy" : "warn";
+            const hdr = isRu
+              ? `Свободны ${freePeople.length} из ${people.length}`
+              : `${freePeople.length} / ${people.length} bõş`;
+            const lines = people
+              .map((p, idx) => {
+                const ev = evs[idx];
+                return ev
+                  ? `🔴 <b>${p.title}:</b> ${ev.room_number || ev.r || "?"} (${toNewUz(ev.title || ev.t || "")})`
+                  : `🟢 <b>${p.title}:</b> ${t.ovPersonFree || "Свободен"}`;
+              })
+              .join("<br>");
+            dayRows.push(`
+              <div class="slot-row ${cls}">
+                <div class="slot-time">${t.pairLabel(sid)}<span>${s.start_time}–${s.end_time}</span></div>
+                <div class="slot-info">
+                  <div class="slot-subj">${hdr}</div>
+                  <div class="slot-meta" style="line-height:1.5; margin-top:4px;">${lines}</div>
+                </div>
+              </div>`);
+          }
+        }
+
+        if (ovScopeMode === "week") {
+          const dayTitle = (t.daysFull && t.daysFull[d]) || t.daysShort[d];
+          htmlSections.push(`
+            <div style="margin-bottom:12px;">
+              <div style="font-size:12.5px; font-weight:800; color:#38bdf8; margin-bottom:6px;">📌 ${dayTitle}</div>
+              ${dayRows.length ? dayRows.join("") : `<div style="font-size:11.5px; color:var(--text-muted); padding:6px 10px;">${isRu ? "Нет общих окон в этот день" : "Bu kuni umumiy bõş vaqt yõq"}</div>`}
+            </div>`);
+        } else {
+          htmlSections.push(...dayRows);
+        }
+      }
 
       if (sumBar) {
         sumBar.innerHTML = `
           <div class="panel" style="display:flex; justify-content:space-around; align-items:center; padding:10px 12px; margin-bottom:10px; gap:8px;">
             <div style="text-align:center;">
-              <div style="font-size:18px; font-weight:800; color:#34d399;">${freeCount}</div>
-              <div style="font-size:11px; color:var(--text-muted);">🟢 Общие окна</div>
+              <div style="font-size:18px; font-weight:800; color:#a78bfa;">${people.length}</div>
+              <div style="font-size:11px; color:var(--text-muted);">👥 ${isRu ? "Участников" : "Iştirokçi"}</div>
             </div>
             <div style="width:1px; height:28px; background:var(--border);"></div>
             <div style="text-align:center;">
-              <div style="font-size:18px; font-weight:800; color:#38bdf8;">${sharedCount}</div>
-              <div style="font-size:11px; color:var(--text-muted);">🤝 Общие пары</div>
+              <div style="font-size:18px; font-weight:800; color:#34d399;">${totalFreeSlots}</div>
+              <div style="font-size:11px; color:var(--text-muted);">🟢 ${isRu ? "Общие окна" : "Bõş vaqtlar"}</div>
             </div>
-          </div>
-        `;
+            <div style="width:1px; height:28px; background:var(--border);"></div>
+            <div style="text-align:center;">
+              <div style="font-size:18px; font-weight:800; color:#38bdf8;">${totalSharedSlots}</div>
+              <div style="font-size:11px; color:var(--text-muted);">🤝 ${isRu ? "Общие пары" : "Umumiy dars"}</div>
+            </div>
+          </div>`;
       }
 
-      const filtered = rows.filter((r) => {
-        if (ovFilterMode === "free") return r.isFree;
-        if (ovFilterMode === "shared") return r.isSharedClass;
-        return true;
-      });
-
-      const freeWord = t.ovPersonFree || "Свободен";
-      if (!filtered.length) {
-        box.innerHTML = `<div class="empty-msg">В этот день по выбранному фильтру совпадений нет. Попробуйте другой день недели.</div>`;
+      if (!htmlSections.length) {
+        box.innerHTML = `<div class="empty-msg">${isRu ? "В этот день по выбранному фильтру совпадений нет. Попробуйте режим «🗓 Вся неделя»!" : "Bu kuni mos keluvçi vaqt topilmadi. «🗓 Вся неделя» rejimini sinab kõring!"}</div>`;
         return;
       }
-
-      box.innerHTML = filtered
-        .map(({ s, sid, e1, e2, isFree, isSharedClass }) => {
-          if (isFree) {
-            return `
-              <div class="slot-row free">
-                <div class="slot-time">${t.pairLabel(sid)}<span>${s.start_time}–${s.end_time}</span></div>
-                <div class="slot-info">
-                  <div class="slot-subj" style="color:#34d399;">${t.ovBothFree}</div>
-                  <div class="slot-meta">${p1.title}  &  ${p2.title}</div>
-                  <button class="btn-sm" style="margin-top:6px; font-size:11px;" onclick="openFreeRoomsForSlot(${sid})">🔍 Свободные кабинеты в это окно</button>
-                </div>
-              </div>
-            `;
-          }
-          if (isSharedClass) {
-            return `
-              <div class="slot-row" style="border-left:4px solid #38bdf8; background:rgba(56,189,248,0.09);">
-                <div class="slot-time">${t.pairLabel(sid)}<span>${s.start_time}–${s.end_time}</span></div>
-                <div class="slot-info">
-                  <div class="slot-subj" style="color:#38bdf8;">🤝 Общая пара! ${toNewUz(e1.title || e2.title || "")}</div>
-                  <div class="slot-meta" style="margin-top:3px;">🚪 Ауд. <b>${e1.room_number || e2.room_number || "—"}</b> · 👨‍🏫 ${toNewUz(e1.instructor || e2.instructor || "—")}</div>
-                </div>
-              </div>
-            `;
-          }
-          const cls = e1 && e2 ? "busy" : "warn";
-          const hdr = e1 && e2 ? t.ovBothBusy : t.ovOneBusy;
-          const line1 = e1 ? `🔴 <b>${p1.title}:</b> ${e1.room_number || "?"} (${toNewUz(e1.title || "")})` : `🟢 <b>${p1.title}:</b> ${freeWord}`;
-          const line2 = e2 ? `🔴 <b>${p2.title}:</b> ${e2.room_number || "?"} (${toNewUz(e2.title || "")})` : `🟢 <b>${p2.title}:</b> ${freeWord}`;
-          return `
-            <div class="slot-row ${cls}">
-              <div class="slot-time">${t.pairLabel(sid)}<span>${s.start_time}–${s.end_time}</span></div>
-              <div class="slot-info">
-                <div class="slot-subj">${hdr}</div>
-                <div class="slot-meta" style="line-height:1.5; margin-top:4px;">${line1}<br>${line2}</div>
-              </div>
-            </div>
-          `;
-        })
-        .join("");
+      box.innerHTML = htmlSections.join("");
     }
 
     /* ── CAMPUS EVENTS CALENDAR TAB ── */
@@ -8625,12 +8746,33 @@
       if (bd) bd.classList.remove("open");
     }
 
+    function setModalViewMode(mode) {
+      haptic("light");
+      STATE.modalViewMode = mode === "week" ? "week" : "day";
+      const dBtn = document.getElementById("modalModeDay");
+      const wBtn = document.getElementById("modalModeWeek");
+      const dayChips = document.getElementById("modalDayChips");
+      if (dBtn) dBtn.classList.toggle("active", STATE.modalViewMode === "day");
+      if (wBtn) wBtn.classList.toggle("active", STATE.modalViewMode === "week");
+      if (dayChips) dayChips.style.display = STATE.modalViewMode === "day" ? "flex" : "none";
+      renderModalContent();
+    }
+
     function renderModalContent() {
       const t = T();
+      const isRu = STATE.lang === "ru";
       const ctx = STATE.modalContext;
       if (!ctx) return;
       _modalSlotCache = {};
-      const tapHintTxt = STATE.lang === "ru" ? "Нажмите для деталей →" : (STATE.lang === "en" ? "Tap for details →" : "Batafsil →");
+      const tapHintTxt = isRu ? "Нажмите для деталей →" : (STATE.lang === "en" ? "Tap for details →" : "Batafsil →");
+
+      const viewMode = STATE.modalViewMode || "day";
+      const dBtn = document.getElementById("modalModeDay");
+      const wBtn = document.getElementById("modalModeWeek");
+      const dayChipsEl = document.getElementById("modalDayChips");
+      if (dBtn) dBtn.classList.toggle("active", viewMode === "day");
+      if (wBtn) wBtn.classList.toggle("active", viewMode === "week");
+      if (dayChipsEl) dayChipsEl.style.display = viewMode === "day" ? "flex" : "none";
 
       const curDateStr = ctx.selectedDateStr || computeDateForWeekday(STATE.selectedDateStr, ctx.day);
       const dp = document.getElementById("modalDatePicker");
@@ -8642,11 +8784,79 @@
         const dStrShort = computeDateForWeekday(curDateStr, d).slice(8, 10);
         dayChipsHtml += `<div class="pill pill-sm ${act}" onclick="selectModalDay(${d})">${t.daysShort[d]} · ${dStrShort}</div>`;
       }
-      document.getElementById("modalDayChips").innerHTML = dayChipsHtml;
+      if (dayChipsEl) dayChipsEl.innerHTML = dayChipsHtml;
 
       const body = document.getElementById("modalBody");
       if (ctx.loading) {
         body.innerHTML = `<div class="empty-msg">${t.loadingLive}</div>`;
+        return;
+      }
+
+      // FULL WEEK VIEW (Mon–Sat) for Student, Group, Professor OR Room!
+      if (viewMode === "week") {
+        const slotsList = STATE.slots.slice(0, 8);
+        const daySections = [];
+        for (let d = 1; d <= 6; d++) {
+          const dayDate = computeDateForWeekday(curDateStr, d);
+          const dayTitle = `${(t.daysFull && t.daysFull[d]) || t.daysShort[d]} · ${dayDate.slice(5)}`;
+          const dayCards = [];
+
+          if (ctx.kind === "ROOM") {
+            const dm = getRoomDayEvents(ctx.id, d);
+            for (const s of slotsList) {
+              const sid = Number(s.id);
+              const ev = dm[sid];
+              if (!ev) continue;
+              const sk = `wk_rm_${d}_${sid}`;
+              _modalSlotCache[sk] = { ev, slot: s, roomName: ctx.room ? ctx.room.name : "" };
+              const meta = [ev.grp ? `👥 ${ev.grp}` : "", toNewUz(ev.i)].filter(Boolean).join(" · ");
+              dayCards.push(`
+                <div class="slot-row busy" onclick="openClassDetailBySlot('${sk}')" style="margin-bottom:5px;">
+                  <div class="slot-time">${t.pairLabel(sid)}<span>${s.start_time}–${s.end_time}</span></div>
+                  <div class="slot-info">
+                    <div class="slot-subj">${toNewUz(ev.t || "—")}</div>
+                    ${meta ? `<div class="slot-meta">${meta}</div>` : ""}
+                  </div>
+                </div>`);
+            }
+          } else {
+            const dEvs = (ctx.events || []).filter((e) => Number(e.week_day || e.d) === d);
+            const byS = {};
+            for (const e of dEvs) {
+              const sid = Number(e.slot_id || e.s);
+              if (sid && !byS[sid]) byS[sid] = e;
+            }
+            for (const s of slotsList) {
+              const sid = Number(s.id);
+              const ev = byS[sid];
+              if (!ev) continue;
+              const sk = `wk_ps_${d}_${sid}`;
+              _modalSlotCache[sk] = { ev, slot: s, roomName: ev.room_number || ev.r || "" };
+              const rm = ev.room_number || ev.r || "—";
+              const meta = [`🚪 ${rm}`, toNewUz(ev.instructor || ev.i), ev.groups ? `👥 ${ev.groups}` : ""].filter(Boolean).join(" · ");
+              dayCards.push(`
+                <div class="slot-row busy" onclick="openClassDetailBySlot('${sk}')" style="margin-bottom:5px;">
+                  <div class="slot-time">${t.pairLabel(sid)}<span>${s.start_time}–${s.end_time}</span></div>
+                  <div class="slot-info">
+                    <div class="slot-subj">${toNewUz(ev.title || ev.t || ev.lesson_name || "—")}</div>
+                    <div class="slot-meta">${meta}</div>
+                  </div>
+                </div>`);
+            }
+          }
+
+          daySections.push(`
+            <div style="margin-bottom:12px;">
+              <div style="display:flex; justify-content:space-between; align-items:center; padding:5px 10px; border-radius:9px; background:rgba(56,189,248,0.12); border:1px solid rgba(56,189,248,0.25); margin-bottom:6px;">
+                <span style="font-size:12.5px; font-weight:800; color:#38bdf8;">📅 ${dayTitle}</span>
+                <span style="font-size:11px; font-weight:700; color:var(--text-sec);">${dayCards.length ? `${dayCards.length} ${isRu ? "пар" : "dars"}` : (isRu ? "Свободно" : "Bõş")}</span>
+              </div>
+              ${dayCards.length ? dayCards.join("") : `<div style="font-size:11.5px; color:var(--text-muted); padding:4px 10px;">🟢 ${isRu ? "Пар нет" : "Darslar yõq"}</div>`}
+            </div>`);
+        }
+
+        const radarTop = ctx.kind === "ROOM" ? "" : buildPersonLiveRadarHtml(ctx.events || []);
+        body.innerHTML = radarTop + daySections.join("");
         return;
       }
 

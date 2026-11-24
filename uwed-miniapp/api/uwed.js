@@ -957,10 +957,11 @@ module.exports = async (req, res) => {
         });
       }
 
-      const [meRes, semsRes, gpaRes] = await Promise.all([
+      const [meRes, semsRes, gpaRes, attRes] = await Promise.all([
         hemisReq("/account/me", "GET", null, token).catch(() => ({})),
         hemisReq("/education/semesters", "GET", null, token).catch(() => ({})),
         hemisReq("/education/gpa-list", "GET", null, token).catch(() => ({})),
+        hemisReq("/education/attendance", "GET", null, token).catch(() => ({})),
       ]);
       const meData = (meRes.json && meRes.json.data) || {};
       const semsData = Array.isArray(semsRes.json && semsRes.json.data)
@@ -1027,15 +1028,33 @@ module.exports = async (req, res) => {
         current: Boolean(s.current),
       }));
 
+      const attRaw = Array.isArray(attRes && attRes.json && attRes.json.data) ? attRes.json.data : [];
+      let attTotal = 0, attExcused = 0, attUnexcused = 0;
+      for (const a of attRaw) {
+        const hrs = Number(a.absent_on || 0) + Number(a.absent_off || 0) || Number(a.hours || 2);
+        attTotal += hrs;
+        if (a.absent_on || a.explicable) attExcused += Number(a.absent_on || hrs);
+        else attUnexcused += Number(a.absent_off || hrs);
+      }
+
       return res.status(200).json({
         ok: true,
         me: {
           full_name: meData.full_name || meData.short_name || login,
           student_id: meData.student_id_number || login,
           group: (meData.group && meData.group.name) || "",
+          faculty: (meData.faculty && meData.faculty.name) || "",
+          level: (meData.level && meData.level.name) || "",
+          specialty: (meData.specialty && meData.specialty.name) || "",
         },
         gpa: latestGpa,
         gpa_list: gpaList,
+        attendance: {
+          total_hours: attTotal,
+          excused_hours: attExcused,
+          unexcused_hours: attUnexcused,
+          records_count: attRaw.length,
+        },
         semester: semCode,
         semester_name: semName,
         education_year: eduYear,

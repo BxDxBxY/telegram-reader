@@ -707,9 +707,10 @@ function detectCurrentSlotAndDay(slots, lang = "uz") {
 }
 
 function isTeachingRoom(snap, r) {
-  if (CLASSROOM_TYPES.has(r.type)) return true;
-  const evs = snap.events[r.id];
-  return Array.isArray(evs) && evs.length > 0;
+  if (!r) return false;
+  const rType = r.type || r.room_type || "";
+  if (rType === "OFFICE" || rType === "UNIMPORTANT" || rType === "SPORT_CENTER") return false;
+  return CLASSROOM_TYPES.has(rType);
 }
 
 function getRoomDayEvents(snap, roomId, day) {
@@ -765,7 +766,7 @@ function buildReplyKeyboard(baseWebappUrl, lang = "uz") {
   const restartBtn = lang === "ru" ? "🔄 Перезапуск / Статус" : lang === "en" ? "🔄 System Status / Fix" : "🔄 Qayta yuklash / Holat";
   return {
     keyboard: [
-      [{ text: tr.openApp, web_app: { url: `${baseWebappUrl}?v=r6&lang=${lang}` } }],
+      [{ text: tr.openApp, web_app: { url: `${baseWebappUrl}?v=r7&lang=${lang}` } }],
       [{ text: tr.findRoomsBtn }, { text: tr.eventsBtn }],
       [{ text: tr.mySchedBtn }, { text: moodleBtn }],
       [{ text: restartBtn }, { text: tr.helpBtn }],
@@ -794,26 +795,26 @@ function formatHomeHub(snap, lang, baseWebappUrl) {
 
   const kb = {
     inline_keyboard: [
-      [{ text: tr.openApp, web_app: { url: `${baseWebappUrl}?v=r6&lang=${lang}` } }],
+      [{ text: tr.openApp, web_app: { url: `${baseWebappUrl}?v=r7&lang=${lang}` } }],
       [{ text: tr.findRoomsBtn, callback_data: `m:pick:${lang}` }],
       [
         {
           text: lang === "ru" ? "🎓 Moodle · Дедлайны" : lang === "en" ? "🎓 Moodle · Deadlines" : "🎓 Moodle · Dedlayn",
-          web_app: { url: `${baseWebappUrl}?v=r6&lang=${lang}&tab=moodle` },
+          web_app: { url: `${baseWebappUrl}?v=r7&lang=${lang}&tab=moodle` },
         },
         {
           text: lang === "ru" ? "🧮 GPA · HEMIS" : lang === "en" ? "🧮 GPA · HEMIS" : "🧮 GPA · HEMIS",
-          web_app: { url: `${baseWebappUrl}?v=r6&lang=${lang}&tab=gpa` },
+          web_app: { url: `${baseWebappUrl}?v=r7&lang=${lang}&tab=gpa` },
         },
       ],
       [
         {
           text: lang === "ru" ? "🗺 3D Карта УМЭД" : lang === "en" ? "🗺 3D Campus Map" : "🗺 3D Xarita",
-          web_app: { url: `${baseWebappUrl}?v=r6&lang=${lang}&tab=map` },
+          web_app: { url: `${baseWebappUrl}?v=r7&lang=${lang}&tab=map` },
         },
         {
           text: lang === "ru" ? "📦 Обмен · Lost&Found" : lang === "en" ? "📦 Swap · Lost&Found" : "📦 Almashinuv · Topilma",
-          web_app: { url: `${baseWebappUrl}?v=r6&lang=${lang}&tab=lf` },
+          web_app: { url: `${baseWebappUrl}?v=r7&lang=${lang}&tab=lf` },
         },
       ],
       [
@@ -825,10 +826,10 @@ function formatHomeHub(snap, lang, baseWebappUrl) {
         { text: tr.mySchedBtn, callback_data: `m:my:${lang}` },
       ],
       [
-        { text: tr.overlapBtn, web_app: { url: `${baseWebappUrl}?v=r6&lang=${lang}&tab=overlap` } },
+        { text: tr.overlapBtn, web_app: { url: `${baseWebappUrl}?v=r7&lang=${lang}&tab=overlap` } },
         {
           text: lang === "ru" ? "🚀 Гранты (9)" : lang === "en" ? "🚀 Grants (9)" : "🚀 Grantlar (9)",
-          web_app: { url: `${baseWebappUrl}?v=r6&lang=${lang}&tab=opps` },
+          web_app: { url: `${baseWebappUrl}?v=r7&lang=${lang}&tab=opps` },
         },
       ],
       ["uz", "ru", "en"].map((l) => ({
@@ -863,7 +864,7 @@ function formatBlockPicker(snap, lang, baseWebappUrl) {
         { text: `🅱️ B (${bRes.free.length})`, callback_data: `v:${lang}:B:A:${cur.day}:${cur.slot}:0` },
         { text: `🇩 D (${dRes.free.length})`, callback_data: `v:${lang}:D:A:${cur.day}:${cur.slot}:0` },
       ],
-      [{ text: tr.openApp, web_app: { url: `${baseWebappUrl}?v=r6&lang=${lang}` } }],
+      [{ text: tr.openApp, web_app: { url: `${baseWebappUrl}?v=r7&lang=${lang}` } }],
       [{ text: tr.backHomeBtn, callback_data: `m:home:${lang}` }],
     ],
   };
@@ -1068,7 +1069,7 @@ async function formatCampusEventsMessage(lang, baseWebappUrl) {
   }
   const kb = {
     inline_keyboard: [
-      [{ text: `🗓 ${tr.openApp}`, web_app: { url: `${baseWebappUrl}?v=r6&lang=${lang}&tab=events` } }],
+      [{ text: `🗓 ${tr.openApp}`, web_app: { url: `${baseWebappUrl}?v=r7&lang=${lang}&tab=events` } }],
       [{ text: tr.backHomeBtn, callback_data: `m:home:${lang}` }],
     ],
   };
@@ -1393,7 +1394,7 @@ async function formatSystemFixCard(snap, lang, baseWebappUrl) {
         [{ text: "📅 Пары на сегодня", callback_data: `m:today:${lang}` }],
         [{ text: "🎓 Moodle · Дедлайны & Оценки", callback_data: `m:moodle:${lang}` }],
         [{ text: "🔔 Настройки напоминаний", callback_data: `m:notify:${lang}` }],
-        [{ text: "📱 Открыть UWED Mini App", web_app: { url: `${baseWebappUrl}?v=r6&lang=${lang}` } }],
+        [{ text: "📱 Открыть UWED Mini App", web_app: { url: `${baseWebappUrl}?v=r7&lang=${lang}` } }],
         [{ text: "← Главное меню", callback_data: `m:home:${lang}` }],
       ],
     };
@@ -1423,7 +1424,7 @@ async function formatSystemFixCard(snap, lang, baseWebappUrl) {
         [{ text: "📅 Today's Classes", callback_data: `m:today:${lang}` }],
         [{ text: "🎓 Moodle · Deadlines & Grades", callback_data: `m:moodle:${lang}` }],
         [{ text: "🔔 Notification Settings", callback_data: `m:notify:${lang}` }],
-        [{ text: "📱 Open UWED Mini App", web_app: { url: `${baseWebappUrl}?v=r6&lang=${lang}` } }],
+        [{ text: "📱 Open UWED Mini App", web_app: { url: `${baseWebappUrl}?v=r7&lang=${lang}` } }],
         [{ text: "← Main Menu", callback_data: `m:home:${lang}` }],
       ],
     };
@@ -1452,7 +1453,7 @@ async function formatSystemFixCard(snap, lang, baseWebappUrl) {
       [{ text: "📅 Bugungi darslar", callback_data: `m:today:${lang}` }],
       [{ text: "🎓 Moodle · Dedlayn & Baholar", callback_data: `m:moodle:${lang}` }],
       [{ text: "🔔 Eslatma sozlamalari", callback_data: `m:notify:${lang}` }],
-      [{ text: "📱 UWED Mini App'ni ochish", web_app: { url: `${baseWebappUrl}?v=r6&lang=${lang}` } }],
+      [{ text: "📱 UWED Mini App'ni ochish", web_app: { url: `${baseWebappUrl}?v=r7&lang=${lang}` } }],
       [{ text: "← Asosiy menyu", callback_data: `m:home:${lang}` }],
     ],
   };
@@ -1483,7 +1484,7 @@ async function formatMoodleDashboard(userMoodle, lang, baseWebappUrl) {
 
       const kb = {
         inline_keyboard: [
-          [{ text: "🔗 Войти в Moodle через Mini App", web_app: { url: `${baseWebappUrl}?v=r6&lang=${lang}&tab=moodle` } }],
+          [{ text: "🔗 Войти в Moodle через Mini App", web_app: { url: `${baseWebappUrl}?v=r7&lang=${lang}&tab=moodle` } }],
           [{ text: "← Назад в меню", callback_data: `m:home:${lang}` }],
         ],
       };
@@ -1509,7 +1510,7 @@ async function formatMoodleDashboard(userMoodle, lang, baseWebappUrl) {
 
       const kb = {
         inline_keyboard: [
-          [{ text: "🔗 Open Moodle in Mini App", web_app: { url: `${baseWebappUrl}?v=r6&lang=${lang}&tab=moodle` } }],
+          [{ text: "🔗 Open Moodle in Mini App", web_app: { url: `${baseWebappUrl}?v=r7&lang=${lang}&tab=moodle` } }],
           [{ text: "← Main Menu", callback_data: `m:home:${lang}` }],
         ],
       };
@@ -1535,7 +1536,7 @@ async function formatMoodleDashboard(userMoodle, lang, baseWebappUrl) {
 
     const kb = {
       inline_keyboard: [
-        [{ text: "🔗 Mini App orqali Moodle'ga kirish", web_app: { url: `${baseWebappUrl}?v=r6&lang=${lang}&tab=moodle` } }],
+        [{ text: "🔗 Mini App orqali Moodle'ga kirish", web_app: { url: `${baseWebappUrl}?v=r7&lang=${lang}&tab=moodle` } }],
         [{ text: "← Asosiy menyu", callback_data: `m:home:${lang}` }],
       ],
     };
@@ -1838,66 +1839,100 @@ async function formatMoodleGrades(userMoodle, lang, baseWebappUrl) {
   return { text: lines.join("\n"), kb };
 }
 
-async function formatTodayClasses(from, snap, db, lang, baseWebappUrl) {
-  const tr = L10N[lang] || L10N.uz;
-  const cur = detectCurrentSlotAndDay(snap.slots, lang);
+async function resolveUserWeeklyEvents(from, snap, db, lang) {
   const sub = (db.subscriptions && db.subscriptions[String(from.id)]) || null;
   const mUser = (db.moodle_users && db.moodle_users[String(from.id)]) || null;
-
   let targetId = sub ? sub.target_id : null;
   let targetKind = sub ? sub.kind : "STUDENT";
   let targetTitle = sub ? sub.title : (mUser ? mUser.fullname : null);
 
-  if (!targetId && mUser && mUser.fullname && snap.events) {
-    const q = mUser.fullname.toLowerCase();
-    for (const elist of Object.values(snap.events)) {
-      for (const e of elist) {
-        if (e.g && (e.g.toLowerCase().includes(q) || q.includes(e.g.toLowerCase()))) {
-          targetId = e.g;
-          targetKind = "STUDENT";
-          targetTitle = e.g;
-          break;
-        }
-      }
-      if (targetId) break;
-    }
+  // 1. FIRST: exact cached personal schedule synced from Mini App (works for Student UUIDs, Groups & Teachers!)
+  if (sub && Array.isArray(sub.cached_events) && sub.cached_events.length) {
+    return {
+      targetTitle,
+      events: sub.cached_events.map((e) => ({
+        d: Number(e.d || e.week_day || 0),
+        s: Number(e.s || e.slot_id || 0),
+        t: e.t || e.title || e.lesson_name || "Занятие",
+        r: e.r || e.room_number || "—",
+        i: e.i || e.instructor || "—",
+      })),
+    };
   }
 
-  const todayClasses = [];
-  if (targetId && snap.events) {
-    for (const s of snap.slots.slice(0, 8)) {
-      const sid = Number(s.id);
-      let foundEv = null;
-      if (targetKind === "TEACHER") {
-        const t = snap.teachers.find((x) => x.id === targetId);
-        const tName = t ? t.full_name.toLowerCase() : (targetTitle || "").toLowerCase();
+  // 2. SECOND: live UWED timetable API for pinned student/teacher UUID
+  if (targetId && !String(targetId).startsWith("grp:")) {
+    try {
+      const liveRes = await uwedGet(
+        "/public/timetable/v1/events/list",
+        { request_id: targetId, type: targetKind || "STUDENT", start_time: getTashkentMonday() },
+        lang
+      );
+      if (liveRes && Array.isArray(liveRes.data) && liveRes.data.length) {
+        return {
+          targetTitle,
+          events: liveRes.data.map((e) => ({
+            d: Number(e.week_day || 0),
+            s: Number(e.slot_id || 0),
+            t: e.title || e.lesson_name || "Занятие",
+            r: e.room_number || "—",
+            i: e.instructor || "—",
+          })),
+        };
+      }
+    } catch (_) {}
+  }
+
+  // 3. THIRD: fallback to snapshot.json room events matching group or teacher
+  const out = [];
+  if (snap && snap.events) {
+    if (targetKind === "TEACHER" && (targetId || targetTitle)) {
+      const tObj = (snap.teachers || []).find((x) => x.id === targetId);
+      const tName = (tObj ? tObj.full_name : targetTitle || "").toLowerCase();
+      if (tName) {
         for (const elist of Object.values(snap.events)) {
           for (const e of elist) {
-            if (Number(e.d) === cur.day && Number(e.s) === sid && e.i && e.i.toLowerCase().includes(tName)) {
-              foundEv = e;
-              break;
-            }
+            if (e.i && e.i.toLowerCase().includes(tName)) out.push(e);
           }
-          if (foundEv) break;
-        }
-      } else {
-        const sTarget = (targetTitle || targetId).toLowerCase();
-        for (const elist of Object.values(snap.events)) {
-          for (const e of elist) {
-            if (Number(e.d) === cur.day && Number(e.s) === sid) {
-              if (e.g && (e.g.toLowerCase().includes(sTarget) || sTarget.includes(e.g.toLowerCase()))) {
-                foundEv = e;
-                break;
-              }
-            }
-          }
-          if (foundEv) break;
         }
       }
-      if (foundEv) {
-        todayClasses.push({ slot: sid, slotObj: s, ev: foundEv });
+    } else {
+      const rawKey = (targetTitle || targetId || "")
+        .replace(/^grp[:_]/i, "")
+        .replace(/^(guruh|группа|group):?\s*/i, "")
+        .replace(/["']/g, "")
+        .trim()
+        .toLowerCase();
+      if (rawKey) {
+        for (const elist of Object.values(snap.events)) {
+          for (const e of elist) {
+            const eg = String(e.g || "").replace(/["']/g, "").toLowerCase();
+            if (eg && (eg.includes(rawKey) || rawKey.includes(eg))) out.push(e);
+          }
+        }
       }
     }
+  }
+  return { targetTitle, events: out };
+}
+
+async function formatTodayClasses(from, snap, db, lang, baseWebappUrl) {
+  const tr = L10N[lang] || L10N.uz;
+  const cur = detectCurrentSlotAndDay(snap.slots, lang);
+  const mUser = (db.moodle_users && db.moodle_users[String(from.id)]) || null;
+  const leadTime = (mUser && Number(mUser.lead_time_mins)) || 20;
+  const { targetTitle, events } = await resolveUserWeeklyEvents(from, snap, db, lang);
+
+  const bySlot = {};
+  for (const e of events) {
+    if (Number(e.d) === Number(cur.day) && e.s && !bySlot[Number(e.s)]) {
+      bySlot[Number(e.s)] = e;
+    }
+  }
+  const todayClasses = [];
+  for (const s of (snap.slots || []).slice(0, 8)) {
+    const sid = Number(s.id);
+    if (bySlot[sid]) todayClasses.push({ slot: sid, slotObj: s, ev: bySlot[sid] });
   }
 
   const dayName = tr.daysFull[cur.day] || "Bugun";
@@ -1910,8 +1945,8 @@ async function formatTodayClasses(from, snap, db, lang, baseWebappUrl) {
   if (todayClasses.length === 0) {
     lines.push(
       lang === "ru"
-        ? `🟢 <b>На сегодня пар нет или расписание ещё не закреплено.</b>\n\nЧтобы бот показывал ваши пары и напоминал за 20 минут, найдите вашу группу в поиске или подключите Moodle (/moodle)!`
-        : `🟢 <b>Bugun darslar yo'q yoki guruh jadvali biriktirilmagan.</b>\n\nDarslar chiqishi va 20 daqiqa oldin eslatma kelishi uchun guruhingizni qidiring yoki Moodle hisobingizni ulang (/moodle)!`
+        ? `🟢 <b>На сегодня пар нет или расписание ещё не закреплено.</b>\n\nОткройте Mini App → выберите свою группу/имя или войдите через HEMIS/Moodle — бот автоматически синхронизирует ваши пары!`
+        : `🟢 <b>Bugun darslar yõq yoki guruh jadvali biriktirilmagan.</b>\n\nMini App'ni oçib guruhingizni tanlang yoki HEMIS/Moodle orqali kiring — bot darslaringizni avtomatik sinxronlaydi!`
     );
   } else {
     for (const item of todayClasses) {
@@ -1926,19 +1961,74 @@ async function formatTodayClasses(from, snap, db, lang, baseWebappUrl) {
     }
     lines.push(
       lang === "ru"
-        ? `🔔 <i>Бот автоматически предупредит вас за 20 минут до начала каждого занятия!</i>`
-        : `🔔 <i>Bot har bir dars boshlanishidan 20 daqiqa oldin sizga eslatma yuboradi!</i>`
+        ? `🔔 <i>Бот предупредит вас за ${leadTime} мин до начала каждой пары!</i>`
+        : `🔔 <i>Bot har bir darsdan ${leadTime} daqiqa oldin eslatma yuboradi!</i>`
     );
   }
 
   const kb = {
     inline_keyboard: [
-      [{ text: "🗺 3D " + (lang === "ru" ? "Карта кампуса" : "Kampus xaritasi"), web_app: { url: `${baseWebappUrl}?v=r6&lang=${lang}&tab=map` } }],
-      [{ text: "🎓 Moodle", callback_data: `m:moodle:${lang}` }],
+      [
+        { text: "🗓 " + (lang === "ru" ? "Вся неделя" : "Haftalik jadval"), callback_data: `m:week:${lang}` },
+        { text: "🎓 Moodle", callback_data: `m:moodle:${lang}` },
+      ],
+      [{ text: "📱 " + (lang === "ru" ? "Открыть в Mini App" : "Mini App'da oçiş"), web_app: { url: `${baseWebappUrl}?v=r7&lang=${lang}&tab=profile` } }],
       [{ text: "← " + (lang === "ru" ? "Главное меню" : "Asosiy menyu"), callback_data: `m:home:${lang}` }],
     ],
   };
   return { text: lines.join("\n"), kb };
+}
+
+async function formatWeekClasses(from, snap, db, lang, baseWebappUrl) {
+  const tr = L10N[lang] || L10N.uz;
+  const { targetTitle, events } = await resolveUserWeeklyEvents(from, snap, db, lang);
+  const slotMap = {};
+  for (const s of snap.slots || []) slotMap[Number(s.id)] = `${s.start_time}`;
+
+  const lines = [
+    `🗓 <b>${lang === "ru" ? "Недельное расписание (Пн–Сб)" : "Haftalik dars jadvali (Du–Şa)"}</b>`,
+    targetTitle ? `👤 <b>${targetTitle}</b>` : "",
+    "",
+  ];
+
+  let totalCnt = 0;
+  for (let d = 1; d <= 6; d++) {
+    const dayEvs = events
+      .filter((e) => Number(e.d) === d)
+      .sort((a, b) => Number(a.s) - Number(b.s));
+    const seenS = new Set();
+    const uniq = dayEvs.filter((e) => { if (seenS.has(e.s)) return false; seenS.add(e.s); return true; });
+    lines.push(`<b>📌 ${tr.daysFull[d]}</b>`);
+    if (!uniq.length) {
+      lines.push(`   <i>${lang === "ru" ? "Выходной / пар нет" : "Dars yõq"}</i>`);
+    } else {
+      for (const e of uniq) {
+        totalCnt++;
+        const tm = slotMap[Number(e.s)] || `${e.s}-п.`;
+        lines.push(`   • <code>${tm}</code> <b>${e.t}</b> (${e.r || "—"})`);
+      }
+    }
+    lines.push("");
+  }
+
+  if (totalCnt === 0) {
+    lines.push(
+      lang === "ru"
+        ? `ℹ️ Расписание ещё не закреплено. Откройте Mini App → Профиль и выберите вашу группу/имя.`
+        : `ℹ️ Jadval hali biriktirilmagan. Mini App → Profil orqali guruhingizni tanlang.`
+    );
+  }
+
+  const kb = {
+    inline_keyboard: [
+      [
+        { text: "📅 " + (lang === "ru" ? "На сегодня" : "Bugungi"), callback_data: `m:today:${lang}` },
+        { text: "📱 Mini App", web_app: { url: `${baseWebappUrl}?v=r7&lang=${lang}&tab=profile` } },
+      ],
+      [{ text: "← " + (lang === "ru" ? "Главное меню" : "Asosiy menyu"), callback_data: `m:home:${lang}` }],
+    ],
+  };
+  return { text: lines.join("\n").slice(0, 4000), kb };
 }
 
 function formatNotificationSettings(userMoodle, lang) {
@@ -2596,7 +2686,7 @@ module.exports = async (req, res) => {
           parse_mode: "HTML",
           reply_markup: {
             inline_keyboard: [
-              [{ text: "🔗 Moodle Mini App", web_app: { url: `${baseWebappUrl}?v=r6&lang=${lang}&tab=moodle` } }],
+              [{ text: "🔗 Moodle Mini App", web_app: { url: `${baseWebappUrl}?v=r7&lang=${lang}&tab=moodle` } }],
             ],
           },
         });
@@ -2687,7 +2777,7 @@ module.exports = async (req, res) => {
             text: tr.noMySched,
             parse_mode: "HTML",
             reply_markup: {
-              inline_keyboard: [[{ text: tr.openApp, web_app: { url: `${baseWebappUrl}?v=r6&lang=${lang}` } }]],
+              inline_keyboard: [[{ text: tr.openApp, web_app: { url: `${baseWebappUrl}?v=r7&lang=${lang}` } }]],
             },
           });
           return res.status(200).json({ ok: true });
@@ -2734,7 +2824,7 @@ module.exports = async (req, res) => {
           text: tr.feedbackPrompt,
           parse_mode: "HTML",
           reply_markup: {
-            inline_keyboard: [[{ text: tr.openApp, web_app: { url: `${baseWebappUrl}?v=r6&lang=${lang}&tab=feedback` } }]],
+            inline_keyboard: [[{ text: tr.openApp, web_app: { url: `${baseWebappUrl}?v=r7&lang=${lang}&tab=feedback` } }]],
           },
         });
         return res.status(200).json({ ok: true });
@@ -2805,7 +2895,7 @@ module.exports = async (req, res) => {
         for (const s of students) {
           rows.push([{ text: `🎓 ${tr.studentWord}: ${toNewUz(s.full_name, lang)}`, callback_data: `p:${lang}:S:${s.id}:${cur.day}` }]);
         }
-        rows.push([{ text: tr.openApp, web_app: { url: `${baseWebappUrl}?v=r6&lang=${lang}` } }]);
+        rows.push([{ text: tr.openApp, web_app: { url: `${baseWebappUrl}?v=r7&lang=${lang}` } }]);
         await tgApi("sendMessage", {
           chat_id: chatId,
           text: tr.searchResults(text),
@@ -2820,7 +2910,7 @@ module.exports = async (req, res) => {
         text: tr.notFound(text),
         parse_mode: "HTML",
         reply_markup: {
-          inline_keyboard: [[{ text: tr.openApp, web_app: { url: `${baseWebappUrl}?v=r6&lang=${lang}` } }]],
+          inline_keyboard: [[{ text: tr.openApp, web_app: { url: `${baseWebappUrl}?v=r7&lang=${lang}` } }]],
         },
       });
       return res.status(200).json({ ok: true });
@@ -3005,6 +3095,22 @@ module.exports = async (req, res) => {
           return res.status(200).json({ ok: true });
         }
 
+        if (mode === "week") {
+          const curDb = await loadDb(true);
+          const card = await formatWeekClasses(from, snap, curDb, lang, baseWebappUrl);
+          await Promise.all([
+            tgApi("editMessageText", {
+              chat_id: chatId,
+              message_id: messageId,
+              text: card.text,
+              parse_mode: "HTML",
+              reply_markup: card.kb,
+            }),
+            tgApi("answerCallbackQuery", { callback_query_id: cb.id }),
+          ]);
+          return res.status(200).json({ ok: true });
+        }
+
         if (mode === "notify") {
           const curDb = await loadDb(true);
           const uM = (curDb.moodle_users && curDb.moodle_users[String(from.id)]) || null;
@@ -3164,7 +3270,7 @@ module.exports = async (req, res) => {
                 parse_mode: "HTML",
                 reply_markup: {
                   inline_keyboard: [
-                    [{ text: tr.openApp, web_app: { url: `${baseWebappUrl}?v=r6&lang=${lang}` } }],
+                    [{ text: tr.openApp, web_app: { url: `${baseWebappUrl}?v=r7&lang=${lang}` } }],
                     [{ text: tr.backHomeBtn, callback_data: `m:home:${lang}` }],
                   ],
                 },
@@ -3198,7 +3304,7 @@ module.exports = async (req, res) => {
               parse_mode: "HTML",
               reply_markup: {
                 inline_keyboard: [
-                  [{ text: tr.openApp, web_app: { url: `${baseWebappUrl}?v=r6&lang=${lang}` } }],
+                  [{ text: tr.openApp, web_app: { url: `${baseWebappUrl}?v=r7&lang=${lang}` } }],
                   [{ text: tr.backHomeBtn, callback_data: `m:home:${lang}` }],
                 ],
               },
