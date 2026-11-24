@@ -723,6 +723,90 @@
       font-size: 12px;
       font-weight: 700;
     }
+    .room-day-dots {
+      display: grid;
+      grid-template-columns: repeat(8, 1fr);
+      gap: 3px;
+      margin-top: 7px;
+    }
+    .room-dot {
+      height: 5px;
+      border-radius: 3px;
+      background: rgba(16, 185, 129, 0.55);
+    }
+    .room-dot.busy { background: rgba(244, 63, 94, 0.55); }
+    .room-dot.cur {
+      height: 7px;
+      margin-top: -1px;
+      box-shadow: 0 0 0 1.5px #ffffff;
+    }
+    .floor-group-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 11px 12px;
+      margin-bottom: 10px;
+      grid-column: 1 / -1;
+    }
+    .floor-group-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+      font-size: 12.5px;
+      font-weight: 800;
+    }
+    .floor-room-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .floor-room-chip {
+      padding: 6px 10px;
+      border-radius: 10px;
+      font-size: 12px;
+      font-weight: 800;
+      cursor: pointer;
+      border: 1px solid rgba(16, 185, 129, 0.35);
+      background: rgba(16, 185, 129, 0.14);
+      color: #34d399;
+    }
+    .floor-room-chip.best {
+      background: rgba(16, 185, 129, 0.28);
+      border-color: #10b981;
+      color: #6ee7b7;
+    }
+    .floor-room-chip.busy {
+      background: rgba(244, 63, 94, 0.10);
+      border-color: rgba(244, 63, 94, 0.25);
+      color: #fda4af;
+      opacity: 0.72;
+    }
+    .prof-cal-day-pill {
+      flex: 0 0 auto;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-width: 48px;
+      padding: 7px 9px;
+      border-radius: 12px;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      cursor: pointer;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-sec);
+    }
+    .prof-cal-day-pill.active {
+      background: linear-gradient(135deg, #2563eb, #06b6d4);
+      border-color: transparent;
+      color: #ffffff;
+    }
+    .prof-cal-day-pill .cal-num {
+      font-size: 14px;
+      font-weight: 800;
+      margin-top: 2px;
+    }
     .class-detail-backdrop {
       position: fixed;
       inset: 0;
@@ -2232,7 +2316,10 @@
 
       <div class="rooms-summary-bar" id="roomsSummaryBar">
         <span id="roomsSummaryText">—</span>
-        <span style="font-size:11px; color:#38bdf8;" id="roomsBestPickTag"></span>
+        <div style="display:flex; align-items:center; gap:6px;">
+          <span style="font-size:11px; color:#38bdf8;" id="roomsBestPickTag"></span>
+          <button class="btn-sm" style="padding:3px 8px; font-size:11px;" id="btnRoomsViewMode" onclick="toggleRoomsViewMode()">🏢 По этажам</button>
+        </div>
       </div>
 
       <div class="search-box">
@@ -2381,9 +2468,10 @@
             <span class="row-label" id="lblEventSort">Saralash tartibi</span>
           </div>
           <div class="chips-scroll" id="eventSortChips">
-            <div class="pill pill-sm active" id="evSortDate" onclick="setEventSort('date')">🔥 Yaqindagi</div>
-            <div class="pill pill-sm" id="evSortNew" onclick="setEventSort('new')">🆕 Yangilar</div>
-            <div class="pill pill-sm" id="evSortAttending" onclick="setEventSort('attending')">⭐ Tanlanganlar</div>
+            <div class="pill pill-sm active" id="evSortDate" onclick="setEventSort('date')">🔥 Ближайшие</div>
+            <div class="pill pill-sm" id="evSortNew" onclick="setEventSort('new')">🆕 Новые</div>
+            <div class="pill pill-sm" id="evSortAttending" onclick="setEventSort('attending')">⭐ Мои</div>
+            <div class="pill pill-sm" id="evSortPast" onclick="setEventSort('past')">📦 Прошедшие</div>
           </div>
         </div>
       </div>
@@ -2551,9 +2639,33 @@
             <input type="checkbox" class="notify-switch" id="chkNotifyGrades" checked onchange="saveMoodleNotifyPrefs()" />
           </label>
           <label class="notify-toggle-row">
-            <span>🌅 Утренняя сводка (07:45)</span>
+            <span>🌅 Утренняя сводка дня</span>
             <input type="checkbox" class="notify-switch" id="chkNotifyMorning" checked onchange="saveMoodleNotifyPrefs()" />
           </label>
+          <div style="padding:10px 12px; border-radius:12px; background:var(--bg-elevated); border:1px solid var(--border); margin-bottom:8px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:7px;">
+              <span style="font-size:12px; font-weight:700;">⏰ Время сводки (Ташкент):</span>
+              <input type="time" id="inpDigestTime" value="07:45" onchange="onCustomDigestTimeChange(this.value)" style="background:var(--bg-card-solid); color:var(--text); border:1px solid var(--border-glow); border-radius:8px; padding:4px 8px; font-weight:800; font-size:13px;" />
+            </div>
+            <div class="chips-scroll" id="digestTimeQuickChips">
+              <div class="pill pill-sm" onclick="setDigestTimePreset('07:00')">07:00</div>
+              <div class="pill pill-sm" onclick="setDigestTimePreset('07:30')">07:30</div>
+              <div class="pill pill-sm active" onclick="setDigestTimePreset('07:45')">07:45</div>
+              <div class="pill pill-sm" onclick="setDigestTimePreset('08:00')">08:00</div>
+              <div class="pill pill-sm" onclick="setDigestTimePreset('08:30')">08:30</div>
+              <div class="pill pill-sm" onclick="setDigestTimePreset('09:00')">09:00</div>
+            </div>
+          </div>
+          <div style="padding:10px 12px; border-radius:12px; background:var(--bg-elevated); border:1px solid var(--border); margin-bottom:6px;">
+            <div style="font-size:12px; font-weight:700; margin-bottom:7px;">🔔 Напоминать о паре за:</div>
+            <div class="chips-scroll" id="leadTimeQuickChips">
+              <div class="pill pill-sm" data-lead="10" onclick="setLeadTimePreset(10)">10 мин</div>
+              <div class="pill pill-sm" data-lead="15" onclick="setLeadTimePreset(15)">15 мин</div>
+              <div class="pill pill-sm active" data-lead="20" onclick="setLeadTimePreset(20)">20 мин</div>
+              <div class="pill pill-sm" data-lead="30" onclick="setLeadTimePreset(30)">30 мин</div>
+              <div class="pill pill-sm" data-lead="45" onclick="setLeadTimePreset(45)">45 мин</div>
+            </div>
+          </div>
           <div id="mdlNotifySyncStatus" style="font-size:11.5px; color:#34d399; margin-top:8px;"></div>
         </div>
       </div>
@@ -2718,6 +2830,53 @@
             <div style="font-size:10.5px; color:var(--text-muted); font-weight:700;" id="profLblOverlap">Общие пары и окна</div>
             <div style="font-size:13px; font-weight:800; color:#8b5cf6; margin-top:3px;">🤝 Сравнить →</div>
           </div>
+        </div>
+      </div>
+
+      <!-- Interactive Personal Calendar right inside Profile -->
+      <div class="panel" id="profCalendarPanel">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:10px; flex-wrap:wrap;">
+          <div>
+            <div style="font-size:14.5px; font-weight:800;" id="profCalTitle">📅 Мой календарь</div>
+            <div style="font-size:11px; color:var(--text-muted);" id="profCalSub">Пары, дедлайны Moodle и мероприятия на день</div>
+          </div>
+          <div style="display:flex; gap:6px; align-items:center;">
+            <input type="date" id="profCalDatePicker" onchange="onProfileCalDatePick(this.value)" style="background:var(--bg-elevated); color:var(--text); border:1px solid var(--border); border-radius:9px; padding:4px 8px; font-size:12px; font-weight:700;" />
+          </div>
+        </div>
+        <div class="chips-scroll" id="profCalDayStrip" style="margin-bottom:10px;"></div>
+        <div id="profCalDayItems" class="list-stack"></div>
+        <div style="display:flex; gap:6px; margin-top:10px; flex-wrap:wrap;">
+          <button class="btn-sm" style="flex:1;" onclick="exportPinnedProfileIcs('daily')">📥 .ICS на день</button>
+          <button class="btn-sm" style="flex:1;" onclick="exportPinnedProfileIcs('weekly')">📆 .ICS на неделю</button>
+        </div>
+      </div>
+
+      <!-- Custom Digest Time & Class Reminder Settings right inside Profile -->
+      <div class="panel" id="profAlertsPrefsPanel">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:8px;">
+          <div style="font-size:14px; font-weight:800;" id="profAlertsTitle">🔔 Время сводки и уведомлений</div>
+          <span style="font-size:11px; color:#34d399; font-weight:700;" id="profDigestSavedBadge"></span>
+        </div>
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:8px;">
+          <span style="font-size:12px; color:var(--text-sec); font-weight:700;">🌅 Ежедневная сводка в:</span>
+          <input type="time" id="profDigestTimeInp" value="07:45" onchange="onCustomDigestTimeChange(this.value)" style="background:var(--bg-elevated); color:var(--text); border:1px solid var(--border-glow); border-radius:9px; padding:5px 9px; font-weight:800; font-size:13px;" />
+        </div>
+        <div class="chips-scroll" style="margin-bottom:8px;" id="profDigestQuickChips">
+          <div class="pill pill-sm" onclick="setDigestTimePreset('07:00')">07:00</div>
+          <div class="pill pill-sm" onclick="setDigestTimePreset('07:30')">07:30</div>
+          <div class="pill pill-sm active" onclick="setDigestTimePreset('07:45')">07:45</div>
+          <div class="pill pill-sm" onclick="setDigestTimePreset('08:00')">08:00</div>
+          <div class="pill pill-sm" onclick="setDigestTimePreset('08:30')">08:30</div>
+          <div class="pill pill-sm" onclick="setDigestTimePreset('09:00')">09:00</div>
+        </div>
+        <div style="font-size:11.5px; color:var(--text-muted); margin-bottom:6px;">⏰ Напоминание перед каждой парой:</div>
+        <div class="chips-scroll" id="profLeadQuickChips">
+          <div class="pill pill-sm" data-lead="10" onclick="setLeadTimePreset(10)">10 мин</div>
+          <div class="pill pill-sm" data-lead="15" onclick="setLeadTimePreset(15)">15 мин</div>
+          <div class="pill pill-sm active" data-lead="20" onclick="setLeadTimePreset(20)">20 мин</div>
+          <div class="pill pill-sm" data-lead="30" onclick="setLeadTimePreset(30)">30 мин</div>
+          <div class="pill pill-sm" data-lead="45" onclick="setLeadTimePreset(45)">45 мин</div>
         </div>
       </div>
 
@@ -4622,13 +4781,18 @@
             }
           } catch (_) {}
 
-          // Hydrate notification toggles from server state
+          // Hydrate notification toggles & custom digest/lead times from server state
           if (STATE.serverMoodle) {
             const setChk = (id, val) => { const el = document.getElementById(id); if (el) el.checked = val !== false; };
             setChk("chkNotifyClasses", STATE.serverMoodle.notify_classes);
             setChk("chkNotifyDeadlines", STATE.serverMoodle.notify_deadlines);
             setChk("chkNotifyGrades", STATE.serverMoodle.notify_grades);
             setChk("chkNotifyMorning", STATE.serverMoodle.morning_digest);
+            const dt = STATE.serverMoodle.morning_digest_time || localStorage.getItem("uwed_digest_time") || "07:45";
+            const lt = Number(STATE.serverMoodle.lead_time_mins) || Number(localStorage.getItem("uwed_lead_mins")) || 20;
+            STATE.digestTime = dt;
+            STATE.leadTimeMins = lt;
+            syncDigestTimeUI(dt, lt);
           }
 
           const bBadge = document.getElementById("bentoEventsBadge");
@@ -5775,17 +5939,66 @@
       try { renderHomeDashboard(); } catch (_) {}
     }
 
+    function syncDigestTimeUI(hhmm, leadMins) {
+      const dt = hhmm || STATE.digestTime || localStorage.getItem("uwed_digest_time") || "07:45";
+      const lt = Number(leadMins || STATE.leadTimeMins || localStorage.getItem("uwed_lead_mins") || 20);
+      ["inpDigestTime", "profDigestTimeInp"].forEach((id) => {
+        const el = document.getElementById(id);
+        if (el && el.value !== dt) el.value = dt;
+      });
+      ["digestTimeQuickChips", "profDigestQuickChips"].forEach((wrapId) => {
+        document.querySelectorAll(`#${wrapId} .pill`).forEach((p) => {
+          p.classList.toggle("active", p.textContent.trim() === dt);
+        });
+      });
+      ["leadTimeQuickChips", "profLeadQuickChips"].forEach((wrapId) => {
+        document.querySelectorAll(`#${wrapId} .pill`).forEach((p) => {
+          p.classList.toggle("active", Number(p.getAttribute("data-lead")) === lt);
+        });
+      });
+    }
+
+    function setDigestTimePreset(hhmm) {
+      haptic("light");
+      STATE.digestTime = hhmm;
+      localStorage.setItem("uwed_digest_time", hhmm);
+      syncDigestTimeUI(hhmm, STATE.leadTimeMins);
+      saveMoodleNotifyPrefs();
+    }
+
+    function onCustomDigestTimeChange(val) {
+      if (!val || !/^\d{2}:\d{2}$/.test(val)) return;
+      STATE.digestTime = val;
+      localStorage.setItem("uwed_digest_time", val);
+      syncDigestTimeUI(val, STATE.leadTimeMins);
+      saveMoodleNotifyPrefs();
+    }
+
+    function setLeadTimePreset(mins) {
+      haptic("light");
+      STATE.leadTimeMins = Number(mins) || 20;
+      localStorage.setItem("uwed_lead_mins", String(STATE.leadTimeMins));
+      syncDigestTimeUI(STATE.digestTime, STATE.leadTimeMins);
+      saveMoodleNotifyPrefs();
+    }
+
     async function saveMoodleNotifyPrefs() {
       haptic("light");
       const stEl = document.getElementById("mdlNotifySyncStatus");
+      const profBadge = document.getElementById("profDigestSavedBadge");
+      const digestTime = STATE.digestTime || (document.getElementById("inpDigestTime") && document.getElementById("inpDigestTime").value) || "07:45";
+      const leadMins = Number(STATE.leadTimeMins || localStorage.getItem("uwed_lead_mins") || 20);
       const prefs = {
         update_prefs: true,
-        notify_classes: Boolean(document.getElementById("chkNotifyClasses")?.checked),
-        notify_deadlines: Boolean(document.getElementById("chkNotifyDeadlines")?.checked),
-        notify_grades: Boolean(document.getElementById("chkNotifyGrades")?.checked),
-        morning_digest: Boolean(document.getElementById("chkNotifyMorning")?.checked),
+        notify_classes: Boolean(document.getElementById("chkNotifyClasses")?.checked ?? true),
+        notify_deadlines: Boolean(document.getElementById("chkNotifyDeadlines")?.checked ?? true),
+        notify_grades: Boolean(document.getElementById("chkNotifyGrades")?.checked ?? true),
+        morning_digest: Boolean(document.getElementById("chkNotifyMorning")?.checked ?? true),
+        morning_digest_time: digestTime,
+        lead_time_mins: leadMins,
       };
       if (stEl) stEl.textContent = "⏳ Сохранение...";
+      if (profBadge) profBadge.textContent = "⏳...";
       try {
         const res = await fetch("/api/telemetry?action=sync_moodle", {
           method: "POST",
@@ -5800,13 +6013,17 @@
           }),
         }).then((r) => r.json());
         if (res && res.synced) {
-          STATE.serverMoodle = { ...(STATE.serverMoodle || {}), ...prefs, connected: true };
-          if (stEl) stEl.textContent = "✅ Настройки уведомлений сохранены и синхронизированы с ботом!";
+          STATE.serverMoodle = { ...(STATE.serverMoodle || {}), ...prefs };
+          if (stEl) stEl.textContent = `✅ Сохранено! Сводка в ${digestTime}, пары за ${leadMins} мин.`;
+          if (profBadge) profBadge.textContent = `✅ ${digestTime} · за ${leadMins}м`;
+          showToast(`✅ Сводка настроена на ${digestTime}`);
         } else {
           if (stEl) stEl.textContent = "⚠️ Откройте Mini App через Telegram бота для синхронизации.";
+          if (profBadge) profBadge.textContent = `💾 Локально (${digestTime})`;
         }
       } catch (_) {
         if (stEl) stEl.textContent = "❌ Ошибка сети";
+        if (profBadge) profBadge.textContent = "";
       }
     }
 
@@ -6408,9 +6625,33 @@
       let html = `<div class="pill pill-sm ${STATE.floor === null ? "active" : ""}" onclick="selectFloor(null)">${t.allFloors}</div>`;
       for (const f of floors) {
         const act = STATE.floor === f ? "active" : "";
-        html += `<div class="pill pill-sm ${act}" onclick="selectFloor(${f})">${f}${t.floorSuffix}</div>`;
+        const fRooms = STATE.rooms.filter(
+          (r) => r.building === STATE.building && Number(r.floor) === Number(f) && (STATE.includeOffices || isTeachingRoom(r))
+        );
+        let fFree = 0;
+        for (const r of fRooms) {
+          const dayMap = getRoomDayEvents(r.id, STATE.day);
+          const rep = STATE.roomReports[r.name];
+          const isCrowdBusy = rep && (rep.status === "busy_students" || rep.status === "locked");
+          if (!dayMap[STATE.slot] && !isCrowdBusy) fFree++;
+        }
+        const badge = fRooms.length ? ` <span style="opacity:0.85;font-size:10.5px;">🟢${fFree}</span>` : "";
+        html += `<div class="pill pill-sm ${act}" onclick="selectFloor(${f})">${f}${t.floorSuffix}${badge}</div>`;
       }
       document.getElementById("floorChips").innerHTML = html;
+    }
+
+    function toggleRoomsViewMode() {
+      haptic("light");
+      STATE.roomsViewMode = STATE.roomsViewMode === "floors" ? "grid" : "floors";
+      const btn = document.getElementById("btnRoomsViewMode");
+      const isRu = STATE.lang === "ru";
+      if (btn) {
+        btn.textContent = STATE.roomsViewMode === "floors"
+          ? (isRu ? "🗂 Карточки" : "🗂 Kartalar")
+          : (isRu ? "🏢 По этажам" : "🏢 Qavatlar");
+      }
+      renderRoomsTab();
     }
 
     function selectBuilding(b) {
@@ -6645,10 +6886,60 @@
       }
 
       const grid = document.getElementById("roomsGrid");
+      if (STATE.building !== "ALL") {
+        try { renderFloorPills(); } catch (_) {}
+      }
       if (items.length === 0) {
         grid.innerHTML = `<div class="empty-msg" style="grid-column: 1 / -1;">${t.noRoomsMatch}</div>`;
         return;
       }
+
+      // Floor-grouped compact view ("🏢 По этажам")
+      if (STATE.roomsViewMode === "floors") {
+        const groups = new Map();
+        for (const it of items) {
+          const bld = it.r.building || "A";
+          const fl = it.r.floor || 1;
+          const gKey = `${bld}-${fl}`;
+          if (!groups.has(gKey)) groups.set(gKey, { bld, fl, free: 0, list: [] });
+          const g = groups.get(gKey);
+          if (it.isFree) g.free++;
+          g.list.push(it);
+        }
+        const sortedGroups = Array.from(groups.values()).sort((a, b) => a.bld.localeCompare(b.bld) || a.fl - b.fl);
+        grid.innerHTML = sortedGroups
+          .map((g) => {
+            const flLbl = isRu ? `Блок ${g.bld} · ${g.fl}-й этаж` : `${g.bld}-blok · ${g.fl}-qavat`;
+            const chips = g.list
+              .map(({ r, isFree, isBest }) => {
+                const cls = !isFree ? "busy" : isBest ? "best" : "";
+                const prefix = !isFree ? "🔴 " : isBest ? "🔥 " : "🟢 ";
+                return `<span class="floor-room-chip ${cls}" onclick="openRoomModal('${r.id}')">${prefix}${r.name}</span>`;
+              })
+              .join("");
+            return `
+              <div class="floor-group-card">
+                <div class="floor-group-head">
+                  <span>🏢 ${flLbl}</span>
+                  <span style="color:#34d399; font-size:11.5px;">🟢 ${g.free} / ${g.list.length}</span>
+                </div>
+                <div class="floor-room-chips">${chips}</div>
+              </div>`;
+          })
+          .join("");
+        return;
+      }
+
+      const buildDayDotsHtml = (roomId) => {
+        const dm = getRoomDayEvents(roomId, STATE.day);
+        let h = '<div class="room-day-dots" title="1–8 пара">';
+        for (let s = 1; s <= 8; s++) {
+          const busyCls = dm[s] ? " busy" : "";
+          const curCls = Number(STATE.slot) === s ? " cur" : "";
+          h += `<span class="room-dot${busyCls}${curCls}"></span>`;
+        }
+        return h + "</div>";
+      };
 
       grid.innerHTML = items
         .map(({ r, isFree, until, ev, isBest }) => {
@@ -6656,6 +6947,7 @@
           const flText = r.floor ? `${r.floor}${t.floorShort}` : "";
           const specs = [tLabel, `${r.capacity || "?"} ${t.seats}`, flText].filter(Boolean).join(" · ");
           const crowdHtml = formatCrowdTagHtml(r.name);
+          const dotsHtml = buildDayDotsHtml(r.id);
 
           if (isFree) {
             const bestStyle = isBest ? "box-shadow: 0 6px 20px -6px rgba(16,185,129,0.28); border-color: rgba(16,185,129,0.35);" : "";
@@ -6671,6 +6963,7 @@
                 </div>
                 <div>
                   <div class="room-foot free-note" style="font-size:12.5px;">🟢 ${until}</div>
+                  ${dotsHtml}
                   ${crowdHtml}
                 </div>
               </div>
@@ -6689,6 +6982,7 @@
                 </div>
                 <div>
                   <div class="room-foot"><b>${subj}</b>${instr ? " · " + instr : ""}</div>
+                  ${dotsHtml}
                   ${crowdHtml}
                 </div>
               </div>
@@ -7624,8 +7918,8 @@
       haptic("light");
       STATE.eventSort = mode;
       STATE.eventsPage = 1;
-      ["date", "new", "attending"].forEach((k) => {
-        const id = { date: "evSortDate", new: "evSortNew", attending: "evSortAttending" }[k];
+      ["date", "new", "attending", "past"].forEach((k) => {
+        const id = { date: "evSortDate", new: "evSortNew", attending: "evSortAttending", past: "evSortPast" }[k];
         const el = document.getElementById(id);
         if (el) el.classList.toggle("active", k === mode);
       });
@@ -7675,27 +7969,55 @@
       }
 
       const attendingIds = new Set((STATE.attendingEvents || []).map((x) => x.id));
+      const todayIso = getTashkentNow().toISOString().slice(0, 10);
+      const isEventPast = (ev) => {
+        const dStr = normalizeDateStr(ev && ev.date);
+        return Boolean(dStr && /^\d{4}-\d{2}-\d{2}$/.test(dStr) && dStr < todayIso);
+      };
 
-      let list = (STATE.campusEvents || []).filter((ev) => {
+      const baseFiltered = (STATE.campusEvents || []).filter((ev) => {
         const catOk = STATE.eventCat === "all" || ev.category === STATE.eventCat;
         const chClean = String(ev.channel_handle || ev.channel_name || "")
           .replace(/^@/, "")
           .trim()
           .toLowerCase();
         const chOk = STATE.eventChannel === "all" || chClean === STATE.eventChannel;
-        const isAttending = attendingIds.has(ev.id);
-        if (STATE.eventSort === "attending" && !isAttending) return false;
         return catOk && chOk;
+      });
+
+      const pastCount = baseFiltered.filter(isEventPast).length;
+      const pastChip = document.getElementById("evSortPast");
+      if (pastChip) {
+        const isRu = STATE.lang === "ru";
+        pastChip.textContent = isRu ? `📦 Прошедшие (${pastCount})` : `📦 Õtganlar (${pastCount})`;
+      }
+
+      let list = baseFiltered.filter((ev) => {
+        if (STATE.eventSort === "attending") return attendingIds.has(ev.id);
+        if (STATE.eventSort === "past") return isEventPast(ev);
+        // Default ("date" & "new"): hide expired/past events so only upcoming & current show at top!
+        return !isEventPast(ev);
       });
 
       if (STATE.eventSort === "date") {
         list.sort((a, b) => {
-          const da = (a.date || "9999") + " " + (a.time || "00:00");
-          const db = (b.date || "9999") + " " + (b.time || "00:00");
+          const da = (normalizeDateStr(a.date) || "9999-12-31") + " " + (a.time || "23:59");
+          const db = (normalizeDateStr(b.date) || "9999-12-31") + " " + (b.time || "23:59");
           return da.localeCompare(db);
         });
+      } else if (STATE.eventSort === "past") {
+        // Most recently passed first
+        list.sort((a, b) => {
+          const da = (normalizeDateStr(a.date) || "0000-01-01") + " " + (a.time || "00:00");
+          const db = (normalizeDateStr(b.date) || "0000-01-01") + " " + (b.time || "00:00");
+          return db.localeCompare(da);
+        });
       } else if (STATE.eventSort === "new") {
-        list.sort((a, b) => Number(b.id || 0) - Number(a.id || 0));
+        list.sort((a, b) => {
+          const idDiff = Number(String(b.id || "").replace(/\D/g, "") || 0) - Number(String(a.id || "").replace(/\D/g, "") || 0);
+          if (idDiff !== 0) return idDiff;
+          return (normalizeDateStr(b.date) || "").localeCompare(normalizeDateStr(a.date) || "");
+        });
       }
 
       const hasPinned = Boolean(localStorage.getItem("uwed_pinned_profile"));
@@ -7707,7 +8029,14 @@
         : "";
 
       if (!list.length) {
-        box.innerHTML = `${pinPromptHtml}<div class="empty-msg">${t.evEmpty}</div>`;
+        const isRu = STATE.lang === "ru";
+        const pastBtn = STATE.eventSort !== "past" && pastCount > 0
+          ? `<div style="margin-top:10px;"><button class="btn-sm" onclick="setEventSort('past')">📦 ${isRu ? `Показать прошедшие (${pastCount})` : `Õtganlarni kõriş (${pastCount})`}</button></div>`
+          : "";
+        const emptyTxt = STATE.eventSort === "date" || STATE.eventSort === "new"
+          ? (isRu ? "Актуальных предстоящих мероприятий пока нет." : "Hozirça kutilayotgan yangi tadbirlar yõq.")
+          : t.evEmpty;
+        box.innerHTML = `${pinPromptHtml}<div class="empty-msg">${emptyTxt}${pastBtn}</div>`;
         if (pBox) pBox.style.display = "none";
         return;
       }
@@ -8645,6 +8974,164 @@
             )
             .join("");
         }
+      }
+
+      try { syncDigestTimeUI(); } catch (_) {}
+      try { renderProfileCalendar(); } catch (_) {}
+    }
+
+    let _profCalSlotCache = {};
+    function openProfCalClass(key) {
+      const p = _profCalSlotCache[key];
+      if (!p) return;
+      openClassDetailModal(p.ev, p.slot, p.ev.room_number || p.ev.r || "");
+    }
+
+    function selectProfileCalDay(d) {
+      haptic("light");
+      STATE.profCalDay = d;
+      const base = STATE.profCalDate || getTashkentNow().toISOString().slice(0, 10);
+      STATE.profCalDate = computeDateForWeekday(base, d);
+      renderProfileCalendar();
+    }
+
+    function onProfileCalDatePick(dateStr) {
+      if (!dateStr) return;
+      STATE.profCalDate = dateStr;
+      const dt = new Date(`${dateStr}T12:00:00Z`);
+      const wd = dt.getUTCDay();
+      STATE.profCalDay = wd === 0 ? 1 : wd;
+      renderProfileCalendar();
+    }
+
+    async function renderProfileCalendar() {
+      const strip = document.getElementById("profCalDayStrip");
+      const out = document.getElementById("profCalDayItems");
+      const picker = document.getElementById("profCalDatePicker");
+      if (!strip || !out) return;
+
+      const t = T();
+      const isRu = STATE.lang === "ru";
+      const cur = detectCurrentSlotAndDay();
+      if (!STATE.profCalDay) STATE.profCalDay = cur.day || 1;
+      if (!STATE.profCalDate) STATE.profCalDate = computeDateForWeekday(getTashkentNow().toISOString().slice(0, 10), STATE.profCalDay);
+      if (picker && picker.value !== STATE.profCalDate) picker.value = STATE.profCalDate;
+
+      // Render 6-day Mon–Sat strip with actual date numbers
+      let stripHtml = "";
+      for (let d = 1; d <= 6; d++) {
+        const dIso = computeDateForWeekday(STATE.profCalDate, d);
+        const dayNum = dIso.slice(8, 10);
+        const act = Number(STATE.profCalDay) === d ? "active" : "";
+        stripHtml += `<div class="prof-cal-day-pill ${act}" onclick="selectProfileCalDay(${d})"><span>${t.daysShort[d]}</span><span class="cal-num">${dayNum}</span></div>`;
+      }
+      strip.innerHTML = stripHtml;
+
+      const rawPin = localStorage.getItem("uwed_pinned_profile");
+      if (rawPin && (!Array.isArray(STATE.pinnedScheduleEvents) || !STATE.pinnedScheduleEvents.length)) {
+        out.innerHTML = `<div class="empty-msg" style="padding:14px;">⏳ ${isRu ? "Загружаем расписание..." : "Jadval yuklanmoqda..."}</div>`;
+        await loadPinnedScheduleEvents();
+      }
+
+      _profCalSlotCache = {};
+      const blocks = [];
+      const dayClasses = (STATE.pinnedScheduleEvents || [])
+        .filter((e) => Number(e.week_day || e.d) === Number(STATE.profCalDay))
+        .sort((a, b) => Number(a.slot_id || a.s) - Number(b.slot_id || b.s));
+
+      for (const ev of dayClasses) {
+        const sid = Number(ev.slot_id || ev.s);
+        const slotObj = STATE.slots.find((s) => Number(s.id) === sid) || { id: sid, start_time: "", end_time: "" };
+        const key = `pc_${sid}_${blocks.length}`;
+        _profCalSlotCache[key] = { ev, slot: slotObj };
+        const rm = ev.room_number || ev.r || "—";
+        const instr = toNewUz(ev.instructor || ev.i || "");
+        blocks.push(`
+          <div class="slot-row busy" onclick="openProfCalClass('${key}')" style="margin-bottom:6px;">
+            <div class="slot-time">${t.pairLabel(sid)}<span>${slotObj.start_time}–${slotObj.end_time}</span></div>
+            <div class="slot-info">
+              <div class="slot-subj">📚 ${toNewUz(ev.title || ev.t || ev.lesson_name || "—")}</div>
+              <div class="slot-meta">🚪 ${rm}${instr ? ` · ${instr}` : ""}</div>
+            </div>
+          </div>`);
+      }
+
+      // Attending campus events on this selected date
+      const selIso = normalizeDateStr(STATE.profCalDate);
+      const dayEvs = (STATE.attendingEvents || []).filter((e) => e && normalizeDateStr(e.date) === selIso);
+      for (const cev of dayEvs) {
+        blocks.push(`
+          <div class="slot-row free" style="border-left:4px solid #38bdf8; background:rgba(56,189,248,0.08); margin-bottom:6px;">
+            <div class="slot-time" style="color:#38bdf8;">🔔 EVENT<span>${cev.time || "14:00"}</span></div>
+            <div class="slot-info">
+              <div class="slot-subj" style="color:#38bdf8;">📌 ${toNewUz(cev.title)}</div>
+              <div class="slot-meta">📍 ${toNewUz(cev.location || "UWED")} · 📡 ${cev.channel_name || "@uwed_official"}</div>
+            </div>
+          </div>`);
+      }
+
+      // Moodle deadlines falling on this selected date
+      const mdl = getVerifiedMoodleIdentity();
+      if (mdl && Array.isArray(mdl.deadlines)) {
+        for (const dl of mdl.deadlines) {
+          if (!dl || !dl.time) continue;
+          const dlIso = new Date((dl.time + 5 * 3600) * 1000).toISOString().slice(0, 10);
+          if (dlIso === selIso) {
+            const dlHm = new Date((dl.time + 5 * 3600) * 1000).toISOString().slice(11, 16);
+            blocks.push(`
+              <div class="slot-row" style="border-left:4px solid #f59e0b; background:rgba(245,158,11,0.1); margin-bottom:6px;">
+                <div class="slot-time" style="color:#fbbf24;">⏳ MOODLE<span>${dlHm}</span></div>
+                <div class="slot-info">
+                  <div class="slot-subj" style="color:#fbbf24;">📝 ${dl.name || "Задание"}</div>
+                  <div class="slot-meta">📚 ${dl.course || "Moodle"}</div>
+                </div>
+              </div>`);
+          }
+        }
+      }
+
+      if (!blocks.length) {
+        if (!rawPin) {
+          out.innerHTML = `<div class="empty-msg" style="padding:14px;">${isRu ? "Закрепите своё расписание, чтобы видеть пары в календаре." : "Kalendarda darslarni kõriş uçun jadvaliꞑizni biriktiring."}<div style="margin-top:8px;"><button class="btn-sm" onclick="switchTab('students')">📌 ${isRu ? "Выбрать группу / студента" : "Guruh / talabani tanlaş"}</button></div></div>`;
+        } else {
+          out.innerHTML = `<div class="empty-msg" style="padding:14px;">🎉 ${isRu ? `На ${selIso} пар, дедлайнов и событий нет!` : `${selIso} kuni dars va tadbirlar yõq!`}</div>`;
+        }
+      } else {
+        out.innerHTML = blocks.join("");
+      }
+    }
+
+    async function exportPinnedProfileIcs(period) {
+      haptic("medium");
+      const rawPin = localStorage.getItem("uwed_pinned_profile");
+      if (!rawPin) {
+        showToast(STATE.lang === "ru" ? "Сначала закрепите расписание!" : "Avval jadvaliꞑizni biriktiring!");
+        switchTab("students");
+        return;
+      }
+      const p = JSON.parse(rawPin);
+      if (!Array.isArray(STATE.pinnedScheduleEvents) || !STATE.pinnedScheduleEvents.length) {
+        await loadPinnedScheduleEvents();
+      }
+      const res = await fetch("/api/telemetry", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(tg && tg.initData ? { "X-Tg-Init-Data": tg.initData } : {}),
+        },
+        body: JSON.stringify({
+          action: "send_schedule_to_bot",
+          user: getCurrentUser(),
+          initData: tg && tg.initData ? tg.initData : "",
+          period,
+          title: p.title || "UWED Schedule",
+          date: STATE.profCalDate || getTashkentNow().toISOString().slice(0, 10),
+          events: STATE.pinnedScheduleEvents || [],
+          lang: STATE.lang,
+        }),
+      }).then((r) => r.json()).catch(() => null);
+      if (res && res.success) {
+        showToast(res.empty ? "На выбранный период занятий не найдено." : "✅ Файл .ics отправлен в Telegram бот!");
       }
     }
 

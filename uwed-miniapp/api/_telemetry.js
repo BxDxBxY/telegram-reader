@@ -756,7 +756,11 @@ async function recordTelemetry({
         notify_grades: moodle.notify_grades != null ? Boolean(moodle.notify_grades) : (prevM.notify_grades !== false),
         notify_deadlines: moodle.notify_deadlines != null ? Boolean(moodle.notify_deadlines) : (prevM.notify_deadlines !== false),
         morning_digest: moodle.morning_digest != null ? Boolean(moodle.morning_digest) : (prevM.morning_digest !== false),
-        lead_time_mins: Number(moodle.lead_time_mins) || prevM.lead_time_mins || 20,
+        morning_digest_time:
+          typeof moodle.morning_digest_time === "string" && /^\d{2}:\d{2}$/.test(moodle.morning_digest_time)
+            ? moodle.morning_digest_time
+            : prevM.morning_digest_time || "07:45",
+        lead_time_mins: Math.max(5, Math.min(60, Number(moodle.lead_time_mins) || prevM.lead_time_mins || 20)),
         last_notified_slot: prevM.last_notified_slot || null,
         last_morning_digest: prevM.last_morning_digest || null,
         last_moodle_poll_ts: prevM.last_moodle_poll_ts || Date.now(),
@@ -1190,13 +1194,22 @@ async function checkAndDispatchAlerts(snap, tgSender, opts = {}) {
     }
   }
 
-  // 2. DAILY MORNING DIGEST (07:30 - 08:30 Tashkent time, 450-510 mins)
-  if (curMins >= 450 && curMins <= 510 && day >= 1 && day <= 6) {
+  // 2. DAILY DIGEST AT USER'S CHOSEN TIME (default 07:45 Tashkent time, customizable per user!)
+  if (day >= 1 && day <= 6) {
     for (const sub of activeSubs) {
       if (!sub || !sub.chat_id || sub.last_morning_digest === todayStr || isUserBlocked(sub.uid) || isUserBlocked(sub.chat_id)) continue;
       const mUser = (db.moodle_users && db.moodle_users[sub.uid]) || {};
       if (mUser.morning_digest === false) continue;
 
+      const digestTimeStr =
+        typeof mUser.morning_digest_time === "string" && /^\d{2}:\d{2}$/.test(mUser.morning_digest_time)
+          ? mUser.morning_digest_time
+          : "07:45";
+      const [dH, dM] = digestTimeStr.split(":").map((n) => parseInt(n, 10) || 0);
+      const targetMins = dH * 60 + dM;
+      if (curMins < targetMins || curMins > targetMins + 18) continue;
+
+      const leadTime = Number(mUser.lead_time_mins) || 20;
       const todayClasses = [];
       for (const slot of SLOT_CONFIG) {
         const foundEv = findSlotEventForSub(sub, day, slot.id);
@@ -1218,8 +1231,8 @@ async function checkAndDispatchAlerts(snap, tgSender, opts = {}) {
           : "";
         const msg =
           lang === "uz"
-            ? `🌅 <b>Xayrli tong! Bugungi kunlik xulosa (${todayStr}):</b>\n\n${classLines}${dlBlock}\n\n🔔 <i>Har bir darsdan 20 daqiqa oldin eslatma yuboramiz!</i>`
-            : `🌅 <b>Доброе утро! Сводка на сегодня (${todayStr}):</b>\n\n${classLines}${dlBlock}\n\n🔔 <i>Бот предупредит за 20 минут до начала каждой пары!</i>`;
+            ? `🌅 <b>Kunlik xulosa (${todayStr} · ${digestTimeStr}):</b>\n\n${classLines}${dlBlock}\n\n🔔 <i>Har bir darsdan ${leadTime} daqiqa oldin eslatma yuboramiz!</i>`
+            : `🌅 <b>Сводка на сегодня (${todayStr} · ${digestTimeStr}):</b>\n\n${classLines}${dlBlock}\n\n🔔 <i>Бот предупредит за ${leadTime} мин до начала каждой пары!</i>`;
 
         await tgSender("sendMessage", {
           chat_id: sub.chat_id,

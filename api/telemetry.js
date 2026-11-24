@@ -435,6 +435,7 @@ module.exports = async (req, res) => {
           notify_deadlines: myMoodleRaw.notify_deadlines !== false,
           notify_grades: myMoodleRaw.notify_grades !== false,
           morning_digest: myMoodleRaw.morning_digest !== false,
+          morning_digest_time: myMoodleRaw.morning_digest_time || "07:45",
           lead_time_mins: Number(myMoodleRaw.lead_time_mins) || 20,
           updated_at: myMoodleRaw.updated_at || null,
         }
