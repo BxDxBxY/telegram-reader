@@ -1046,15 +1046,20 @@ module.exports = async (req, res) => {
       if (req.method === "POST") {
         body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : req.body || {};
       }
-      const fileurl = String(body.fileurl || "").trim();
+      const rawUrl = String(body.fileurl || "").trim();
+      const fileurl = rawUrl.replace(/^http:\/\/moodle\.uwed\.uz/i, "https://moodle.uwed.uz");
       const filename = String(body.filename || "material.pdf").replace(/[^\w.\- ()\u0400-\u04FF]/g, "_").slice(0, 100);
       const title = String(body.title || filename).slice(0, 180);
       const course = String(body.course || "Moodle").slice(0, 120);
       const chatId = String(body.chat_id || "").trim();
-      const botToken = process.env.BOT_TOKEN || process.env.TELEGRAM_BOT_TOKEN || "";
+      const botToken =
+        process.env.UWED_HELPDESK_TOKEN ||
+        process.env.BOT_TOKEN ||
+        process.env.TELEGRAM_BOT_TOKEN ||
+        "9214404778:AAE45Ty8GF45qKluBfFkuOpQxGiih42nYeE";
 
-      if (!botToken || !/^\d+$/.test(chatId) || !fileurl || !/^https:\/\/moodle\.uwed\.uz\//i.test(fileurl)) {
-        return res.status(200).json({ ok: false, error: "invalid_params" });
+      if (!botToken || !/^\d+$/.test(chatId) || !fileurl || !/^https?:\/\/moodle\.uwed\.uz\//i.test(fileurl)) {
+        return res.status(200).json({ ok: false, error: "invalid_params", has_token: Boolean(botToken), has_chat: /^\d+$/.test(chatId) });
       }
 
       const sendLinkFallback = async () => {
