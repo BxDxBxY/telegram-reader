@@ -2742,6 +2742,31 @@
         <div id="hemisStatusMsg" style="margin-top:8px; font-size:12px; color:#38bdf8; text-align:center;"></div>
       </div>
 
+      <!-- HEMIS Connected Account Card (Persistent Session — no re-login!) -->
+      <div class="panel" id="hemisAccountCard" style="display:none; margin-bottom:10px; border-color:rgba(16,185,129,0.38);">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px;">
+          <div style="min-width:0; flex:1;">
+            <div style="font-size:14px; font-weight:800; color:var(--text);" id="hemisAccName">—</div>
+            <div style="font-size:11.5px; color:var(--text-sec); margin-top:2px;" id="hemisAccMeta">—</div>
+          </div>
+          <div style="display:flex; gap:6px; flex-shrink:0;">
+            <button class="btn-sm" id="btnHemisRefresh" onclick="refreshHemisSession()" style="background:rgba(2,132,199,0.16); border-color:rgba(2,132,199,0.38); color:#0284c7; font-weight:800;">🔄</button>
+            <button class="btn-sm" onclick="logoutHemis()" style="color:#e11d48; border-color:rgba(225,29,72,0.32);">Выйти</button>
+          </div>
+        </div>
+        <div id="hemisRefreshStatus" style="font-size:11px; color:var(--text-muted); margin-top:6px;"></div>
+      </div>
+
+      <!-- HEMIS 4-Section Sub-Navigation -->
+      <div class="chips-scroll" id="hemisSubNav" style="margin-bottom:10px;">
+        <button class="pill pill-sm active" id="hemisTabGpa" onclick="switchHemisSubTab('gpa')">📊 GPA и оценки</button>
+        <button class="pill pill-sm" id="hemisTabNb" onclick="switchHemisSubTab('nb')">📉 Посещаемость (NB)</button>
+        <button class="pill pill-sm" id="hemisTabExams" onclick="switchHemisSubTab('exams')">📝 Экзамены</button>
+        <button class="pill pill-sm" id="hemisTabDocs" onclick="switchHemisSubTab('docs')">💳 Контракт и Документы</button>
+      </div>
+
+      <!-- SUB-PANE 1: GPA & SUBJECTS -->
+      <div id="hemisPaneGpa">
       <div class="gpa-ring-card">
         <div style="flex:1; min-width:0;">
           <div style="font-size:11.5px; font-weight:700; text-transform:uppercase; color:#6ee7b7;" id="gpaMainLbl">Rasmiy JIDU GPA ko'rsatkichi</div>
@@ -2782,6 +2807,16 @@
         90–100 ball → <b>5.0 (A'lo)</b> · 70–89 ball → <b>4.0 (Yaxshi)</b> · 60–69 ball → <b>3.0 (Qoniqarli)</b> · &lt;60 ball → <b>0 (Akademik qarz)</b>.<br>
         GPA = (Kredit × Baho) yig'indisi / Jami kreditlar.
       </div>
+      </div><!-- /hemisPaneGpa -->
+
+      <!-- SUB-PANE 2: ATTENDANCE (NB) -->
+      <div id="hemisPaneNb" style="display:none;"></div>
+
+      <!-- SUB-PANE 3: EXAMS & MIDTERMS -->
+      <div id="hemisPaneExams" style="display:none;"></div>
+
+      <!-- SUB-PANE 4: CONTRACT & OFFICIAL DOCUMENTS -->
+      <div id="hemisPaneDocs" style="display:none;"></div>
     </section>
 
     <!-- 11. GRANTS & OPPORTUNITIES VIEW -->
@@ -5391,6 +5426,42 @@
       }
     });
 
+    function normSearchStr(s) {
+      const cyr = {
+        а: "a", б: "b", в: "v", г: "g", д: "d", е: "e", ё: "yo", ж: "j", з: "z", и: "i", й: "y",
+        к: "k", л: "l", м: "m", н: "n", о: "o", п: "p", р: "r", с: "s", т: "t", у: "u", ф: "f",
+        х: "x", ц: "ts", ч: "ch", ш: "sh", щ: "sh", ъ: "", ы: "i", ь: "", э: "e", ю: "yu", я: "ya",
+        ў: "o", қ: "q", ғ: "g", ҳ: "h",
+      };
+      return String(s || "")
+        .toLowerCase()
+        .replace(/[ʻ’'`‘]/g, "")
+        .split("")
+        .map((ch) => (cyr[ch] !== undefined ? cyr[ch] : ch))
+        .join("")
+        .replace(/[^a-z0-9\s]+/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+    }
+
+    function smartPersonMatch(fullName, query) {
+      const qNorm = normSearchStr(query);
+      if (!qNorm) return true;
+      const nNorm = normSearchStr(fullName);
+      if (!nNorm) return false;
+      if (nNorm.includes(qNorm)) return true;
+      const qTokens = qNorm.split(" ").filter(Boolean);
+      const nTokens = nNorm.split(" ").filter(Boolean);
+      return qTokens.every((qt) =>
+        nTokens.some((nt) => {
+          if (nt.includes(qt)) return true;
+          if (nt.length <= 2 && qt.startsWith(nt)) return true;
+          if (qt.length === 1 && nt.startsWith(qt)) return true;
+          return false;
+        })
+      );
+    }
+
     function clearHeroGlobalSearch() {
       const inp = document.getElementById("heroGlobalSearchInput");
       const btn = document.getElementById("heroSearchClearBtn");
@@ -5423,9 +5494,9 @@
           if (hits.length >= 4) break;
         }
       }
-      // 2. Teachers
+      // 2. Teachers (supports First+Last, Last+First, initials, Cyrillic/Latin)
       for (const tc of STATE.teachers) {
-        if ((tc.full_name || "").toLowerCase().includes(q)) {
+        if (smartPersonMatch(tc.full_name || "", rawQ)) {
           hits.push({
             icon: "👨‍🏫",
             title: toNewUz(tc.full_name),
@@ -6443,6 +6514,35 @@
         : `<div class="empty-msg">${t.mdlNoCourses || "Kurslar topilmadi."}</div>`;
     }
 
+    function classifyMoodleModule(m, secName = "") {
+      const txt = `${m.name || ""} ${secName || ""}`.toLowerCase();
+      const mod = String(m.modname || "").toLowerCase();
+      if (mod === "assign" || mod === "quiz" || /задан|assign|quiz|тест|test|midterm|nazorat|контрол|эссе|essay|exam|экзам|imtihon/.test(txt)) {
+        return "assign";
+      }
+      if (/семин|semin|практ|pract|amaliy|лаб|lab|workshop|case|кейс|tutorial/.test(txt)) {
+        return "seminar";
+      }
+      if (/лекц|lect|ma'ruza|maruza|маъруза|slide|слайд|презент|present|ppt|syllabus|силлабус|конспект/.test(txt)) {
+        return "lecture";
+      }
+      return "other";
+    }
+
+    function extractSectionOrderNum(secName) {
+      const m = String(secName || "").match(/(\d+)/);
+      return m ? parseInt(m[1], 10) : 9999;
+    }
+
+    function sortMoodleSections(sections) {
+      return [...(sections || [])].sort((a, b) => {
+        const na = extractSectionOrderNum(a.name);
+        const nb = extractSectionOrderNum(b.name);
+        if (na !== nb) return na - nb;
+        return Number(a.id || 0) - Number(b.id || 0);
+      });
+    }
+
     async function toggleMoodleCourseContents(courseId) {
       haptic("light");
       const bodyEl = document.getElementById(`mdlCourseBody_${courseId}`);
@@ -6478,13 +6578,23 @@
         bodyEl.dataset.loaded = "1";
         const iconForMod = (m) =>
           m === "assign" ? "📝" : m === "quiz" ? "✅" : m === "resource" ? "📄" : m === "folder" ? "📁" : m === "url" ? "🔗" : m === "forum" ? "💬" : "📌";
-        bodyEl.innerHTML = res.sections
+        const catBadge = (cat) => {
+          if (cat === "lecture") return `<span style="font-size:10px;font-weight:800;padding:2px 6px;border-radius:5px;background:rgba(2,132,199,0.16);color:#0284c7;">📖 ${isRu ? "Лекция" : "Ma'ruza"}</span>`;
+          if (cat === "seminar") return `<span style="font-size:10px;font-weight:800;padding:2px 6px;border-radius:5px;background:rgba(16,185,129,0.16);color:#059669;">🧪 ${isRu ? "Семинар" : "Seminar"}</span>`;
+          if (cat === "assign") return `<span style="font-size:10px;font-weight:800;padding:2px 6px;border-radius:5px;background:rgba(245,158,11,0.18);color:#d97706;">📝 ${isRu ? "Задание" : "Topshiriq"}</span>`;
+          return `<span style="font-size:10px;font-weight:800;padding:2px 6px;border-radius:5px;background:rgba(148,163,184,0.18);color:var(--text-muted);">📎 ${isRu ? "Материал" : "Material"}</span>`;
+        };
+        const sortedSections = sortMoodleSections(res.sections);
+        const catRank = { lecture: 1, seminar: 2, assign: 3, other: 4 };
+        bodyEl.innerHTML = sortedSections
           .map(
             (sec) => `
-            <div style="margin-bottom:8px;">
-              <div style="font-size:11.5px;font-weight:800;color:#38bdf8;margin-bottom:4px;">${sec.name}</div>
-              ${(sec.modules || [])
+            <div style="margin-bottom:10px;">
+              <div style="font-size:11.5px;font-weight:800;color:#0284c7;margin-bottom:4px;">📂 ${sec.name}</div>
+              ${[...(sec.modules || [])]
+                .sort((a, b) => catRank[classifyMoodleModule(a, sec.name)] - catRank[classifyMoodleModule(b, sec.name)])
                 .map((m) => {
+                  const cat = classifyMoodleModule(m, sec.name);
                   const filesHtml = (m.files || [])
                     .map(
                       (f) => {
@@ -6492,17 +6602,20 @@
                         const safeFn = String(f.filename || "file").replace(/'/g, "\\'");
                         const safeTitle = String(m.name || f.filename || "Материал").replace(/'/g, "\\'");
                         return `<div style="display:inline-flex;align-items:center;gap:4px;margin-top:4px;margin-right:4px;">` +
-                          `<a href="${f.fileurl}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:#34d399;text-decoration:none;background:rgba(16,185,129,0.12);padding:3px 7px;border-radius:6px;">⬇️ ${f.filename}</a>` +
-                          `<button onclick="sendMoodleFileToBot('${safeUrl}','${safeFn}','${safeTitle}','Moodle')" style="background:rgba(56,189,248,0.16);border:1px solid rgba(56,189,248,0.35);color:#38bdf8;font-size:10.5px;font-weight:700;padding:3px 7px;border-radius:6px;cursor:pointer;">✈️ ${isRu ? "В бот" : "Botga"}</button>` +
+                          `<a href="${f.fileurl}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:#059669;text-decoration:none;background:rgba(16,185,129,0.14);padding:3px 7px;border-radius:6px;font-weight:700;">⬇️ ${f.filename}</a>` +
+                          `<button onclick="sendMoodleFileToBot('${safeUrl}','${safeFn}','${safeTitle}','Moodle')" style="background:rgba(2,132,199,0.14);border:1px solid rgba(2,132,199,0.35);color:#0284c7;font-size:10.5px;font-weight:700;padding:3px 7px;border-radius:6px;cursor:pointer;">✈️ ${isRu ? "В бот" : "Botga"}</button>` +
                           `</div>`;
                       }
                     )
                     .join("");
                   return `
-                    <div style="padding:6px 8px;border-radius:8px;background:var(--bg-elevated);margin-bottom:4px;">
+                    <div style="padding:7px 9px;border-radius:8px;background:var(--bg-elevated);margin-bottom:5px;">
                       <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;">
                         <span style="font-size:12px;font-weight:600;color:var(--text);">${iconForMod(m.modname)} ${m.name}</span>
-                        ${m.url ? `<a href="${m.url}" target="_blank" rel="noopener" style="font-size:11px;font-weight:700;color:#38bdf8;text-decoration:none;flex-shrink:0;">Открыть ↗</a>` : ""}
+                        <div style="display:flex;align-items:center;gap:5px;flex-shrink:0;">
+                          ${catBadge(cat)}
+                          ${m.url ? `<a href="${m.url}" target="_blank" rel="noopener" style="font-size:11px;font-weight:700;color:#0284c7;text-decoration:none;">↗</a>` : ""}
+                        </div>
                       </div>
                       ${filesHtml ? `<div>${filesHtml}</div>` : ""}
                     </div>`;
@@ -6735,6 +6848,7 @@
         })
         .join("");
       recalcGpaSummary();
+      try { renderHemisCabinetPanes(); } catch (_) {}
     }
 
     function updateGpaRow(idx, field, val) {
@@ -6742,6 +6856,7 @@
       gpaSubjects[idx][field] = Number(val);
       saveGpaState();
       recalcGpaSummary();
+      try { renderHemisCabinetPanes(); } catch (_) {}
     }
 
     function recalcGpaSummary() {
@@ -6955,38 +7070,10 @@
         }).then((r) => r.json());
         document.getElementById("hemisPassInp").value = "";
         if (res && res.ok && Array.isArray(res.subjects) && res.subjects.length) {
-          gpaSubjects = res.subjects;
-          localStorage.setItem("uwed_gpa_source", "hemis");
-          const pLabel = [res.education_year, res.semester_name || (res.semester ? `${res.semester}-semestr` : "")].filter(Boolean).join(" · ") || "HEMIS";
-          localStorage.setItem("uwed_gpa_period", pLabel);
-          if (res.gpa != null) localStorage.setItem("uwed_hemis_official_gpa", String(res.gpa));
-          if (Array.isArray(res.gpa_list) && res.gpa_list.length) {
-            localStorage.setItem("uwed_hemis_gpa_history", JSON.stringify(res.gpa_list));
-          }
-          if (res.token) localStorage.setItem("uwed_hemis_token", res.token);
-          if (Array.isArray(res.semesters) && res.semesters.length) {
-            localStorage.setItem("uwed_hemis_semesters", JSON.stringify(res.semesters));
-          }
-          if (res.semester) localStorage.setItem("uwed_hemis_cur_sem", String(res.semester));
-          if (res.me) {
-            localStorage.setItem(
-              "uwed_hemis_profile",
-              JSON.stringify({
-                ...res.me,
-                attendance: res.attendance || null,
-                exams: Array.isArray(res.exams) ? res.exams : [],
-                contract: res.contract || null,
-              })
-            );
-            // Automatically link student's schedule from HEMIS to Profile & Telegram Bot!
-            try { autoLinkStudentFromMoodle(res.me.full_name, res.me.group); } catch (_) {}
-            // Sync safe HEMIS summary (GPA, NB, exams, contract — NEVER password) to Telegram Bot
-            try { syncHemisToBot(res, pLabel); } catch (_) {}
-          }
-          saveGpaState();
-          renderGpaTab();
-          try { renderHomeDashboard(); } catch (_) {}
-          try { renderProfileTab(); } catch (_) {}
+          localStorage.setItem("uwed_hemis_login_id", login);
+          const pLabel = applyHemisResponse(res);
+          const box = document.getElementById("hemisImportBox");
+          if (box) box.style.display = "none";
           const attNote = res.attendance && res.attendance.total_hours ? ` · NB: ${res.attendance.total_hours}ч` : "";
           stEl.textContent = `✅ ${res.subjects.length} ta fan yuklandi (${pLabel}${attNote})!`;
         } else {
@@ -6994,6 +7081,207 @@
         }
       } catch (_) {
         stEl.textContent = "❌ Ulanişda xatolik.";
+      }
+    }
+
+    function applyHemisResponse(res) {
+      gpaSubjects = res.subjects || gpaSubjects;
+      localStorage.setItem("uwed_gpa_source", "hemis");
+      const pLabel = [res.education_year, res.semester_name || (res.semester ? `${res.semester}-semestr` : "")].filter(Boolean).join(" · ") || "HEMIS";
+      localStorage.setItem("uwed_gpa_period", pLabel);
+      if (res.gpa != null) localStorage.setItem("uwed_hemis_official_gpa", String(res.gpa));
+      if (Array.isArray(res.gpa_list) && res.gpa_list.length) {
+        localStorage.setItem("uwed_hemis_gpa_history", JSON.stringify(res.gpa_list));
+      }
+      if (res.token) localStorage.setItem("uwed_hemis_token", res.token);
+      if (Array.isArray(res.semesters) && res.semesters.length) {
+        localStorage.setItem("uwed_hemis_semesters", JSON.stringify(res.semesters));
+      }
+      if (res.semester) localStorage.setItem("uwed_hemis_cur_sem", String(res.semester));
+      const fullProfile = {
+        ...(res.me || {}),
+        attendance: res.attendance || null,
+        exams: Array.isArray(res.exams) ? res.exams : [],
+        contract: res.contract || null,
+        documents: Array.isArray(res.documents) ? res.documents : [],
+        performance: Array.isArray(res.performance) ? res.performance : [],
+        updated_at: new Date().toISOString(),
+      };
+      localStorage.setItem("uwed_hemis_profile", JSON.stringify(fullProfile));
+      if (res.me) {
+        try { autoLinkStudentFromMoodle(res.me.full_name, res.me.group); } catch (_) {}
+        try { syncHemisToBot(res, pLabel); } catch (_) {}
+      }
+      saveGpaState();
+      renderGpaTab();
+      try { renderHomeDashboard(); } catch (_) {}
+      try { renderProfileTab(); } catch (_) {}
+      return pLabel;
+    }
+
+    async function refreshHemisSession() {
+      haptic("medium");
+      const isRu = STATE.lang === "ru";
+      const token = localStorage.getItem("uwed_hemis_token");
+      const stEl = document.getElementById("hemisRefreshStatus");
+      if (!token) {
+        toggleHemisImportBox();
+        return;
+      }
+      if (stEl) stEl.textContent = isRu ? "⏳ Обновляем данные из student.uwed.uz..." : "⏳ student.uwed.uz dan yangilanmoqda...";
+      try {
+        const res = await fetch("/api/uwed?action=hemis_refresh", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token, semester: localStorage.getItem("uwed_hemis_cur_sem") || "" }),
+        }).then((r) => r.json());
+        if (res && res.ok) {
+          applyHemisResponse(res);
+          if (stEl) stEl.textContent = isRu ? "✅ Данные HEMIS обновлены!" : "✅ HEMIS ma'lumotlari yangilandi!";
+          showToast(isRu ? "✅ HEMIS обновлён!" : "✅ HEMIS yangilandi!");
+        } else {
+          if (stEl) stEl.textContent = isRu ? "⚠️ Сессия HEMIS истекла — войдите заново." : "⚠️ HEMIS sessiyasi tugadi — qayta kiring.";
+          const box = document.getElementById("hemisImportBox");
+          if (box) box.style.display = "block";
+        }
+      } catch (_) {
+        if (stEl) stEl.textContent = isRu ? "⚠️ Ошибка сети (HEMIS работает без VPN в UZ)." : "⚠️ Tarmoq xatoligi.";
+      }
+    }
+
+    function logoutHemis() {
+      haptic("light");
+      ["uwed_hemis_token", "uwed_hemis_profile", "uwed_hemis_official_gpa", "uwed_hemis_gpa_history", "uwed_hemis_semesters", "uwed_hemis_cur_sem"].forEach((k) => localStorage.removeItem(k));
+      renderGpaTab();
+      try { renderProfileTab(); } catch (_) {}
+      showToast(STATE.lang === "ru" ? "Вы вышли из HEMIS" : "HEMIS dan chiqdingiz");
+    }
+
+    function switchHemisSubTab(sub) {
+      haptic("light");
+      ["gpa", "nb", "exams", "docs"].forEach((k) => {
+        const cap = k.charAt(0).toUpperCase() + k.slice(1);
+        const tabEl = document.getElementById(`hemisTab${cap}`);
+        const paneEl = document.getElementById(`hemisPane${cap}`);
+        if (tabEl) tabEl.classList.toggle("active", k === sub);
+        if (paneEl) paneEl.style.display = k === sub ? "block" : "none";
+      });
+    }
+
+    function renderHemisCabinetPanes() {
+      const isRu = STATE.lang === "ru";
+      let hp = null;
+      try { hp = JSON.parse(localStorage.getItem("uwed_hemis_profile") || "null"); } catch (_) {}
+      const loginInp = document.getElementById("hemisLoginInp");
+      const savedLogin = localStorage.getItem("uwed_hemis_login_id");
+      if (loginInp && savedLogin && !loginInp.value) loginInp.value = savedLogin;
+
+      const accCard = document.getElementById("hemisAccountCard");
+      if (accCard) {
+        if (hp && hp.full_name) {
+          accCard.style.display = "block";
+          const nEl = document.getElementById("hemisAccName");
+          const mEl = document.getElementById("hemisAccMeta");
+          if (nEl) nEl.textContent = `🏛 ${toNewUz(hp.full_name)}`;
+          if (mEl) {
+            mEl.textContent = [hp.group, hp.level, hp.payment_form, hp.faculty].filter(Boolean).join(" · ");
+          }
+        } else {
+          accCard.style.display = "none";
+        }
+      }
+
+      // Pane 2: Attendance (NB)
+      const nbPane = document.getElementById("hemisPaneNb");
+      if (nbPane) {
+        const att = hp && hp.attendance;
+        if (!att) {
+          nbPane.innerHTML = `<div class="panel" style="text-align:center;padding:18px;"><div style="font-size:13px;color:var(--text-sec);margin-bottom:10px;">${isRu ? "Войдите в HEMIS, чтобы видеть посещаемость (NB) по всем предметам и датам." : "Barcha fanlar va sanalar bo'yicha NB ni ko'rish uchun HEMIS ga kiring."}</div><button class="btn-sm" onclick="toggleHemisImportBox()">📥 ${isRu ? "Войти в HEMIS" : "HEMIS ga kirish"}</button></div>`;
+        } else {
+          const recs = Array.isArray(att.records) ? att.records : [];
+          const bySubj = new Map();
+          for (const r of recs) {
+            const sn = r.subject || (isRu ? "Предмет" : "Fan");
+            bySubj.set(sn, (bySubj.get(sn) || 0) + (Number(r.hours) || 2));
+          }
+          const subjRows = Array.from(bySubj.entries())
+            .sort((a, b) => b[1] - a[1])
+            .map(([sn, hrs]) => `<div style="display:flex;justify-content:space-between;padding:6px 0;border-top:1px solid var(--border);font-size:12.5px;"><span style="color:var(--text);">${toNewUz(sn)}</span><b style="color:${hrs >= 8 ? "#e11d48" : "#d97706"};">${hrs} ${isRu ? "ч." : "s."}</b></div>`)
+            .join("");
+          const recRows = recs
+            .slice(0, 35)
+            .map((r) => `
+              <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:7px 9px;border-radius:10px;background:var(--bg-elevated);margin-bottom:5px;font-size:12px;">
+                <div style="min-width:0;flex:1;">
+                  <div style="font-weight:700;color:var(--text);">${toNewUz(r.subject || "—")}</div>
+                  <div style="font-size:11px;color:var(--text-muted);">${[r.date, r.time, r.type, r.teacher].filter(Boolean).join(" · ")}</div>
+                </div>
+                <span style="font-size:11px;font-weight:800;padding:3px 7px;border-radius:6px;background:${r.excused ? "rgba(245,158,11,0.16)" : "rgba(244,63,94,0.16)"};color:${r.excused ? "#d97706" : "#e11d48"};">${r.hours}ч ${r.excused ? (isRu ? "Уваж." : "Sababli") : "NB"}</span>
+              </div>`)
+            .join("");
+          nbPane.innerHTML = `
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px;">
+              <div class="panel" style="margin:0;text-align:center;padding:10px;"><div style="font-size:20px;font-weight:800;color:var(--text);">${att.total_hours || 0}ч</div><div style="font-size:10.5px;color:var(--text-muted);">${isRu ? "Всего NB" : "Jami NB"}</div></div>
+              <div class="panel" style="margin:0;text-align:center;padding:10px;"><div style="font-size:20px;font-weight:800;color:#e11d48;">${att.unexcused_hours || 0}ч</div><div style="font-size:10.5px;color:var(--text-muted);">${isRu ? "Неуваж." : "Sababsiz"}</div></div>
+              <div class="panel" style="margin:0;text-align:center;padding:10px;"><div style="font-size:20px;font-weight:800;color:#059669;">${att.excused_hours || 0}ч</div><div style="font-size:10.5px;color:var(--text-muted);">${isRu ? "Уважит." : "Sababli"}</div></div>
+            </div>
+            ${subjRows ? `<div class="panel" style="margin-bottom:10px;"><div style="font-size:12.5px;font-weight:800;margin-bottom:6px;">📚 ${isRu ? "Пропуски по предметам" : "Fanlar bo'yicha NB"}</div>${subjRows}</div>` : ""}
+            <div class="panel"><div style="font-size:12.5px;font-weight:800;margin-bottom:8px;">📅 ${isRu ? "История пропусков" : "NB tarixi"} (${recs.length})</div>${recRows || `<div style="font-size:12px;color:#059669;">🎉 ${isRu ? "Пропусков нет!" : "NB yo'q!"}</div>`}</div>`;
+        }
+      }
+
+      // Pane 3: Exams
+      const exPane = document.getElementById("hemisPaneExams");
+      if (exPane) {
+        const exams = (hp && Array.isArray(hp.exams) ? hp.exams : []) || [];
+        exPane.innerHTML = exams.length
+          ? `<div class="panel"><div style="font-size:13px;font-weight:800;margin-bottom:8px;">📝 ${isRu ? "Расписание экзаменов и мидтермов" : "Imtihonlar jadvali"} (${exams.length})</div>${exams
+              .map(
+                (ex) => `
+                <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 10px;border-radius:10px;background:var(--bg-elevated);margin-bottom:6px;font-size:12.5px;">
+                  <div style="min-width:0;flex:1;">
+                    <div style="font-weight:800;color:var(--text);">${toNewUz(ex.subject || "—")}</div>
+                    <div style="font-size:11px;color:var(--text-muted);">${[ex.type || ex.exam_type, ex.room || ex.auditorium ? `🚪 ${ex.room || ex.auditorium}` : "", ex.teacher].filter(Boolean).join(" · ")}</div>
+                  </div>
+                  <div style="text-align:right;flex-shrink:0;font-size:11.5px;font-weight:800;color:#0284c7;">${ex.date || "—"}<br/>${ex.time || ""}</div>
+                </div>`
+              )
+              .join("")}</div>`
+          : `<div class="panel" style="text-align:center;padding:18px;font-size:12.5px;color:var(--text-muted);">📝 ${isRu ? "Экзамены пока не назначены в HEMIS (или войдите в HEMIS)." : "HEMIS da imtihonlar hali belgilanmagan."}</div>`;
+      }
+
+      // Pane 4: Contract & Documents
+      const docPane = document.getElementById("hemisPaneDocs");
+      if (docPane) {
+        const c = hp && hp.contract;
+        const docs = (hp && Array.isArray(hp.documents) ? hp.documents : []) || [];
+        const fmtN = (n) => (n != null && !isNaN(Number(n)) ? Number(n).toLocaleString("ru-RU") : "—");
+        const contractHtml = c
+          ? `<div class="panel" style="margin-bottom:10px;border-color:rgba(2,132,199,0.35);">
+              <div style="font-size:13px;font-weight:800;color:#0284c7;margin-bottom:8px;">💳 ${isRu ? "Контракт" : "Kontrakt"}${c.edu_year ? ` · ${c.edu_year}` : ""}</div>
+              <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;text-align:center;">
+                <div style="padding:8px;border-radius:9px;background:var(--bg-elevated);"><div style="font-size:12px;font-weight:800;">${fmtN(c.total ?? c.summa)}</div><div style="font-size:10px;color:var(--text-muted);">${isRu ? "Сумма" : "Summa"}</div></div>
+                <div style="padding:8px;border-radius:9px;background:var(--bg-elevated);"><div style="font-size:12px;font-weight:800;color:#059669;">${fmtN(c.paid)}</div><div style="font-size:10px;color:var(--text-muted);">${isRu ? "Оплачено" : "To'langan"}</div></div>
+                <div style="padding:8px;border-radius:9px;background:var(--bg-elevated);"><div style="font-size:12px;font-weight:800;color:${c.debt ? "#e11d48" : "#059669"};">${fmtN(c.debt)}</div><div style="font-size:10px;color:var(--text-muted);">${isRu ? "Долг" : "Qarz"}</div></div>
+              </div>
+              ${c.pdf_url ? `<a href="${c.pdf_url}" target="_blank" rel="noopener" class="btn-sm" style="display:block;text-align:center;margin-top:8px;text-decoration:none;">📄 ${isRu ? "Скачать договор PDF" : "Shartnoma PDF"}</a>` : ""}
+            </div>`
+          : `<div class="panel" style="margin-bottom:10px;font-size:12px;color:var(--text-muted);">💳 ${isRu ? "Данные контракта отсутствуют (возможно, грант или HEMIS не подключён)." : "Kontrakt ma'lumotlari yo'q."}</div>`;
+        const docsHtml = docs.length
+          ? `<div class="panel"><div style="font-size:13px;font-weight:800;margin-bottom:8px;">📄 ${isRu ? "Документы и приказы (HEMIS)" : "Hujjatlar va buyruqlar"} (${docs.length})</div>${docs
+              .map(
+                (d) => `
+                <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:7px 9px;border-radius:10px;background:var(--bg-elevated);margin-bottom:5px;font-size:12px;">
+                  <div style="min-width:0;flex:1;">
+                    <div style="font-weight:700;color:var(--text);">${toNewUz(d.name)}</div>
+                    <div style="font-size:11px;color:var(--text-muted);">${[d.type, d.number ? `#${d.number}` : "", d.date].filter(Boolean).join(" · ")}</div>
+                  </div>
+                  ${d.file ? `<a href="${d.file}" target="_blank" rel="noopener" class="btn-sm" style="text-decoration:none;">⬇️</a>` : ""}
+                </div>`
+              )
+              .join("")}</div>`
+          : `<div class="panel" style="font-size:12px;color:var(--text-muted);">📄 ${isRu ? "Официальных документов/приказов пока нет." : "Hujjatlar topilmadi."}</div>`;
+        docPane.innerHTML = contractHtml + docsHtml;
       }
     }
 
@@ -7022,6 +7310,8 @@
             attendance: res.attendance || null,
             exams: res.exams || [],
             contract: res.contract || null,
+            documents: res.documents || [],
+            performance: res.performance || [],
             subjects: res.subjects || [],
           },
         }),
@@ -7757,9 +8047,9 @@
 
     function renderTeachersList(query = "") {
       const t = T();
-      const q = query.toUpperCase();
+      const q = (query || "").trim();
       const filtered = STATE.teachers
-        .filter((item) => !q || (item.full_name || "").toUpperCase().includes(q))
+        .filter((item) => !q || smartPersonMatch(item.full_name || "", q))
         .slice(0, 45);
 
       const container = document.getElementById("teachersList");
@@ -9502,10 +9792,10 @@
         renderClassAttendanceCard(title, instructor, slotObj, attBox);
       }
 
-      // Auto-load matching Moodle course materials (with direct Download + Send to Bot + Course selector)
+      // Auto-load matching Moodle course materials (sorted by Lecture/Seminar/Assign/Other + sections)
       const matBox = document.getElementById("cdMoodleMaterialsBox");
       if (matBox) {
-        loadClassMoodleMaterials(title, matBox);
+        loadClassMoodleMaterials(title, matBox, null, studyType);
       }
 
       document.getElementById("classDetailBackdrop").classList.add("open");
@@ -9595,7 +9885,78 @@
       }
     }
 
-    async function loadClassMoodleMaterials(classTitle, matBox, forcedCourseId = null) {
+    let _classModalModsState = null;
+
+    function filterClassMoodleMaterials(cat) {
+      if (!_classModalModsState) return;
+      haptic("light");
+      _classModalModsState.activeCat = cat;
+      renderClassMoodleMaterialsList();
+    }
+
+    function renderClassMoodleMaterialsList() {
+      const st = _classModalModsState;
+      const matBox = document.getElementById("cdMoodleMaterialsBox");
+      if (!st || !matBox) return;
+      const isRu = STATE.lang === "ru";
+      const { allMods, courseName, coursePickerHtml, activeCat } = st;
+      const counts = { all: allMods.length, lecture: 0, seminar: 0, assign: 0, other: 0 };
+      allMods.forEach((m) => { counts[m.cat] = (counts[m.cat] || 0) + 1; });
+
+      const tabs = [
+        { k: "all", lbl: `${isRu ? "Все" : "Barchasi"} (${counts.all})` },
+        ...(counts.lecture ? [{ k: "lecture", lbl: `📖 ${isRu ? "Лекции" : "Ma'ruza"} (${counts.lecture})` }] : []),
+        ...(counts.seminar ? [{ k: "seminar", lbl: `🧪 ${isRu ? "Семинары" : "Seminar"} (${counts.seminar})` }] : []),
+        ...(counts.assign ? [{ k: "assign", lbl: `📝 ${isRu ? "Задания" : "Topshiriq"} (${counts.assign})` }] : []),
+        ...(counts.other ? [{ k: "other", lbl: `📎 ${isRu ? "Другое" : "Boshqa"} (${counts.other})` }] : []),
+      ];
+      const pillsHtml = `<div class="chips-scroll" style="margin:6px 0 8px;">${tabs
+        .map((tb) => `<button class="pill pill-sm ${activeCat === tb.k ? "active" : ""}" onclick="filterClassMoodleMaterials('${tb.k}')">${tb.lbl}</button>`)
+        .join("")}</div>`;
+
+      const filtered = activeCat === "all" ? allMods : allMods.filter((m) => m.cat === activeCat);
+      _classModalFilesCache = filtered
+        .filter((m) => m.files && m.files[0])
+        .map((m) => ({ fileurl: m.files[0].fileurl, filename: m.files[0].filename, title: m.name || m.files[0].filename }));
+
+      const safeCourse = String(courseName || "Moodle").replace(/'/g, "\\'");
+      // Group filtered items by section/week name
+      const bySec = new Map();
+      for (const m of filtered.slice(0, 14)) {
+        const sKey = m.secName || (isRu ? "Общее" : "Umumiy");
+        if (!bySec.has(sKey)) bySec.set(sKey, []);
+        bySec.get(sKey).push(m);
+      }
+
+      let groupsHtml = "";
+      for (const [secName, list] of bySec.entries()) {
+        groupsHtml += `<div style="font-size:10.5px;font-weight:800;color:var(--text-muted);margin-top:6px;margin-bottom:2px;">📂 ${secName}</div>`;
+        groupsHtml += list
+          .map((m) => {
+            const firstFile = m.files && m.files[0];
+            const catIcon = m.cat === "lecture" ? "📖" : m.cat === "seminar" ? "🧪" : m.cat === "assign" ? "📝" : "📄";
+            const btns = firstFile
+              ? `<div style="display:flex;gap:4px;flex-shrink:0;">` +
+                `<a href="${firstFile.fileurl}" target="_blank" rel="noopener" style="background:rgba(16,185,129,0.16);border:1px solid rgba(16,185,129,0.36);color:#059669;font-size:10.5px;font-weight:800;padding:3px 7px;border-radius:6px;text-decoration:none;">⬇️</a>` +
+                `<button onclick="sendMoodleFileToBot('${String(firstFile.fileurl || "").replace(/'/g, "\\'")}','${String(firstFile.filename || "file").replace(/'/g, "\\'")}','${String(m.name || "").replace(/'/g, "\\'")}','${safeCourse}')" style="background:rgba(2,132,199,0.16);border:1px solid rgba(2,132,199,0.38);color:#0284c7;font-size:10.5px;font-weight:800;padding:3px 7px;border-radius:6px;cursor:pointer;">✈️ ${isRu ? "В бот" : "Botga"}</button>` +
+                `</div>`
+              : m.url
+              ? `<a href="${m.url}" target="_blank" rel="noopener" style="font-size:10.5px;font-weight:700;color:#0284c7;text-decoration:none;flex-shrink:0;">Открыть ↗</a>`
+              : "";
+            return `<div style="display:flex;justify-content:space-between;align-items:center;gap:6px;padding:5px 0;border-top:1px solid var(--border);"><span style="font-size:12px;color:var(--text);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${catIcon} ${m.name}</span>${btns}</div>`;
+          })
+          .join("");
+      }
+
+      const sendAllBtn =
+        _classModalFilesCache.length >= 2
+          ? `<button onclick="sendAllClassFilesToBot('${safeCourse}')" class="btn-sm" style="width:100%;margin-top:8px;padding:7px;background:rgba(2,132,199,0.14);border-color:rgba(2,132,199,0.35);color:#0284c7;font-weight:800;">📦 ${isRu ? `Отправить файлы (${Math.min(5, _classModalFilesCache.length)}) в чат бота` : `Fayllarni (${Math.min(5, _classModalFilesCache.length)}) botga yuborish`}</button>`
+          : "";
+
+      matBox.innerHTML = `<div class="panel" style="margin:0;padding:10px 12px;border-color:rgba(56,189,248,0.32);"><div style="display:flex;justify-content:space-between;align-items:center;"><span style="font-size:11.5px;font-weight:800;color:#0284c7;">📚 ${isRu ? "Материалы пары (Moodle)" : "Dars materiallari (Moodle)"}</span><button onclick="closeClassDetailModal();switchTab('moodle');switchMoodleSubTab('courses')" style="background:none;border:none;color:#059669;font-size:11px;font-weight:800;cursor:pointer;">${isRu ? "Все →" : "Barchasi →"}</button></div>${pillsHtml}${groupsHtml}${sendAllBtn}${coursePickerHtml}</div>`;
+    }
+
+    async function loadClassMoodleMaterials(classTitle, matBox, forcedCourseId = null, studyType = "") {
       const isRu = STATE.lang === "ru";
       const mdl = getVerifiedMoodleIdentity();
       const token = (mdl && mdl.token) || localStorage.getItem("uwed_moodle_token") || "";
@@ -9671,18 +10032,15 @@
           body: JSON.stringify({ token, courseid: bestCourse.id }),
         }).then((r) => r.json());
         const flatMods = [];
-        _classModalFilesCache = [];
-        for (const sec of (res && res.sections) || []) {
-          for (const m of sec.modules || []) {
+        const sortedSecs = sortMoodleSections((res && res.sections) || []);
+        const catRank = { lecture: 1, seminar: 2, assign: 3, other: 4 };
+        for (const sec of sortedSecs) {
+          const mods = [...(sec.modules || [])].sort(
+            (a, b) => catRank[classifyMoodleModule(a, sec.name)] - catRank[classifyMoodleModule(b, sec.name)]
+          );
+          for (const m of mods) {
             if ((m.files && m.files.length) || m.url) {
-              flatMods.push({ ...m, secName: sec.name });
-              if (m.files && m.files[0]) {
-                _classModalFilesCache.push({
-                  fileurl: m.files[0].fileurl,
-                  filename: m.files[0].filename,
-                  title: m.name || m.files[0].filename,
-                });
-              }
+              flatMods.push({ ...m, secName: sec.name, cat: classifyMoodleModule(m, sec.name) });
             }
           }
         }
@@ -9690,27 +10048,17 @@
           matBox.innerHTML = `<div class="panel" style="margin:0;padding:10px 12px;border-color:rgba(56,189,248,0.25);"><div style="font-size:11.5px;font-weight:800;color:#0284c7;">📚 Moodle: ${bestCourse.name}</div><div style="font-size:11px;color:var(--text-muted);margin-top:3px;">${isRu ? "Файлы в этом курсе пока не добавлены." : "Ushbu kursda fayllar hali qo'shilmagan."}</div>${coursePickerHtml}</div>`;
           return;
         }
-        const safeCourse = String(bestCourse.name || "Moodle").replace(/'/g, "\\'");
-        const itemsHtml = flatMods
-          .slice(0, 8)
-          .map((m) => {
-            const firstFile = m.files && m.files[0];
-            const btns = firstFile
-              ? `<div style="display:flex;gap:4px;flex-shrink:0;">` +
-                `<a href="${firstFile.fileurl}" target="_blank" rel="noopener" style="background:rgba(16,185,129,0.16);border:1px solid rgba(16,185,129,0.36);color:#059669;font-size:10.5px;font-weight:800;padding:3px 7px;border-radius:6px;text-decoration:none;">⬇️</a>` +
-                `<button onclick="sendMoodleFileToBot('${String(firstFile.fileurl || "").replace(/'/g, "\\'")}','${String(firstFile.filename || "file").replace(/'/g, "\\'")}','${String(m.name || "").replace(/'/g, "\\'")}','${safeCourse}')" style="background:rgba(2,132,199,0.16);border:1px solid rgba(2,132,199,0.38);color:#0284c7;font-size:10.5px;font-weight:800;padding:3px 7px;border-radius:6px;cursor:pointer;">✈️ ${isRu ? "В бот" : "Botga"}</button>` +
-                `</div>`
-              : m.url
-              ? `<a href="${m.url}" target="_blank" rel="noopener" style="font-size:10.5px;font-weight:700;color:#0284c7;text-decoration:none;flex-shrink:0;">Открыть ↗</a>`
-              : "";
-            return `<div style="display:flex;justify-content:space-between;align-items:center;gap:6px;padding:6px 0;border-top:1px solid var(--border);"><span style="font-size:12px;color:var(--text);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">📄 ${m.name}</span>${btns}</div>`;
-          })
-          .join("");
-        const sendAllBtn =
-          _classModalFilesCache.length >= 2
-            ? `<button onclick="sendAllClassFilesToBot('${safeCourse}')" class="btn-sm" style="width:100%;margin-top:8px;padding:7px;background:rgba(2,132,199,0.14);border-color:rgba(2,132,199,0.35);color:#0284c7;font-weight:800;">📦 ${isRu ? `Отправить все файлы (${Math.min(5, _classModalFilesCache.length)}) в чат бота` : `Barcha fayllarni (${Math.min(5, _classModalFilesCache.length)}) botga yuborish`}</button>`
-            : "";
-        matBox.innerHTML = `<div class="panel" style="margin:0;padding:10px 12px;border-color:rgba(56,189,248,0.32);"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;"><span style="font-size:11.5px;font-weight:800;color:#0284c7;">📚 ${isRu ? "Материалы пары (Moodle)" : "Dars materiallari (Moodle)"}</span><button onclick="closeClassDetailModal();switchTab('moodle');switchMoodleSubTab('courses')" style="background:none;border:none;color:#059669;font-size:11px;font-weight:800;cursor:pointer;">${isRu ? "Все →" : "Barchasi →"}</button></div>${itemsHtml}${sendAllBtn}${coursePickerHtml}</div>`;
+        const stUp = String(studyType || "").toUpperCase();
+        let initialCat = "all";
+        if (stUp.includes("LECT") && flatMods.some((m) => m.cat === "lecture")) initialCat = "lecture";
+        else if ((stUp.includes("PRACT") || stUp.includes("SEMIN")) && flatMods.some((m) => m.cat === "seminar")) initialCat = "seminar";
+        _classModalModsState = {
+          allMods: flatMods,
+          courseName: bestCourse.name,
+          coursePickerHtml,
+          activeCat: initialCat,
+        };
+        renderClassMoodleMaterialsList();
       } catch (_) {
         matBox.style.display = "none";
       }

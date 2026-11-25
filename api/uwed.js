@@ -503,21 +503,95 @@ module.exports = async (req, res) => {
       return res.status(200).json(data);
     }
 
+    function normSearchStr(s) {
+      const cyr = {
+        а: "a", б: "b", в: "v", г: "g", д: "d", е: "e", ё: "yo", ж: "j", з: "z", и: "i", й: "y",
+        к: "k", л: "l", м: "m", н: "n", о: "o", п: "p", р: "r", с: "s", т: "t", у: "u", ф: "f",
+        х: "x", ц: "ts", ч: "ch", ш: "sh", щ: "sh", ъ: "", ы: "i", ь: "", э: "e", ю: "yu", я: "ya",
+        ў: "o", қ: "q", ғ: "g", ҳ: "h",
+      };
+      return String(s || "")
+        .toLowerCase()
+        .replace(/[ʻ’'`‘]/g, "")
+        .split("")
+        .map((ch) => (cyr[ch] !== undefined ? cyr[ch] : ch))
+        .join("")
+        .replace(/[^a-z0-9\s]+/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+    }
+
+    function smartPersonMatch(fullName, query) {
+      const qNorm = normSearchStr(query);
+      if (!qNorm) return true;
+      const nNorm = normSearchStr(fullName);
+      if (!nNorm) return false;
+      if (nNorm.includes(qNorm)) return true;
+      const qTokens = qNorm.split(" ").filter(Boolean);
+      const nTokens = nNorm.split(" ").filter(Boolean);
+      return qTokens.every((qt) =>
+        nTokens.some((nt) => {
+          if (nt.includes(qt)) return true;
+          // Initial match: DB has "a" or "al", user typed "alisher"
+          if (nt.length <= 2 && qt.startsWith(nt)) return true;
+          // Reverse initial: user typed "a", DB has "alisher"
+          if (qt.length === 1 && nt.startsWith(qt)) return true;
+          return false;
+        })
+      );
+    }
+
     if (action === "search_teachers") {
       const q = (req.query.q || "").trim();
       if (q.length < 2) return res.status(200).json({ success: true, data: [] });
-      const data = await uwedGet("/public/timetable/v1/search/teachers", { search: q }, lang);
+      let data = await uwedGet("/public/timetable/v1/search/teachers", { search: q }, lang);
+      let list = Array.isArray(data && data.data) ? data.data : [];
+      if (!list.length && q.includes(" ")) {
+        const words = q.split(/\s+/).filter((w) => w.length >= 2);
+        const byId = new Map();
+        const responses = await Promise.all(
+          words.slice(0, 3).map((w) => uwedGet("/public/timetable/v1/search/teachers", { search: w }, lang).catch(() => ({})))
+        );
+        for (const r of responses) {
+          for (const item of Array.isArray(r && r.data) ? r.data : []) {
+            if (item && item.id && smartPersonMatch(item.full_name || "", q)) {
+              byId.set(item.id, item);
+            }
+          }
+        }
+        list = Array.from(byId.values());
+        return res.status(200).json({ success: true, data: list });
+      }
       return res.status(200).json(data);
     }
 
     if (action === "search_students") {
       const q = (req.query.q || "").trim();
       if (q.length < 2) return res.status(200).json({ success: true, data: [] });
-      const data = await uwedGet(
+      let data = await uwedGet(
         "/public/education/v1/student/search/for-timetable",
         { search: q },
         lang
       );
+      let list = Array.isArray(data && data.data) ? data.data : [];
+      if (!list.length && q.includes(" ")) {
+        const words = q.split(/\s+/).filter((w) => w.length >= 2);
+        const byId = new Map();
+        const responses = await Promise.all(
+          words.slice(0, 2).map((w) =>
+            uwedGet("/public/education/v1/student/search/for-timetable", { search: w }, lang).catch(() => ({}))
+          )
+        );
+        for (const r of responses) {
+          for (const item of Array.isArray(r && r.data) ? r.data : []) {
+            if (item && item.id && smartPersonMatch(item.full_name || "", q)) {
+              byId.set(item.id, item);
+            }
+          }
+        }
+        list = Array.from(byId.values());
+        return res.status(200).json({ success: true, data: list });
+      }
       return res.status(200).json(data);
     }
 
@@ -1125,17 +1199,12 @@ module.exports = async (req, res) => {
       return res.status(200).json({ ok: true, semester, subjects });
     }
 
-    // ─── HEMIS SERVER FALLBACK (student.uwed.uz/rest/v1) ───
-    if (action === "hemis_login") {
+    // ─── HEMIS SERVER FALLBACK & PERSISTENT REFRESH (student.uwed.uz/rest/v1) ───
+    if (action === "hemis_login" || action === "hemis_refresh") {
       res.setHeader("Cache-Control", "no-store");
       let body = {};
       if (req.method === "POST") {
         body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : req.body || {};
-      }
-      const login = (body.login || "").trim();
-      const password = body.password || "";
-      if (!login || !password) {
-        return res.status(200).json({ ok: false, error: "bad_login" });
       }
 
       const hemisReq = (pathStr, method = "GET", payload = null, bearer = "") =>
@@ -1183,23 +1252,39 @@ module.exports = async (req, res) => {
           r.end();
         });
 
-      const authRes = await hemisReq("/auth/login", "POST", { login, password });
-      const token = authRes.json && authRes.json.data && authRes.json.data.token;
-      if (!token) {
-        return res.status(200).json({
-          ok: false,
-          error: [400, 401, 403, 422].includes(authRes.status) ? "bad_login" : "unreachable",
-        });
+      let token = "";
+      let login = (body.login || "").trim();
+      if (action === "hemis_refresh") {
+        token = String(body.token || "").trim();
+        if (!token) return res.status(200).json({ ok: false, error: "expired" });
+      } else {
+        const password = body.password || "";
+        if (!login || !password) {
+          return res.status(200).json({ ok: false, error: "bad_login" });
+        }
+        const authRes = await hemisReq("/auth/login", "POST", { login, password });
+        token = authRes.json && authRes.json.data && authRes.json.data.token;
+        if (!token) {
+          return res.status(200).json({
+            ok: false,
+            error: [400, 401, 403, 422].includes(authRes.status) ? "bad_login" : "unreachable",
+          });
+        }
       }
 
-      const [meRes, semsRes, gpaRes, attRes, examRes, contractRes] = await Promise.all([
+      const [meRes, semsRes, gpaRes, attRes, examRes, contractRes, docRes, perfRes] = await Promise.all([
         hemisReq("/account/me", "GET", null, token).catch(() => ({})),
         hemisReq("/education/semesters", "GET", null, token).catch(() => ({})),
         hemisReq("/education/gpa-list", "GET", null, token).catch(() => ({})),
         hemisReq("/education/attendance", "GET", null, token).catch(() => ({})),
         hemisReq("/education/exam-table", "GET", null, token).catch(() => ({})),
         hemisReq("/student/contract", "GET", null, token).catch(() => ({})),
+        hemisReq("/student/document", "GET", null, token).catch(() => ({})),
+        hemisReq("/education/performance", "GET", null, token).catch(() => ({})),
       ]);
+      if (action === "hemis_refresh" && [401, 403].includes(meRes && meRes.status)) {
+        return res.status(200).json({ ok: false, error: "expired" });
+      }
       const meData = (meRes.json && meRes.json.data) || {};
       const semsData = Array.isArray(semsRes.json && semsRes.json.data)
         ? semsRes.json.data
@@ -1310,8 +1395,28 @@ module.exports = async (req, res) => {
             total: Number(contractData.summa || contractData.contract_sum || 0),
             paid: Number(contractData.paid_credit_amount || contractData.paid_sum || 0),
             debt: Number(contractData.debt || contractData.debt_sum || 0),
+            edu_year: (contractData.edu_year && contractData.edu_year.name) || contractData.edu_year || "",
+            pdf_url: contractData.pdfLink || contractData.pdf_url || "",
           }
         : null;
+
+      const docsRaw = Array.isArray(docRes && docRes.json && docRes.json.data) ? docRes.json.data : [];
+      const documents = docsRaw.slice(0, 20).map((d) => ({
+        name: d.name || (d.type && d.type.name) || "Документ",
+        type: (d.type && d.type.name) || "",
+        number: d.number || "",
+        date: d.date ? (typeof d.date === "number" ? new Date(d.date * 1000).toISOString().slice(0, 10) : String(d.date).slice(0, 10)) : "",
+        file: d.file || d.url || "",
+      }));
+
+      const perfRaw = Array.isArray(perfRes && perfRes.json && perfRes.json.data) ? perfRes.json.data : [];
+      const performance = perfRaw.slice(0, 30).map((p) => ({
+        subject: (p.subject && p.subject.name) || p.name || "",
+        exam_type: (p.examType && p.examType.name) || "",
+        grade: p.grade != null ? Number(p.grade) : null,
+        max_ball: p.max_ball != null ? Number(p.max_ball) : 100,
+        date: p.examDate ? new Date(p.examDate * 1000).toISOString().slice(0, 10) : "",
+      }));
 
       return res.status(200).json({
         ok: true,
@@ -1323,8 +1428,15 @@ module.exports = async (req, res) => {
           faculty: (meData.faculty && meData.faculty.name) || "",
           level: (meData.level && meData.level.name) || "",
           specialty: (meData.specialty && meData.specialty.name) || "",
+          payment_form: (meData.paymentForm && meData.paymentForm.name) || "",
+          education_form: (meData.educationForm && meData.educationForm.name) || "",
+          education_type: (meData.educationType && meData.educationType.name) || "",
+          avg_gpa: meData.avg_gpa || null,
+          phone: meData.phone || "",
+          email: meData.email || "",
+          photo: meData.image || "",
         },
-        gpa: latestGpa,
+        gpa: latestGpa != null ? latestGpa : (meData.avg_gpa ? Number(meData.avg_gpa) : null),
         gpa_list: gpaList,
         attendance: {
           total_hours: attTotal,
@@ -1335,6 +1447,8 @@ module.exports = async (req, res) => {
         },
         exams,
         contract,
+        documents,
+        performance,
         semester: semCode,
         semester_name: semName,
         education_year: eduYear,

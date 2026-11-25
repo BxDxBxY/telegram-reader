@@ -810,6 +810,8 @@ async function recordTelemetry({
         attendance: hemis.attendance || prevH.attendance || null,
         exams: Array.isArray(hemis.exams) ? hemis.exams.slice(0, 25) : prevH.exams || [],
         contract: hemis.contract || prevH.contract || null,
+        documents: Array.isArray(hemis.documents) ? hemis.documents.slice(0, 20) : prevH.documents || [],
+        performance: Array.isArray(hemis.performance) ? hemis.performance.slice(0, 30) : prevH.performance || [],
         subjects: Array.isArray(hemis.subjects) ? hemis.subjects.slice(0, 20) : prevH.subjects || [],
         notified_exams: prevH.notified_exams || {},
         updated_at: nowIso,

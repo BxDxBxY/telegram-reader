@@ -2539,6 +2539,55 @@ module.exports = async (req, res) => {
         return res.status(200).json({ ok: true });
       }
 
+      if (text.startsWith("/hemis") || text.includes("HEMIS")) {
+        const curDb = await loadDb(true);
+        const uH = (curDb.hemis_users && curDb.hemis_users[String(from.id)]) || null;
+        let msg = "";
+        if (uH && (uH.full_name || uH.gpa != null || uH.attendance)) {
+          const att = uH.attendance || {};
+          const exCnt = Array.isArray(uH.exams) ? uH.exams.length : 0;
+          const docCnt = Array.isArray(uH.documents) ? uH.documents.length : 0;
+          const c = uH.contract;
+          const fmtN = (n) => (n != null && !isNaN(Number(n)) ? Number(n).toLocaleString("ru-RU") : "—");
+          msg =
+            lang === "uz"
+              ? `🏛 <b>HEMIS Talaba kabineti</b>\n\n` +
+                `👤 <b>${uH.full_name || "—"}</b>\n` +
+                `${uH.group ? `👥 Guruh: <b>${uH.group}</b>\n` : ""}` +
+                `${uH.faculty ? `🎓 Fakultet: <i>${uH.faculty}</i>\n` : ""}` +
+                `📊 Rasmiy GPA: <b>${uH.gpa != null ? Number(uH.gpa).toFixed(2) : "—"} / 5.0</b>\n` +
+                `📉 Davomat (NB): <b>${att.total_hours || 0} soat</b> (sababsiz: ${att.unexcused_hours || 0})\n` +
+                `📝 Imtihonlar: <b>${exCnt}</b> ta\n` +
+                `📄 Hujjatlar: <b>${docCnt}</b> ta` +
+                (c ? `\n💳 Kontrakt: to'langan <b>${fmtN(c.paid)}</b> / ${fmtN(c.total)}` : "")
+              : `🏛 <b>HEMIS Кабинет студента</b>\n\n` +
+                `👤 <b>${uH.full_name || "—"}</b>\n` +
+                `${uH.group ? `👥 Группа: <b>${uH.group}</b>\n` : ""}` +
+                `${uH.faculty ? `🎓 Факультет: <i>${uH.faculty}</i>\n` : ""}` +
+                `📊 Официальный GPA: <b>${uH.gpa != null ? Number(uH.gpa).toFixed(2) : "—"} / 5.0</b>\n` +
+                `📉 Посещаемость (NB): <b>${att.total_hours || 0} ч.</b> (неуваж.: ${att.unexcused_hours || 0})\n` +
+                `📝 Экзамены: <b>${exCnt}</b>\n` +
+                `📄 Документы: <b>${docCnt}</b>` +
+                (c ? `\n💳 Контракт: оплачено <b>${fmtN(c.paid)}</b> из ${fmtN(c.total)}` : "");
+        } else {
+          msg =
+            lang === "uz"
+              ? "🏛 <b>HEMIS hali ulanmagan.</b>\n\nMini App → <b>🏛 HEMIS</b> bo'limiga 1 marta kiring — GPA, NB, imtihonlar, kontrakt va hujjatlar shu yerda ham ishlaydi."
+              : "🏛 <b>HEMIS ещё не подключён.</b>\n\nВойдите 1 раз во вкладке <b>🏛 HEMIS</b> в Mini App — после этого GPA, NB, экзамены, контракт и документы будут доступны прямо в боте.";
+        }
+        await tgApi("sendMessage", {
+          chat_id: chatId,
+          text: msg,
+          parse_mode: "HTML",
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: "🏛 " + (lang === "uz" ? "HEMIS kabinetni ochish" : "Открыть HEMIS кабинет"), web_app: { url: `${baseWebappUrl}?v=r8&lang=${lang}&tab=gpa` } }],
+            ],
+          },
+        });
+        return res.status(200).json({ ok: true });
+      }
+
       if (text.startsWith("/exams") || text.startsWith("/exam") || text.includes("Экзамены") || text.includes("Imtihonlar")) {
         const curDb = await loadDb(true);
         const uH = (curDb.hemis_users && curDb.hemis_users[String(from.id)]) || null;
