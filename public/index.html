@@ -3102,7 +3102,8 @@
         </div>
         <button class="btn-sm" onclick="closeClassDetailModal()" style="padding:6px 10px; font-size:13px;">✕</button>
       </div>
-      <div id="cdMetaGrid" style="display:grid; gap:8px; margin-bottom:14px;"></div>
+      <div id="cdMetaGrid" style="display:grid; gap:8px; margin-bottom:12px;"></div>
+      <div id="cdAttendanceBox" style="display:none; margin-bottom:12px;"></div>
       <div id="cdMoodleMaterialsBox" style="display:none; margin-bottom:14px;"></div>
       <div id="cdActionsRow" style="display:flex; flex-wrap:wrap; gap:8px;"></div>
     </div>
@@ -9494,7 +9495,13 @@
       actions.push(`<button class="btn-sm" style="flex:1;padding:9px;background:rgba(16,185,129,0.2);border-color:rgba(16,185,129,0.4);color:#6ee7b7;" onclick="closeClassDetailModal();exportScheduleToBot('daily')">📅 ${isRu ? "В календарь (.ics)" : "Kalendarga (.ics)"}</button>`);
       document.getElementById("cdActionsRow").innerHTML = actions.join("");
 
-      // Auto-load matching Moodle course materials for this class!
+      // Render HEMIS Attendance (NB) status for this class & date
+      const attBox = document.getElementById("cdAttendanceBox");
+      if (attBox) {
+        renderClassAttendanceCard(title, instructor, slotObj, attBox);
+      }
+
+      // Auto-load matching Moodle course materials (with direct Download + Send to Bot + Course selector)
       const matBox = document.getElementById("cdMoodleMaterialsBox");
       if (matBox) {
         loadClassMoodleMaterials(title, matBox);
@@ -9503,41 +9510,159 @@
       document.getElementById("classDetailBackdrop").classList.add("open");
     }
 
-    async function loadClassMoodleMaterials(classTitle, matBox) {
+    function renderClassAttendanceCard(classTitle, instructor, slotObj, attBox) {
+      const isRu = STATE.lang === "ru";
+      let hp = null;
+      try { hp = JSON.parse(localStorage.getItem("uwed_hemis_profile") || "null"); } catch (_) {}
+      const att = hp && hp.attendance;
+      attBox.style.display = "block";
+      if (!att) {
+        attBox.innerHTML = `
+          <div class="panel" style="margin:0;padding:10px 12px;display:flex;justify-content:space-between;align-items:center;gap:8px;border-color:rgba(148,163,184,0.28);">
+            <div>
+              <div style="font-size:11px;font-weight:800;color:var(--text-muted);">📋 ${isRu ? "ПОСЕЩАЕМОСТЬ (HEMIS NB)" : "DAVOMAT (HEMIS NB)"}</div>
+              <div style="font-size:12px;color:var(--text-sec);margin-top:2px;">${isRu ? "Войдите в HEMIS, чтобы проверять NB по паре" : "NB holatini ko'rish uchun HEMIS ga kiring"}</div>
+            </div>
+            <button class="btn-sm" onclick="closeClassDetailModal();switchTab('gpa');toggleHemisImportBox()">🏛 HEMIS</button>
+          </div>`;
+        return;
+      }
+
+      const selDate =
+        (STATE.modalContext && STATE.modalContext.selectedDateStr) ||
+        STATE.profCalDate ||
+        getTashkentNow().toISOString().slice(0, 10);
+      const norm = (s) => String(s || "").toLowerCase().replace(/[^a-z0-9\u0400-\u04ff]+/g, " ").trim();
+      const qWords = norm(classTitle).split(/\s+/).filter((w) => w.length >= 4);
+      const tLast = norm(instructor).split(/\s+/)[0] || "";
+      const records = Array.isArray(att.records) ? att.records : [];
+
+      const subjRecs = records.filter((r) => {
+        const sNorm = norm(r.subject);
+        const wordHit = qWords.some((w) => sNorm.includes(w));
+        const teacherHit = tLast.length >= 4 && norm(r.teacher).includes(tLast);
+        return wordHit || teacherHit;
+      });
+      const onDateRec = subjRecs.find((r) => r.date === selDate) || records.find((r) => r.date === selDate && slotObj && r.time && String(r.time).startsWith(String(slotObj.start_time || "").slice(0, 5)));
+      const subjNbHours = subjRecs.reduce((acc, r) => acc + (Number(r.hours) || 2), 0);
+
+      const statusBadge = onDateRec
+        ? onDateRec.excused
+          ? `<span style="font-size:11.5px;font-weight:800;padding:3px 8px;border-radius:7px;background:rgba(245,158,11,0.18);color:#d97706;">🟡 ${isRu ? `Уважит. NB (${onDateRec.hours}ч)` : `Sababli NB (${onDateRec.hours}s)`}</span>`
+          : `<span style="font-size:11.5px;font-weight:800;padding:3px 8px;border-radius:7px;background:rgba(244,63,94,0.18);color:#e11d48;">❌ ${isRu ? `Отмечен NB (${onDateRec.hours}ч)` : `NB qo'yilgan (${onDateRec.hours}s)`}</span>`
+        : `<span style="font-size:11.5px;font-weight:800;padding:3px 8px;border-radius:7px;background:rgba(16,185,129,0.16);color:#059669;">✅ ${isRu ? `На ${selDate.slice(5)} NB нет` : `${selDate.slice(5)} kuni NB yo'q`}</span>`;
+
+      const histDates = subjRecs
+        .filter((r) => r.date)
+        .slice(0, 4)
+        .map((r) => `${r.date.slice(5)} (${r.hours}ч)`)
+        .join(", ");
+
+      attBox.innerHTML = `
+        <div class="panel" style="margin:0;padding:10px 12px;border-color:${onDateRec ? "rgba(244,63,94,0.38)" : "rgba(16,185,129,0.32)"};">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap;">
+            <span style="font-size:11px;font-weight:800;color:var(--text-muted);">📋 ${isRu ? "ПОСЕЩАЕМОСТЬ (HEMIS)" : "DAVOMAT (HEMIS)"}</span>
+            ${statusBadge}
+          </div>
+          <div style="font-size:11.5px;color:var(--text-sec);margin-top:5px;">
+            ${isRu ? "По предмету" : "Fan bo'yicha"}: <b>${subjNbHours} ${isRu ? "ч. NB" : "soat NB"}</b> · ${isRu ? "Всего за семестр" : "Jami"}: <b>${att.total_hours || 0} ${isRu ? "ч." : "soat"}</b>
+            ${histDates ? `<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">📅 NB: ${histDates}</div>` : ""}
+          </div>
+        </div>`;
+    }
+
+    let _classModalFilesCache = [];
+    function getClassMoodleMap() {
+      try { return JSON.parse(localStorage.getItem("uwed_class_moodle_map") || "{}") || {}; } catch (_) { return {}; }
+    }
+    function bindClassToMoodleCourse(normKey, courseId, classTitle) {
+      const map = getClassMoodleMap();
+      if (courseId) map[normKey] = Number(courseId);
+      else delete map[normKey];
+      try { localStorage.setItem("uwed_class_moodle_map", JSON.stringify(map)); } catch (_) {}
+      const matBox = document.getElementById("cdMoodleMaterialsBox");
+      if (matBox && courseId) loadClassMoodleMaterials(classTitle, matBox, Number(courseId));
+    }
+
+    async function sendAllClassFilesToBot(courseName) {
+      if (!_classModalFilesCache.length) return;
+      const isRu = STATE.lang === "ru";
+      const list = _classModalFilesCache.slice(0, 5);
+      showToast(isRu ? `📦 Отправляю ${list.length} файл(ов) в чат бота...` : `📦 ${list.length} ta fayl botga yuborilmoqda...`);
+      for (const f of list) {
+        await sendMoodleFileToBot(f.fileurl, f.filename, f.title, courseName);
+      }
+    }
+
+    async function loadClassMoodleMaterials(classTitle, matBox, forcedCourseId = null) {
       const isRu = STATE.lang === "ru";
       const token = localStorage.getItem("uwed_moodle_token");
       const mdl = getVerifiedMoodleIdentity();
       if (!token || !mdl || !Array.isArray(mdl.courses) || !mdl.courses.length) {
-        matBox.style.display = "none";
+        matBox.style.display = "block";
+        matBox.innerHTML = `
+          <div class="panel" style="margin:0;padding:10px 12px;display:flex;justify-content:space-between;align-items:center;gap:8px;border-color:rgba(56,189,248,0.28);">
+            <div>
+              <div style="font-size:11px;font-weight:800;color:#0284c7;">📚 ${isRu ? "МАТЕРИАЛЫ ПАРЫ (MOODLE)" : "DARS MATERIALLARI (MOODLE)"}</div>
+              <div style="font-size:12px;color:var(--text-sec);margin-top:2px;">${isRu ? "Войдите в Moodle, чтобы скачивать лекции этой пары" : "Ma'ruzalarni yuklash uchun Moodle ga kiring"}</div>
+            </div>
+            <button class="btn-sm" onclick="closeClassDetailModal();switchTab('moodle')">🎓 Moodle</button>
+          </div>`;
         return;
       }
+
       const norm = (s) =>
         String(s || "")
           .toLowerCase()
           .replace(/[^a-z0-9\u0400-\u04ff]+/g, " ")
           .trim();
-      const qWords = norm(classTitle)
-        .split(/\s+/)
-        .filter((w) => w.length >= 4);
+      const normKey = norm(classTitle);
+      const savedMap = getClassMoodleMap();
       let bestCourse = null;
-      let bestScore = 0;
-      for (const c of mdl.courses) {
-        const cNorm = norm(c.name || "");
-        let sc = 0;
-        for (const w of qWords) {
-          if (cNorm.includes(w)) sc += w.length;
-        }
-        if (sc > bestScore) {
-          bestScore = sc;
-          bestCourse = c;
-        }
+
+      if (forcedCourseId) {
+        bestCourse = mdl.courses.find((c) => Number(c.id) === Number(forcedCourseId)) || null;
+      } else if (savedMap[normKey]) {
+        bestCourse = mdl.courses.find((c) => Number(c.id) === Number(savedMap[normKey])) || null;
       }
-      if (!bestCourse || bestScore < 4) {
-        matBox.style.display = "none";
+
+      if (!bestCourse) {
+        const qWords = normKey.split(/\s+/).filter((w) => w.length >= 3);
+        let bestScore = 0;
+        for (const c of mdl.courses) {
+          const cNorm = norm(c.name || "");
+          let sc = 0;
+          for (const w of qWords) {
+            if (cNorm.includes(w)) sc += w.length;
+          }
+          if (sc > bestScore) {
+            bestScore = sc;
+            bestCourse = c;
+          }
+        }
+        if (bestScore < 4) bestCourse = null;
+      }
+
+      const safeNormKey = normKey.replace(/'/g, "\\'");
+      const safeTitle = String(classTitle || "").replace(/'/g, "\\'");
+      const coursePickerHtml = `
+        <select onchange="bindClassToMoodleCourse('${safeNormKey}', this.value, '${safeTitle}')" style="width:100%;margin-top:6px;padding:6px 8px;border-radius:8px;font-size:11.5px;font-weight:600;border:1px solid var(--border);background:var(--bg-elevated);color:var(--text);">
+          <option value="">${bestCourse ? (isRu ? `🔄 Курс: ${bestCourse.name}` : `🔄 Kurs: ${bestCourse.name}`) : (isRu ? "🔗 Выберите курс Moodle для этой пары..." : "🔗 Ushbu fan uchun Moodle kursini tanlang...")}</option>
+          ${mdl.courses.map((c) => `<option value="${c.id}" ${bestCourse && Number(bestCourse.id) === Number(c.id) ? "selected" : ""}>${c.name}</option>`).join("")}
+        </select>`;
+
+      matBox.style.display = "block";
+      if (!bestCourse) {
+        matBox.innerHTML = `
+          <div class="panel" style="margin:0;padding:10px 12px;border-color:rgba(56,189,248,0.32);">
+            <div style="font-size:11.5px;font-weight:800;color:#0284c7;">📚 ${isRu ? "Материалы пары (Moodle)" : "Dars materiallari (Moodle)"}</div>
+            <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">${isRu ? "Выберите курс 1 раз — мы запомним его для этой пары:" : "Kursni 1 marta tanlang — eslab qolamiz:"}</div>
+            ${coursePickerHtml}
+          </div>`;
         return;
       }
-      matBox.style.display = "block";
-      matBox.innerHTML = `<div class="panel" style="margin:0;padding:10px 12px;border-color:rgba(56,189,248,0.3);"><div style="font-size:11.5px;font-weight:800;color:#38bdf8;">📚 ${isRu ? "Материалы пары из Moodle" : "Moodle dars materiallari"}: ${bestCourse.name}</div><div style="font-size:11.5px;color:var(--text-muted);margin-top:4px;">⏳ ${isRu ? "Загрузка файлов..." : "Yuklanmoqda..."}</div></div>`;
+
+      matBox.innerHTML = `<div class="panel" style="margin:0;padding:10px 12px;border-color:rgba(56,189,248,0.3);"><div style="font-size:11.5px;font-weight:800;color:#0284c7;">📚 ${isRu ? "Материалы пары (Moodle)" : "Dars materiallari (Moodle)"}: ${bestCourse.name}</div><div style="font-size:11.5px;color:var(--text-muted);margin-top:4px;">⏳ ${isRu ? "Загрузка файлов..." : "Yuklanmoqda..."}</div></div>`;
       try {
         const res = await fetch("/api/uwed?action=moodle_course_contents", {
           method: "POST",
@@ -9545,31 +9670,46 @@
           body: JSON.stringify({ token, courseid: bestCourse.id }),
         }).then((r) => r.json());
         const flatMods = [];
+        _classModalFilesCache = [];
         for (const sec of (res && res.sections) || []) {
           for (const m of sec.modules || []) {
             if ((m.files && m.files.length) || m.url) {
               flatMods.push({ ...m, secName: sec.name });
+              if (m.files && m.files[0]) {
+                _classModalFilesCache.push({
+                  fileurl: m.files[0].fileurl,
+                  filename: m.files[0].filename,
+                  title: m.name || m.files[0].filename,
+                });
+              }
             }
           }
         }
         if (!flatMods.length) {
-          matBox.innerHTML = `<div class="panel" style="margin:0;padding:10px 12px;border-color:rgba(56,189,248,0.25);"><div style="font-size:11.5px;font-weight:800;color:#38bdf8;">📚 Moodle: ${bestCourse.name}</div><div style="font-size:11px;color:var(--text-muted);margin-top:3px;">${isRu ? "Файлы в этом курсе пока не добавлены." : "Ushbu kursda fayllar hali qo'shilmagan."}</div></div>`;
+          matBox.innerHTML = `<div class="panel" style="margin:0;padding:10px 12px;border-color:rgba(56,189,248,0.25);"><div style="font-size:11.5px;font-weight:800;color:#0284c7;">📚 Moodle: ${bestCourse.name}</div><div style="font-size:11px;color:var(--text-muted);margin-top:3px;">${isRu ? "Файлы в этом курсе пока не добавлены." : "Ushbu kursda fayllar hali qo'shilmagan."}</div>${coursePickerHtml}</div>`;
           return;
         }
         const safeCourse = String(bestCourse.name || "Moodle").replace(/'/g, "\\'");
         const itemsHtml = flatMods
-          .slice(0, 6)
+          .slice(0, 8)
           .map((m) => {
             const firstFile = m.files && m.files[0];
-            const btnBot = firstFile
-              ? `<button onclick="sendMoodleFileToBot('${String(firstFile.fileurl || "").replace(/'/g, "\\'")}','${String(firstFile.filename || "file").replace(/'/g, "\\'")}','${String(m.name || "").replace(/'/g, "\\'")}','${safeCourse}')" style="background:rgba(56,189,248,0.18);border:1px solid rgba(56,189,248,0.38);color:#38bdf8;font-size:10.5px;font-weight:700;padding:3px 7px;border-radius:6px;cursor:pointer;flex-shrink:0;">✈️ ${isRu ? "В бот" : "Botga"}</button>`
+            const btns = firstFile
+              ? `<div style="display:flex;gap:4px;flex-shrink:0;">` +
+                `<a href="${firstFile.fileurl}" target="_blank" rel="noopener" style="background:rgba(16,185,129,0.16);border:1px solid rgba(16,185,129,0.36);color:#059669;font-size:10.5px;font-weight:800;padding:3px 7px;border-radius:6px;text-decoration:none;">⬇️</a>` +
+                `<button onclick="sendMoodleFileToBot('${String(firstFile.fileurl || "").replace(/'/g, "\\'")}','${String(firstFile.filename || "file").replace(/'/g, "\\'")}','${String(m.name || "").replace(/'/g, "\\'")}','${safeCourse}')" style="background:rgba(2,132,199,0.16);border:1px solid rgba(2,132,199,0.38);color:#0284c7;font-size:10.5px;font-weight:800;padding:3px 7px;border-radius:6px;cursor:pointer;">✈️ ${isRu ? "В бот" : "Botga"}</button>` +
+                `</div>`
               : m.url
-              ? `<a href="${m.url}" target="_blank" rel="noopener" style="font-size:10.5px;font-weight:700;color:#38bdf8;text-decoration:none;flex-shrink:0;">Открыть ↗</a>`
+              ? `<a href="${m.url}" target="_blank" rel="noopener" style="font-size:10.5px;font-weight:700;color:#0284c7;text-decoration:none;flex-shrink:0;">Открыть ↗</a>`
               : "";
-            return `<div style="display:flex;justify-content:space-between;align-items:center;gap:6px;padding:5px 0;border-top:1px solid rgba(255,255,255,0.06);"><span style="font-size:12px;color:var(--text);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">📄 ${m.name}</span>${btnBot}</div>`;
+            return `<div style="display:flex;justify-content:space-between;align-items:center;gap:6px;padding:6px 0;border-top:1px solid var(--border);"><span style="font-size:12px;color:var(--text);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">📄 ${m.name}</span>${btns}</div>`;
           })
           .join("");
-        matBox.innerHTML = `<div class="panel" style="margin:0;padding:10px 12px;border-color:rgba(56,189,248,0.32);"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><span style="font-size:11.5px;font-weight:800;color:#38bdf8;">📚 ${isRu ? "Материалы пары (Moodle)" : "Dars materiallari (Moodle)"}</span><button onclick="closeClassDetailModal();switchTab('moodle');switchMoodleSubTab('courses')" style="background:none;border:none;color:#34d399;font-size:11px;font-weight:700;cursor:pointer;">${isRu ? "Все →" : "Barchasi →"}</button></div>${itemsHtml}</div>`;
+        const sendAllBtn =
+          _classModalFilesCache.length >= 2
+            ? `<button onclick="sendAllClassFilesToBot('${safeCourse}')" class="btn-sm" style="width:100%;margin-top:8px;padding:7px;background:rgba(2,132,199,0.14);border-color:rgba(2,132,199,0.35);color:#0284c7;font-weight:800;">📦 ${isRu ? `Отправить все файлы (${Math.min(5, _classModalFilesCache.length)}) в чат бота` : `Barcha fayllarni (${Math.min(5, _classModalFilesCache.length)}) botga yuborish`}</button>`
+            : "";
+        matBox.innerHTML = `<div class="panel" style="margin:0;padding:10px 12px;border-color:rgba(56,189,248,0.32);"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;"><span style="font-size:11.5px;font-weight:800;color:#0284c7;">📚 ${isRu ? "Материалы пары (Moodle)" : "Dars materiallari (Moodle)"}</span><button onclick="closeClassDetailModal();switchTab('moodle');switchMoodleSubTab('courses')" style="background:none;border:none;color:#059669;font-size:11px;font-weight:800;cursor:pointer;">${isRu ? "Все →" : "Barchasi →"}</button></div>${itemsHtml}${sendAllBtn}${coursePickerHtml}</div>`;
       } catch (_) {
         matBox.style.display = "none";
       }

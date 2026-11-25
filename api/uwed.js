@@ -1267,11 +1267,31 @@ module.exports = async (req, res) => {
 
       const attRaw = Array.isArray(attRes && attRes.json && attRes.json.data) ? attRes.json.data : [];
       let attTotal = 0, attExcused = 0, attUnexcused = 0;
+      const attRecords = [];
       for (const a of attRaw) {
         const hrs = Number(a.absent_on || 0) + Number(a.absent_off || 0) || Number(a.hours || 2);
+        const isExc = Boolean(a.absent_on || a.explicable);
         attTotal += hrs;
-        if (a.absent_on || a.explicable) attExcused += Number(a.absent_on || hrs);
+        if (isExc) attExcused += Number(a.absent_on || hrs);
         else attUnexcused += Number(a.absent_off || hrs);
+        let dtIso = "";
+        if (typeof a.lesson_date === "number" && a.lesson_date > 1000000000) {
+          dtIso = new Date((a.lesson_date + 5 * 3600) * 1000).toISOString().slice(0, 10);
+        } else if (typeof a.lesson_date === "string" && a.lesson_date.length >= 10) {
+          dtIso = a.lesson_date.slice(0, 10);
+        }
+        if (attRecords.length < 80) {
+          attRecords.push({
+            subject: (a.subject && a.subject.name) || a.subject_name || "",
+            date: dtIso,
+            time: (a.lessonPair && a.lessonPair.start_time) || "",
+            pair: (a.lessonPair && a.lessonPair.name) || "",
+            hours: hrs,
+            excused: isExc,
+            type: (a.trainingType && a.trainingType.name) || "",
+            teacher: (a.employee && a.employee.name) || "",
+          });
+        }
       }
 
       const examsRaw = Array.isArray(examRes && examRes.json && examRes.json.data) ? examRes.json.data : [];
@@ -1311,6 +1331,7 @@ module.exports = async (req, res) => {
           excused_hours: attExcused,
           unexcused_hours: attUnexcused,
           records_count: attRaw.length,
+          records: attRecords,
         },
         exams,
         contract,
