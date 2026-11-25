@@ -6458,7 +6458,8 @@
       if (bodyEl.dataset.loaded === "1") return;
 
       const isRu = STATE.lang === "ru";
-      const token = localStorage.getItem("uwed_moodle_token");
+      const mdl = getVerifiedMoodleIdentity();
+      const token = (mdl && mdl.token) || localStorage.getItem("uwed_moodle_token") || "";
       if (!token) {
         bodyEl.innerHTML = `<div style="font-size:12px;color:var(--text-muted);">${isRu ? "Войдите в Moodle для просмотра материалов." : "Materiallarni ko'rish uchun Moodle ga kiring."}</div>`;
         return;
@@ -9596,8 +9597,8 @@
 
     async function loadClassMoodleMaterials(classTitle, matBox, forcedCourseId = null) {
       const isRu = STATE.lang === "ru";
-      const token = localStorage.getItem("uwed_moodle_token");
       const mdl = getVerifiedMoodleIdentity();
+      const token = (mdl && mdl.token) || localStorage.getItem("uwed_moodle_token") || "";
       if (!token || !mdl || !Array.isArray(mdl.courses) || !mdl.courses.length) {
         matBox.style.display = "block";
         matBox.innerHTML = `
