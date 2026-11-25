@@ -2102,8 +2102,9 @@
 
         <!-- Global Search Bar across Rooms, Teachers, Students, Buildings, Leadership & Docs -->
         <div class="hero-search-wrap">
-          <svg style="position:absolute;left:13px;top:50%;transform:translateY(-50%);width:16px;height:16px;color:#38bdf8;pointer-events:none;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-          <input type="text" class="hero-search-input" id="heroGlobalSearchInput" placeholder="..." oninput="onHeroGlobalSearch(this.value)" onfocus="onHeroGlobalSearchFocus()" />
+          <svg style="position:absolute;left:13px;top:50%;transform:translateY(-50%);width:16px;height:16px;color:#38bdf8;pointer-events:none;z-index:3;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+          <input type="text" class="hero-search-input" id="heroGlobalSearchInput" placeholder="..." oninput="onHeroGlobalSearch(this.value)" onfocus="onHeroGlobalSearchFocus()" style="position:relative;z-index:2;padding-right:34px;font-size:15px;" autocomplete="off" />
+          <button type="button" id="heroSearchClearBtn" onclick="clearHeroGlobalSearch()" style="display:none;position:absolute;right:10px;top:50%;transform:translateY(-50%);z-index:3;background:none;border:none;color:#94a3b8;font-size:16px;font-weight:800;cursor:pointer;padding:2px 6px;">✕</button>
           <div class="hero-search-results" id="heroGlobalSearchResults"></div>
         </div>
 
@@ -2404,9 +2405,10 @@
         <div class="row-head">
           <span class="row-label" id="lblStudentSearch">Talaba yoki oqim qidiruvi</span>
         </div>
-        <div class="search-box" style="margin-bottom: 8px;">
+        <div class="search-box" style="margin-bottom: 8px; position: relative;">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-          <input type="text" class="search-input" id="studentSearchInput" oninput="onStudentSearchInput()" />
+          <input type="text" class="search-input" id="studentSearchInput" oninput="onStudentSearchInput()" style="padding-right:34px;" autocomplete="off" />
+          <button type="button" id="studentSearchClearBtn" onclick="clearStudentSearch()" style="display:none;position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--text-muted);font-size:16px;font-weight:800;cursor:pointer;padding:2px 6px;">✕</button>
         </div>
         <div style="font-size: 11.5px; color: var(--text-muted); line-height: 1.45;" id="studentHint"></div>
       </div>
@@ -3028,6 +3030,14 @@
           <button class="btn-sm" id="modalRenameBtn" style="display:none; background:rgba(56,189,248,0.16); border-color:rgba(56,189,248,0.35); color:#38bdf8;" onclick="renameCurrentStudentModal()">✏️ Имя</button>
           <button class="btn-sm" id="modalPinBtn" style="display:none;"></button>
           <button class="modal-close" onclick="closeModal()">✕</button>
+        </div>
+      </div>
+      <!-- Inline Student Rename Bar (replaces window.prompt which locks WebView keyboard!) -->
+      <div id="modalRenameBar" style="display:none; padding:8px 16px; border-bottom:1px solid var(--border); background:var(--bg-elevated);">
+        <div style="display:flex; gap:6px; align-items:center;">
+          <input type="text" id="modalRenameInput" class="search-input" placeholder="Введите ФИО студента..." style="flex:1; padding:7px 10px; font-size:14px;" onkeydown="if(event.key==='Enter') saveInlineStudentRename()" />
+          <button class="btn-sm" style="background:#0284c7; color:#fff; border:none; padding:7px 12px; font-weight:800;" onclick="saveInlineStudentRename()">✓</button>
+          <button class="btn-sm" style="padding:7px 10px;" onclick="document.getElementById('modalRenameBar').style.display='none'">✕</button>
         </div>
       </div>
       <!-- Day / Week Switcher + Date Picker + Weekday Chips + Direct Bot Export -->
@@ -5380,10 +5390,21 @@
       }
     });
 
+    function clearHeroGlobalSearch() {
+      const inp = document.getElementById("heroGlobalSearchInput");
+      const btn = document.getElementById("heroSearchClearBtn");
+      const box = document.getElementById("heroGlobalSearchResults");
+      if (inp) { inp.value = ""; inp.focus(); }
+      if (btn) btn.style.display = "none";
+      if (box) box.style.display = "none";
+    }
+
     /* ─── GLOBAL HERO SEARCH (Rooms, Teachers, Buildings, Leadership, Docs) ─── */
     function onHeroGlobalSearch(rawQ) {
       const box = document.getElementById("heroGlobalSearchResults");
+      const clrBtn = document.getElementById("heroSearchClearBtn");
       const q = (rawQ || "").trim().toLowerCase();
+      if (clrBtn) clrBtn.style.display = rawQ && rawQ.length ? "block" : "none";
       if (q.length < 2) {
         onHeroGlobalSearchFocus();
         return;
@@ -7774,9 +7795,20 @@
         histHtml + `<div class="empty-msg">${T().studentDefault}</div>`;
     }
 
+    function clearStudentSearch() {
+      const inp = document.getElementById("studentSearchInput");
+      const clr = document.getElementById("studentSearchClearBtn");
+      if (inp) { inp.value = ""; inp.focus(); }
+      if (clr) clr.style.display = "none";
+      renderStudentsDefault();
+    }
+
     function onStudentSearchInput() {
       clearTimeout(studentSearchTimer);
-      const q = (document.getElementById("studentSearchInput").value || "").trim();
+      const rawVal = (document.getElementById("studentSearchInput").value || "");
+      const clr = document.getElementById("studentSearchClearBtn");
+      if (clr) clr.style.display = rawVal.length ? "block" : "none";
+      const q = rawVal.trim();
       if (q.length < 2) {
         renderStudentsDefault();
         return;
@@ -9152,16 +9184,27 @@
       const ctx = STATE.modalContext;
       if (!ctx || ctx.kind !== "STUDENT") return;
       haptic("light");
+      const bar = document.getElementById("modalRenameBar");
+      const inp = document.getElementById("modalRenameInput");
+      if (!bar || !inp) return;
+      const isOpen = bar.style.display === "block";
+      if (isOpen) {
+        bar.style.display = "none";
+        return;
+      }
+      inp.placeholder = STATE.lang === "ru" ? "Введите ФИО студента..." : "Talaba F.I.Sh. ni kiriting...";
+      inp.value = getStudentAlias(ctx.id) || "";
+      bar.style.display = "block";
+      setTimeout(() => inp.focus(), 60);
+    }
+
+    function saveInlineStudentRename() {
+      const ctx = STATE.modalContext;
+      const bar = document.getElementById("modalRenameBar");
+      const inp = document.getElementById("modalRenameInput");
+      if (!ctx || ctx.kind !== "STUDENT" || !inp) return;
       const isRu = STATE.lang === "ru";
-      const cur = getStudentAlias(ctx.id) || "";
-      const entered = window.prompt(
-        isRu
-          ? "Введите полное ФИО студента (сохранится для поиска, истории и общих окон):"
-          : "Talabaning to'liq F.I.Sh. ni kiriting (qidiruv va tarixda saqlanadi):",
-        cur
-      );
-      if (entered === null) return;
-      const clean = entered.trim();
+      const clean = (inp.value || "").trim();
       setStudentAlias(ctx.id, clean);
       const rawClean = String(ctx.rawTitle || ctx.title || "").replace(/^Talaba:\s*/i, "").replace(/^Студент:\s*/i, "");
       const newTitle = clean ? `${clean}${rawClean && !clean.includes(rawClean) ? ` (${rawClean})` : ""}` : ctx.rawTitle || ctx.title;
@@ -9170,6 +9213,8 @@
       const pinBtn = document.getElementById("modalPinBtn");
       if (pinBtn) pinBtn.onclick = () => savePinnedProfile(ctx.kind, ctx.id, newTitle);
       addToSearchHistory({ kind: "STUDENT", id: ctx.id, title: newTitle, sub: ctx.resolvedGroup || "" });
+      if (bar) bar.style.display = "none";
+      inp.blur();
       showToast(clean ? (isRu ? `✅ Имя сохранено: ${clean}` : `✅ Ism saqlandi: ${clean}`) : (isRu ? "Имя сброшено" : "Ism o'chirildi"));
     }
 
@@ -9841,6 +9886,13 @@
 
     function closeModal() {
       document.getElementById("detailModal").classList.remove("open");
+      const rb = document.getElementById("modalRenameBar");
+      if (rb) rb.style.display = "none";
+      const hBox = document.getElementById("heroGlobalSearchResults");
+      if (hBox) hBox.style.display = "none";
+      try {
+        if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+      } catch (_) {}
     }
 
     function savePinnedProfile(kind, id, title) {

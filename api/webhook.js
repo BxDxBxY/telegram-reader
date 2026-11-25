@@ -1842,9 +1842,10 @@ async function formatMoodleGrades(userMoodle, lang, baseWebappUrl) {
 async function resolveUserWeeklyEvents(from, snap, db, lang) {
   const sub = (db.subscriptions && db.subscriptions[String(from.id)]) || null;
   const mUser = (db.moodle_users && db.moodle_users[String(from.id)]) || null;
-  let targetId = sub ? sub.target_id : null;
+  const hUser = (db.hemis_users && db.hemis_users[String(from.id)]) || null;
+  let targetId = sub ? sub.target_id : (hUser && hUser.group ? `grp:${hUser.group}` : null);
   let targetKind = sub ? sub.kind : "STUDENT";
-  let targetTitle = sub ? sub.title : (mUser ? mUser.fullname : null);
+  let targetTitle = sub ? sub.title : (hUser ? (hUser.group || hUser.full_name) : (mUser ? mUser.fullname : null));
 
   // 1. FIRST: exact cached personal schedule synced from Mini App (works for Student UUIDs, Groups & Teachers!)
   if (sub && Array.isArray(sub.cached_events) && sub.cached_events.length) {
@@ -2864,25 +2865,13 @@ module.exports = async (req, res) => {
         text.includes("Моё расписание") ||
         text.includes("My Schedule")
       ) {
-        const sub = db.subscriptions && db.subscriptions[String(from.id)];
-        if (!sub || !sub.target_id) {
-          await tgApi("sendMessage", {
-            chat_id: chatId,
-            text: tr.noMySched,
-            parse_mode: "HTML",
-            reply_markup: {
-              inline_keyboard: [[{ text: tr.openApp, web_app: { url: `${baseWebappUrl}?v=r8&lang=${lang}` } }]],
-            },
-          });
-          return res.status(200).json({ ok: true });
-        }
-        const pCode = sub.kind === "TEACHER" ? "T" : "S";
-        const view = await formatPersonScheduleView(snap, pCode, sub.target_id, cur.day, lang, baseWebappUrl);
+        const curDb = await loadDb(true);
+        const card = await formatTodayClasses(from, snap, curDb, lang, baseWebappUrl);
         await tgApi("sendMessage", {
           chat_id: chatId,
-          text: view.text,
+          text: card.text,
           parse_mode: "HTML",
-          reply_markup: view.kb,
+          reply_markup: card.kb,
         });
         return res.status(200).json({ ok: true });
       }
