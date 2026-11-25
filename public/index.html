@@ -98,12 +98,37 @@
     html[data-theme="light"] input[type="password"],
     html[data-theme="light"] input[type="tel"],
     html[data-theme="light"] input[type="date"],
+    html[data-theme="light"] input[type="time"],
     html[data-theme="light"] input[type="number"],
     html[data-theme="light"] select,
     html[data-theme="light"] textarea {
-      background: #ffffff;
-      border-color: rgba(148, 163, 184, 0.38);
-      color: var(--text);
+      background: #ffffff !important;
+      border-color: rgba(148, 163, 184, 0.48) !important;
+      color: #0f172a !important;
+      color-scheme: light;
+    }
+    html[data-theme="light"] #modalRenameBtn {
+      background: #e0f2fe !important;
+      border-color: #38bdf8 !important;
+      color: #0369a1 !important;
+    }
+    html[data-theme="light"] #lblBotExport {
+      color: #047857 !important;
+    }
+    html[data-theme="light"] #homeMyDayCard {
+      background: linear-gradient(135deg, rgba(16, 185, 129, 0.12), rgba(255, 255, 255, 0.96)) !important;
+      border-color: rgba(5, 150, 105, 0.35) !important;
+    }
+    html[data-theme="light"] #homeMyDayTitle {
+      color: #047857 !important;
+    }
+    html[data-theme="light"] #homeShortcutBanner {
+      background: linear-gradient(135deg, rgba(14, 165, 233, 0.14), rgba(16, 185, 129, 0.10)) !important;
+      border-color: rgba(2, 132, 199, 0.35) !important;
+    }
+    html[data-theme="light"] #homeShortcutBtn {
+      background: #0284c7 !important;
+      color: #ffffff !important;
     }
     html[data-theme="light"] .pill {
       background: #f1f5f9;
@@ -3012,7 +3037,7 @@
             <button class="pill pill-sm active" id="modalModeDay" onclick="setModalViewMode('day')">📅 День</button>
             <button class="pill pill-sm" id="modalModeWeek" onclick="setModalViewMode('week')">🗓 Неделя</button>
           </div>
-          <input type="date" id="modalDatePicker" onchange="onModalDatePick(this.value)" style="background:rgba(15,23,42,0.85); color:var(--text-main); border:1px solid var(--border); border-radius:9px; padding:5px 8px; font-size:11.5px; font-family:inherit; font-weight:700;" />
+          <input type="date" id="modalDatePicker" onchange="onModalDatePick(this.value)" style="background:var(--bg-elevated); color:var(--text); border:1px solid var(--border); border-radius:9px; padding:5px 8px; font-size:11.5px; font-family:inherit; font-weight:700;" />
         </div>
         <div class="chips-scroll" id="modalDayChips"></div>
         <div id="modalBotDownloadBar" style="display:flex; align-items:center; justify-content:space-between; gap:6px; background:rgba(16,185,129,0.08); border:1px solid rgba(16,185,129,0.25); border-radius:10px; padding:6px 10px;">
@@ -9233,12 +9258,18 @@
             if (!apiFullName && ev.student_name && !/^\d+$/.test(String(ev.student_name).trim())) apiFullName = String(ev.student_name).trim();
             if (!apiFullName && ev.student_full_name && !/^\d+$/.test(String(ev.student_full_name).trim())) apiFullName = String(ev.student_full_name).trim();
             if (ev.groups) {
-              const gStr = Array.isArray(ev.groups) ? ev.groups.join(", ") : String(ev.groups);
-              if (gStr.trim()) grpSet.add(gStr.trim());
+              const gRaw = Array.isArray(ev.groups) ? ev.groups.join(",") : String(ev.groups);
+              gRaw
+                .replace(/["'\[\]]/g, "")
+                .split(/[,;]+/)
+                .map((x) => x.trim())
+                .filter(Boolean)
+                .forEach((g) => grpSet.add(g));
             }
             if (ev.speciality_names) {
-              const spStr = Array.isArray(ev.speciality_names) ? ev.speciality_names[0] : String(ev.speciality_names);
-              if (spStr && spStr.trim()) specSet.add(spStr.trim());
+              const spRaw = Array.isArray(ev.speciality_names) ? ev.speciality_names[0] : String(ev.speciality_names);
+              const spClean = String(spRaw || "").replace(/["'\[\]]/g, "").trim();
+              if (spClean) specSet.add(spClean);
             }
           }
           const grpLabel = Array.from(grpSet).slice(0, 2).join(", ");
