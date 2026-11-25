@@ -6543,6 +6543,99 @@
       });
     }
 
+    const _moodleCourseCache = {};
+
+    function filterMoodleCourseTab(courseId, cat) {
+      haptic("light");
+      renderMoodleCourseBody(courseId, cat);
+    }
+
+    function renderMoodleCourseBody(courseId, activeCat = "all") {
+      const bodyEl = document.getElementById(`mdlCourseBody_${courseId}`);
+      const sections = _moodleCourseCache[courseId];
+      if (!bodyEl || !Array.isArray(sections)) return;
+      const isRu = STATE.lang === "ru";
+      const iconForMod = (m) =>
+        m === "assign" ? "📝" : m === "quiz" ? "✅" : m === "resource" ? "📄" : m === "folder" ? "📁" : m === "url" ? "🔗" : m === "forum" ? "💬" : "📌";
+      const catBadge = (cat) => {
+        if (cat === "lecture") return `<span style="font-size:10px;font-weight:800;padding:2px 6px;border-radius:5px;background:rgba(2,132,199,0.16);color:#0284c7;">📖 ${isRu ? "Лекция" : "Ma'ruza"}</span>`;
+        if (cat === "seminar") return `<span style="font-size:10px;font-weight:800;padding:2px 6px;border-radius:5px;background:rgba(16,185,129,0.16);color:#059669;">🧪 ${isRu ? "Семинар" : "Seminar"}</span>`;
+        if (cat === "assign") return `<span style="font-size:10px;font-weight:800;padding:2px 6px;border-radius:5px;background:rgba(245,158,11,0.18);color:#d97706;">📝 ${isRu ? "Задание" : "Topshiriq"}</span>`;
+        return `<span style="font-size:10px;font-weight:800;padding:2px 6px;border-radius:5px;background:rgba(148,163,184,0.18);color:var(--text-muted);">📎 ${isRu ? "Материал" : "Material"}</span>`;
+      };
+
+      const counts = { all: 0, lecture: 0, seminar: 0, assign: 0, other: 0 };
+      const sortedSections = sortMoodleSections(sections);
+      const catRank = { lecture: 1, seminar: 2, assign: 3, other: 4 };
+      for (const sec of sortedSections) {
+        for (const m of sec.modules || []) {
+          const c = classifyMoodleModule(m, sec.name);
+          counts.all++;
+          counts[c] = (counts[c] || 0) + 1;
+        }
+      }
+
+      const tabs = [
+        { k: "all", lbl: `${isRu ? "Все" : "Barchasi"} (${counts.all})` },
+        ...(counts.lecture ? [{ k: "lecture", lbl: `📖 ${isRu ? "Лекции" : "Ma'ruza"} (${counts.lecture})` }] : []),
+        ...(counts.seminar ? [{ k: "seminar", lbl: `🧪 ${isRu ? "Семинары" : "Seminar"} (${counts.seminar})` }] : []),
+        ...(counts.assign ? [{ k: "assign", lbl: `📝 ${isRu ? "Задания" : "Topshiriq"} (${counts.assign})` }] : []),
+        ...(counts.other ? [{ k: "other", lbl: `📎 ${isRu ? "Другое" : "Boshqa"} (${counts.other})` }] : []),
+      ];
+      const filterBar = `<div class="chips-scroll" style="margin-bottom:8px;">${tabs
+        .map((tb) => `<button class="pill pill-sm ${activeCat === tb.k ? "active" : ""}" onclick="filterMoodleCourseTab(${courseId},'${tb.k}')">${tb.lbl}</button>`)
+        .join("")}</div>`;
+
+      let renderedIdx = 0;
+      const secsHtml = sortedSections
+        .map((sec) => {
+          const mods = [...(sec.modules || [])]
+            .filter((m) => activeCat === "all" || classifyMoodleModule(m, sec.name) === activeCat)
+            .sort((a, b) => catRank[classifyMoodleModule(a, sec.name)] - catRank[classifyMoodleModule(b, sec.name)]);
+          if (!mods.length) return "";
+          const openAttr = activeCat !== "all" || renderedIdx === 0 ? "open" : "";
+          renderedIdx++;
+          const modsHtml = mods
+            .map((m) => {
+              const cat = classifyMoodleModule(m, sec.name);
+              const filesHtml = (m.files || [])
+                .map((f) => {
+                  const safeUrl = String(f.fileurl || "").replace(/'/g, "\\'");
+                  const safeFn = String(f.filename || "file").replace(/'/g, "\\'");
+                  const safeTitle = String(m.name || f.filename || "Материал").replace(/'/g, "\\'");
+                  return `<div style="display:inline-flex;align-items:center;gap:4px;margin-top:5px;margin-right:4px;">` +
+                    `<a href="${f.fileurl}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:#059669;text-decoration:none;background:rgba(16,185,129,0.14);padding:3px 7px;border-radius:6px;font-weight:700;">⬇️ ${f.filename}</a>` +
+                    `<button onclick="sendMoodleFileToBot('${safeUrl}','${safeFn}','${safeTitle}','Moodle')" style="background:rgba(2,132,199,0.14);border:1px solid rgba(2,132,199,0.35);color:#0284c7;font-size:10.5px;font-weight:700;padding:3px 7px;border-radius:6px;cursor:pointer;">✈️ ${isRu ? "В бот" : "Botga"}</button>` +
+                    `</div>`;
+                })
+                .join("");
+              return `
+                <div style="padding:7px 9px;border-radius:8px;background:var(--bg-card-solid,var(--bg-elevated));border:1px solid var(--border);margin-bottom:5px;">
+                  <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;">
+                    <span style="font-size:12px;font-weight:600;color:var(--text);">${iconForMod(m.modname)} ${m.name}</span>
+                    <div style="display:flex;align-items:center;gap:5px;flex-shrink:0;">
+                      ${catBadge(cat)}
+                      ${m.url ? `<a href="${m.url}" target="_blank" rel="noopener" style="font-size:11px;font-weight:700;color:#0284c7;text-decoration:none;">↗</a>` : ""}
+                    </div>
+                  </div>
+                  ${filesHtml ? `<div>${filesHtml}</div>` : ""}
+                </div>`;
+            })
+            .join("");
+          return `
+            <details ${openAttr} style="margin-bottom:7px;border:1px solid var(--border);border-radius:10px;background:var(--bg-elevated);padding:7px 9px;">
+              <summary style="cursor:pointer;font-size:12px;font-weight:800;color:var(--text);display:flex;justify-content:space-between;align-items:center;list-style:none;">
+                <span>📂 ${sec.name}</span>
+                <span style="font-size:10.5px;font-weight:700;color:#0284c7;background:rgba(2,132,199,0.12);padding:2px 7px;border-radius:999px;">${mods.length}</span>
+              </summary>
+              <div style="margin-top:8px;">${modsHtml}</div>
+            </details>`;
+        })
+        .join("");
+
+      bodyEl.innerHTML = filterBar + (secsHtml || `<div style="font-size:12px;color:var(--text-muted);padding:6px 0;">${isRu ? "В этой категории материалов нет." : "Bu toifada materiallar yo'q."}</div>`);
+    }
+
     async function toggleMoodleCourseContents(courseId) {
       haptic("light");
       const bodyEl = document.getElementById(`mdlCourseBody_${courseId}`);
@@ -6576,54 +6669,8 @@
           return;
         }
         bodyEl.dataset.loaded = "1";
-        const iconForMod = (m) =>
-          m === "assign" ? "📝" : m === "quiz" ? "✅" : m === "resource" ? "📄" : m === "folder" ? "📁" : m === "url" ? "🔗" : m === "forum" ? "💬" : "📌";
-        const catBadge = (cat) => {
-          if (cat === "lecture") return `<span style="font-size:10px;font-weight:800;padding:2px 6px;border-radius:5px;background:rgba(2,132,199,0.16);color:#0284c7;">📖 ${isRu ? "Лекция" : "Ma'ruza"}</span>`;
-          if (cat === "seminar") return `<span style="font-size:10px;font-weight:800;padding:2px 6px;border-radius:5px;background:rgba(16,185,129,0.16);color:#059669;">🧪 ${isRu ? "Семинар" : "Seminar"}</span>`;
-          if (cat === "assign") return `<span style="font-size:10px;font-weight:800;padding:2px 6px;border-radius:5px;background:rgba(245,158,11,0.18);color:#d97706;">📝 ${isRu ? "Задание" : "Topshiriq"}</span>`;
-          return `<span style="font-size:10px;font-weight:800;padding:2px 6px;border-radius:5px;background:rgba(148,163,184,0.18);color:var(--text-muted);">📎 ${isRu ? "Материал" : "Material"}</span>`;
-        };
-        const sortedSections = sortMoodleSections(res.sections);
-        const catRank = { lecture: 1, seminar: 2, assign: 3, other: 4 };
-        bodyEl.innerHTML = sortedSections
-          .map(
-            (sec) => `
-            <div style="margin-bottom:10px;">
-              <div style="font-size:11.5px;font-weight:800;color:#0284c7;margin-bottom:4px;">📂 ${sec.name}</div>
-              ${[...(sec.modules || [])]
-                .sort((a, b) => catRank[classifyMoodleModule(a, sec.name)] - catRank[classifyMoodleModule(b, sec.name)])
-                .map((m) => {
-                  const cat = classifyMoodleModule(m, sec.name);
-                  const filesHtml = (m.files || [])
-                    .map(
-                      (f) => {
-                        const safeUrl = String(f.fileurl || "").replace(/'/g, "\\'");
-                        const safeFn = String(f.filename || "file").replace(/'/g, "\\'");
-                        const safeTitle = String(m.name || f.filename || "Материал").replace(/'/g, "\\'");
-                        return `<div style="display:inline-flex;align-items:center;gap:4px;margin-top:4px;margin-right:4px;">` +
-                          `<a href="${f.fileurl}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:#059669;text-decoration:none;background:rgba(16,185,129,0.14);padding:3px 7px;border-radius:6px;font-weight:700;">⬇️ ${f.filename}</a>` +
-                          `<button onclick="sendMoodleFileToBot('${safeUrl}','${safeFn}','${safeTitle}','Moodle')" style="background:rgba(2,132,199,0.14);border:1px solid rgba(2,132,199,0.35);color:#0284c7;font-size:10.5px;font-weight:700;padding:3px 7px;border-radius:6px;cursor:pointer;">✈️ ${isRu ? "В бот" : "Botga"}</button>` +
-                          `</div>`;
-                      }
-                    )
-                    .join("");
-                  return `
-                    <div style="padding:7px 9px;border-radius:8px;background:var(--bg-elevated);margin-bottom:5px;">
-                      <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;">
-                        <span style="font-size:12px;font-weight:600;color:var(--text);">${iconForMod(m.modname)} ${m.name}</span>
-                        <div style="display:flex;align-items:center;gap:5px;flex-shrink:0;">
-                          ${catBadge(cat)}
-                          ${m.url ? `<a href="${m.url}" target="_blank" rel="noopener" style="font-size:11px;font-weight:700;color:#0284c7;text-decoration:none;">↗</a>` : ""}
-                        </div>
-                      </div>
-                      ${filesHtml ? `<div>${filesHtml}</div>` : ""}
-                    </div>`;
-                })
-                .join("")}
-            </div>`
-          )
-          .join("");
+        _moodleCourseCache[courseId] = res.sections;
+        renderMoodleCourseBody(courseId, "all");
       } catch (_) {
         bodyEl.innerHTML = `<div style="font-size:12px;color:#fb7185;">⚠️ ${isRu ? "Не удалось загрузить материалы." : "Materiallarni yuklab bo'lmadi."}</div>`;
       }
@@ -9792,10 +9839,10 @@
         renderClassAttendanceCard(title, instructor, slotObj, attBox);
       }
 
-      // Auto-load matching Moodle course materials (sorted by Lecture/Seminar/Assign/Other + sections)
+      // Auto-load ONLY the materials matching THIS specific class/topic (not the entire course!)
       const matBox = document.getElementById("cdMoodleMaterialsBox");
       if (matBox) {
-        loadClassMoodleMaterials(title, matBox, null, studyType);
+        loadClassMoodleMaterials(title, matBox, null, studyType, topic);
       }
 
       document.getElementById("classDetailBackdrop").classList.add("open");
@@ -9887,11 +9934,27 @@
 
     let _classModalModsState = null;
 
-    function filterClassMoodleMaterials(cat) {
+    function selectClassMoodleSection(secIdx) {
       if (!_classModalModsState) return;
       haptic("light");
-      _classModalModsState.activeCat = cat;
+      _classModalModsState.selectedSecIdx = secIdx === "" ? -1 : Number(secIdx);
       renderClassMoodleMaterialsList();
+    }
+
+    function openMatchedCourseInMoodle(courseId) {
+      closeClassDetailModal();
+      switchTab("moodle");
+      switchMoodleSubTab("courses");
+      if (courseId) {
+        setTimeout(() => {
+          const bodyEl = document.getElementById(`mdlCourseBody_${courseId}`);
+          if (bodyEl && bodyEl.style.display !== "block") {
+            toggleMoodleCourseContents(courseId);
+          }
+          const card = bodyEl && bodyEl.parentElement;
+          if (card && card.scrollIntoView) card.scrollIntoView({ behavior: "smooth", block: "center" });
+        }, 250);
+      }
     }
 
     function renderClassMoodleMaterialsList() {
@@ -9899,39 +9962,35 @@
       const matBox = document.getElementById("cdMoodleMaterialsBox");
       if (!st || !matBox) return;
       const isRu = STATE.lang === "ru";
-      const { allMods, courseName, coursePickerHtml, activeCat } = st;
-      const counts = { all: allMods.length, lecture: 0, seminar: 0, assign: 0, other: 0 };
-      allMods.forEach((m) => { counts[m.cat] = (counts[m.cat] || 0) + 1; });
-
-      const tabs = [
-        { k: "all", lbl: `${isRu ? "Все" : "Barchasi"} (${counts.all})` },
-        ...(counts.lecture ? [{ k: "lecture", lbl: `📖 ${isRu ? "Лекции" : "Ma'ruza"} (${counts.lecture})` }] : []),
-        ...(counts.seminar ? [{ k: "seminar", lbl: `🧪 ${isRu ? "Семинары" : "Seminar"} (${counts.seminar})` }] : []),
-        ...(counts.assign ? [{ k: "assign", lbl: `📝 ${isRu ? "Задания" : "Topshiriq"} (${counts.assign})` }] : []),
-        ...(counts.other ? [{ k: "other", lbl: `📎 ${isRu ? "Другое" : "Boshqa"} (${counts.other})` }] : []),
-      ];
-      const pillsHtml = `<div class="chips-scroll" style="margin:6px 0 8px;">${tabs
-        .map((tb) => `<button class="pill pill-sm ${activeCat === tb.k ? "active" : ""}" onclick="filterClassMoodleMaterials('${tb.k}')">${tb.lbl}</button>`)
-        .join("")}</div>`;
-
-      const filtered = activeCat === "all" ? allMods : allMods.filter((m) => m.cat === activeCat);
-      _classModalFilesCache = filtered
-        .filter((m) => m.files && m.files[0])
-        .map((m) => ({ fileurl: m.files[0].fileurl, filename: m.files[0].filename, title: m.name || m.files[0].filename }));
-
+      const { sections, courseId, courseName, coursePickerHtml, selectedSecIdx, matchedAutomatically, studyType } = st;
       const safeCourse = String(courseName || "Moodle").replace(/'/g, "\\'");
-      // Group filtered items by section/week name
-      const bySec = new Map();
-      for (const m of filtered.slice(0, 14)) {
-        const sKey = m.secName || (isRu ? "Общее" : "Umumiy");
-        if (!bySec.has(sKey)) bySec.set(sKey, []);
-        bySec.get(sKey).push(m);
-      }
 
-      let groupsHtml = "";
-      for (const [secName, list] of bySec.entries()) {
-        groupsHtml += `<div style="font-size:10.5px;font-weight:800;color:var(--text-muted);margin-top:6px;margin-bottom:2px;">📂 ${secName}</div>`;
-        groupsHtml += list
+      const secSelectorHtml = sections.length > 1
+        ? `<select onchange="selectClassMoodleSection(this.value)" style="width:100%;margin-top:6px;padding:6px 8px;border-radius:8px;font-size:11.5px;font-weight:700;border:1px solid var(--border);background:var(--bg-elevated);color:var(--text);">
+            <option value="">${isRu ? "📂 Выберите тему / неделю этой пары..." : "📂 Ushbu dars mavzusini tanlang..."}</option>
+            ${sections.map((s, idx) => `<option value="${idx}" ${idx === selectedSecIdx ? "selected" : ""}>📂 ${s.name} (${s.mods.length})</option>`).join("")}
+          </select>`
+        : "";
+
+      const activeSec = selectedSecIdx >= 0 && sections[selectedSecIdx] ? sections[selectedSecIdx] : null;
+      let bodyHtml = "";
+      _classModalFilesCache = [];
+
+      if (!activeSec) {
+        bodyHtml = `<div style="font-size:11.5px;color:var(--text-muted);margin-top:4px;">${isRu ? "Точная тема пары не указана в расписании — выберите нужную тему/неделю ниже или откройте весь курс:" : "Dars mavzusi jadvalda ko'rsatilmagan — kerakli mavzuni tanlang yoki to'liq kursni oching:"}</div>${secSelectorHtml}`;
+      } else {
+        const stUp = String(studyType || "").toUpperCase();
+        let modsToShow = activeSec.mods;
+        if (stUp.includes("LECT") && activeSec.mods.some((m) => m.cat === "lecture")) {
+          modsToShow = activeSec.mods.filter((m) => m.cat === "lecture" || m.cat === "other");
+        } else if ((stUp.includes("PRACT") || stUp.includes("SEMIN")) && activeSec.mods.some((m) => m.cat === "seminar")) {
+          modsToShow = activeSec.mods.filter((m) => m.cat === "seminar" || m.cat === "assign" || m.cat === "other");
+        }
+        _classModalFilesCache = modsToShow
+          .filter((m) => m.files && m.files[0])
+          .map((m) => ({ fileurl: m.files[0].fileurl, filename: m.files[0].filename, title: m.name || m.files[0].filename }));
+
+        const itemsHtml = modsToShow
           .map((m) => {
             const firstFile = m.files && m.files[0];
             const catIcon = m.cat === "lecture" ? "📖" : m.cat === "seminar" ? "🧪" : m.cat === "assign" ? "📝" : "📄";
@@ -9943,20 +10002,34 @@
               : m.url
               ? `<a href="${m.url}" target="_blank" rel="noopener" style="font-size:10.5px;font-weight:700;color:#0284c7;text-decoration:none;flex-shrink:0;">Открыть ↗</a>`
               : "";
-            return `<div style="display:flex;justify-content:space-between;align-items:center;gap:6px;padding:5px 0;border-top:1px solid var(--border);"><span style="font-size:12px;color:var(--text);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${catIcon} ${m.name}</span>${btns}</div>`;
+            return `<div style="display:flex;justify-content:space-between;align-items:center;gap:6px;padding:6px 0;border-top:1px solid var(--border);"><span style="font-size:12px;color:var(--text);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${catIcon} ${m.name}</span>${btns}</div>`;
           })
           .join("");
+
+        const sendAllBtn =
+          _classModalFilesCache.length >= 2
+            ? `<button onclick="sendAllClassFilesToBot('${safeCourse}')" class="btn-sm" style="width:100%;margin-top:6px;padding:7px;background:rgba(2,132,199,0.14);border-color:rgba(2,132,199,0.35);color:#0284c7;font-weight:800;">📦 ${isRu ? `Отправить файлы этой темы (${Math.min(5, _classModalFilesCache.length)}) в бот` : `Mavzu fayllarini (${Math.min(5, _classModalFilesCache.length)}) botga yuborish`}</button>`
+            : "";
+
+        bodyHtml =
+          `<div style="font-size:11px;font-weight:800;color:#059669;margin-top:4px;margin-bottom:4px;">📂 ${activeSec.name}${matchedAutomatically ? (isRu ? " · совпадение по теме" : " · mavzu bo'yicha") : ""}</div>` +
+          itemsHtml +
+          sendAllBtn +
+          secSelectorHtml;
       }
 
-      const sendAllBtn =
-        _classModalFilesCache.length >= 2
-          ? `<button onclick="sendAllClassFilesToBot('${safeCourse}')" class="btn-sm" style="width:100%;margin-top:8px;padding:7px;background:rgba(2,132,199,0.14);border-color:rgba(2,132,199,0.35);color:#0284c7;font-weight:800;">📦 ${isRu ? `Отправить файлы (${Math.min(5, _classModalFilesCache.length)}) в чат бота` : `Fayllarni (${Math.min(5, _classModalFilesCache.length)}) botga yuborish`}</button>`
-          : "";
-
-      matBox.innerHTML = `<div class="panel" style="margin:0;padding:10px 12px;border-color:rgba(56,189,248,0.32);"><div style="display:flex;justify-content:space-between;align-items:center;"><span style="font-size:11.5px;font-weight:800;color:#0284c7;">📚 ${isRu ? "Материалы пары (Moodle)" : "Dars materiallari (Moodle)"}</span><button onclick="closeClassDetailModal();switchTab('moodle');switchMoodleSubTab('courses')" style="background:none;border:none;color:#059669;font-size:11px;font-weight:800;cursor:pointer;">${isRu ? "Все →" : "Barchasi →"}</button></div>${pillsHtml}${groupsHtml}${sendAllBtn}${coursePickerHtml}</div>`;
+      matBox.innerHTML = `
+        <div class="panel" style="margin:0;padding:10px 12px;border-color:rgba(56,189,248,0.32);">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;">
+            <span style="font-size:11.5px;font-weight:800;color:#0284c7;">📚 ${isRu ? "Материалы этой пары" : "Ushbu dars materiallari"}</span>
+            <button onclick="openMatchedCourseInMoodle(${courseId})" style="background:none;border:none;color:#059669;font-size:11px;font-weight:800;cursor:pointer;">${isRu ? "Весь курс →" : "To'liq kurs →"}</button>
+          </div>
+          ${bodyHtml}
+          ${coursePickerHtml}
+        </div>`;
     }
 
-    async function loadClassMoodleMaterials(classTitle, matBox, forcedCourseId = null, studyType = "") {
+    async function loadClassMoodleMaterials(classTitle, matBox, forcedCourseId = null, studyType = "", lessonTopic = "") {
       const isRu = STATE.lang === "ru";
       const mdl = getVerifiedMoodleIdentity();
       const token = (mdl && mdl.token) || localStorage.getItem("uwed_moodle_token") || "";
@@ -10031,32 +10104,63 @@
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ token, courseid: bestCourse.id }),
         }).then((r) => r.json());
-        const flatMods = [];
         const sortedSecs = sortMoodleSections((res && res.sections) || []);
         const catRank = { lecture: 1, seminar: 2, assign: 3, other: 4 };
-        for (const sec of sortedSecs) {
-          const mods = [...(sec.modules || [])].sort(
-            (a, b) => catRank[classifyMoodleModule(a, sec.name)] - catRank[classifyMoodleModule(b, sec.name)]
-          );
-          for (const m of mods) {
-            if ((m.files && m.files.length) || m.url) {
-              flatMods.push({ ...m, secName: sec.name, cat: classifyMoodleModule(m, sec.name) });
-            }
-          }
-        }
-        if (!flatMods.length) {
+        const cleanSecs = sortedSecs
+          .map((sec) => ({
+            id: sec.id,
+            name: sec.name || (isRu ? "Раздел" : "Bo'lim"),
+            mods: [...(sec.modules || [])]
+              .filter((m) => (m.files && m.files.length) || m.url)
+              .map((m) => ({ ...m, secName: sec.name, cat: classifyMoodleModule(m, sec.name) }))
+              .sort((a, b) => catRank[a.cat] - catRank[b.cat]),
+          }))
+          .filter((s) => s.mods.length > 0);
+
+        if (!cleanSecs.length) {
           matBox.innerHTML = `<div class="panel" style="margin:0;padding:10px 12px;border-color:rgba(56,189,248,0.25);"><div style="font-size:11.5px;font-weight:800;color:#0284c7;">📚 Moodle: ${bestCourse.name}</div><div style="font-size:11px;color:var(--text-muted);margin-top:3px;">${isRu ? "Файлы в этом курсе пока не добавлены." : "Ushbu kursda fayllar hali qo'shilmagan."}</div>${coursePickerHtml}</div>`;
           return;
         }
-        const stUp = String(studyType || "").toUpperCase();
-        let initialCat = "all";
-        if (stUp.includes("LECT") && flatMods.some((m) => m.cat === "lecture")) initialCat = "lecture";
-        else if ((stUp.includes("PRACT") || stUp.includes("SEMIN")) && flatMods.some((m) => m.cat === "seminar")) initialCat = "seminar";
+
+        // Match ONLY the specific topic/section for THIS class (never dump the whole semester!)
+        let selectedSecIdx = -1;
+        let matchedAutomatically = false;
+        const topicClean = normSearchStr(lessonTopic || "");
+        if (topicClean && topicClean !== normSearchStr(classTitle)) {
+          const topicNumMatch = topicClean.match(/\b(\d{1,2})\b/);
+          const topicWords = topicClean.split(" ").filter((w) => w.length >= 4);
+          let bestIdx = -1;
+          let bestSc = 0;
+          cleanSecs.forEach((sec, idx) => {
+            const secNorm = normSearchStr(`${sec.name} ${sec.mods.map((m) => m.name).join(" ")}`);
+            let sc = 0;
+            if (topicNumMatch && extractSectionOrderNum(sec.name) === parseInt(topicNumMatch[1], 10)) sc += 12;
+            for (const w of topicWords) {
+              if (secNorm.includes(w)) sc += w.length;
+            }
+            if (sc > bestSc) {
+              bestSc = sc;
+              bestIdx = idx;
+            }
+          });
+          if (bestIdx >= 0 && bestSc >= 6) {
+            selectedSecIdx = bestIdx;
+            matchedAutomatically = true;
+          }
+        }
+        // If course only has 1 section total, show that 1 section cleanly
+        if (selectedSecIdx === -1 && cleanSecs.length === 1) {
+          selectedSecIdx = 0;
+        }
+
         _classModalModsState = {
-          allMods: flatMods,
+          sections: cleanSecs,
+          courseId: bestCourse.id,
           courseName: bestCourse.name,
           coursePickerHtml,
-          activeCat: initialCat,
+          selectedSecIdx,
+          matchedAutomatically,
+          studyType,
         };
         renderClassMoodleMaterialsList();
       } catch (_) {
