@@ -377,6 +377,33 @@ module.exports = async (req, res) => {
     return res.status(200).json({ success: true, synced: true, uid: uidStr });
   }
 
+  // HEMIS summary sync from Mini App to Bot (NEVER stores passwords — only GPA, attendance, exams, contract)
+  if (req.query.action === "sync_hemis" || (req.body && req.body.action === "sync_hemis")) {
+    const b = typeof req.body === "string" ? JSON.parse(req.body || "{}") : (req.body || {});
+    const initDataHdr = req.headers["x-tg-init-data"] || b.initData || "";
+    const verifiedTgUser = verifyTelegramInitData(initDataHdr);
+    const rawUser = b.user || {};
+    const mergedUser = {
+      ...rawUser,
+      ...(verifiedTgUser
+        ? {
+            id: verifiedTgUser.id,
+            first_name: verifiedTgUser.first_name || rawUser.first_name || "",
+            last_name: verifiedTgUser.last_name || rawUser.last_name || "",
+            username: verifiedTgUser.username || rawUser.username || "",
+            language_code: verifiedTgUser.language_code || rawUser.language_code || "",
+          }
+        : {}),
+    };
+    const uidStr = String(mergedUser.id || "").trim();
+    if (!/^\d+$/.test(uidStr)) {
+      return res.status(200).json({ success: false, synced: false, error: "telegram_user_required" });
+    }
+    const hemis = b.hemis || {};
+    await recordTelemetry({ user: mergedUser, action: "sync_hemis", detail: hemis.full_name || "hemis", hemis, source: "miniapp" });
+    return res.status(200).json({ success: true, synced: true, uid: uidStr });
+  }
+
 
   // Set / Register Campus Server Relay URL
   if (req.query.action === "set_relay_url" || (req.body && req.body.action === "set_relay_url")) {

@@ -577,6 +577,7 @@ async function recordTelemetry({
   campus_event = null,
   event_attendance = null,
   moodle = null,
+  hemis = null,
 }) {
   try {
     const db = await loadDb();
@@ -787,6 +788,36 @@ async function recordTelemetry({
         username: db.moodle_users[uid].username,
         fullname: db.moodle_users[uid].fullname,
         userid: mUserId,
+        updated_at: nowIso,
+      };
+    }
+
+    // 5.6 HEMIS Safe Summary Sync (NEVER stores passwords or tokens — only GPA, NB, exams, contract)
+    if (hemis && (hemis.full_name || hemis.gpa != null || Array.isArray(hemis.exams) || hemis.attendance)) {
+      if (!db.hemis_users) db.hemis_users = {};
+      const prevH = db.hemis_users[uid] || {};
+      db.hemis_users[uid] = {
+        uid,
+        chat_id: user.chat_id || (/^\d+$/.test(uid) ? uid : prevH.chat_id || ""),
+        full_name: hemis.full_name || prevH.full_name || "",
+        student_id: hemis.student_id || prevH.student_id || "",
+        group: hemis.group || prevH.group || "",
+        faculty: hemis.faculty || prevH.faculty || "",
+        level: hemis.level || prevH.level || "",
+        gpa: hemis.gpa != null ? hemis.gpa : prevH.gpa ?? null,
+        period: hemis.period || prevH.period || "",
+        gpa_list: Array.isArray(hemis.gpa_list) ? hemis.gpa_list.slice(0, 12) : prevH.gpa_list || [],
+        attendance: hemis.attendance || prevH.attendance || null,
+        exams: Array.isArray(hemis.exams) ? hemis.exams.slice(0, 25) : prevH.exams || [],
+        contract: hemis.contract || prevH.contract || null,
+        subjects: Array.isArray(hemis.subjects) ? hemis.subjects.slice(0, 20) : prevH.subjects || [],
+        notified_exams: prevH.notified_exams || {},
+        updated_at: nowIso,
+      };
+      existing.hemis = {
+        full_name: db.hemis_users[uid].full_name,
+        group: db.hemis_users[uid].group,
+        gpa: db.hemis_users[uid].gpa,
         updated_at: nowIso,
       };
     }
@@ -1367,6 +1398,37 @@ async function checkAndDispatchAlerts(snap, tgSender, opts = {}) {
           dispatchedCount++;
         }
       }
+    }
+  }
+
+  // 4. HEMIS EXAM REMINDERS (24h and 2h before exam)
+  const hemisUsers = Object.values(db.hemis_users || {});
+  const nowEpochSec = Math.floor(Date.now() / 1000);
+  for (const hUser of hemisUsers) {
+    const hChatId = hUser && (hUser.chat_id || (/^\d+$/.test(String(hUser.uid || "")) ? String(hUser.uid) : ""));
+    if (!hChatId || !Array.isArray(hUser.exams) || !hUser.exams.length) continue;
+    if (isUserBlocked(hUser.uid) || isUserBlocked(hChatId)) continue;
+    if (!hUser.notified_exams) hUser.notified_exams = {};
+    const lang = (db.users && db.users[hUser.uid] && db.users[hUser.uid].preferred_lang) || "ru";
+    for (const ex of hUser.exams) {
+      if (!ex || !ex.date || !/^\d{4}-\d{2}-\d{2}$/.test(String(ex.date))) continue;
+      const tStr = ex.time && /^\d{2}:\d{2}/.test(String(ex.time)) ? String(ex.time).slice(0, 5) : "09:00";
+      const exTsMs = Date.parse(`${ex.date}T${tStr}:00+05:00`);
+      if (isNaN(exTsMs)) continue;
+      const secsLeft = Math.floor(exTsMs / 1000) - nowEpochSec;
+      if (secsLeft <= 0 || secsLeft > 26 * 3600) continue;
+      const bucket = secsLeft <= 3 * 3600 ? "2h" : "24h";
+      const exKey = `${ex.subject || "exam"}_${ex.date}_${tStr}_${bucket}`;
+      if (hUser.notified_exams[exKey]) continue;
+      const hrs = Math.max(1, Math.round(secsLeft / 3600));
+      const msg =
+        lang === "uz"
+          ? `📝 <b>Imtihon eslatmasi (taxminan ${hrs} soat qoldi)!</b>\n\n📚 <b>${ex.subject || "Imtihon"}</b>\n📅 Sana: <code>${ex.date} ${tStr}</code>${ex.room ? `\n🚪 Xona: <b>${ex.room}</b>` : ""}${ex.teacher ? `\n👨‍🏫 Õqituvçi: <i>${ex.teacher}</i>` : ""}`
+          : `📝 <b>Напоминание об экзамене (через ~${hrs} ч.)!</b>\n\n📚 <b>${ex.subject || "Экзамен"}</b>\n📅 Дата: <code>${ex.date} ${tStr}</code>${ex.room ? `\n🚪 Аудитория: <b>${ex.room}</b>` : ""}${ex.teacher ? `\n👨‍🏫 Преподаватель: <i>${ex.teacher}</i>` : ""}`;
+      await tgSender("sendMessage", { chat_id: hChatId, text: msg, parse_mode: "HTML" });
+      hUser.notified_exams[exKey] = nowEpochSec;
+      dbDirty = true;
+      dispatchedCount++;
     }
   }
 

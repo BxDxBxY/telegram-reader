@@ -965,6 +965,166 @@ module.exports = async (req, res) => {
       return res.status(200).json({ ok: true, courseid, sections });
     }
 
+    // ─── SEND MOODLE FILE DIRECTLY TO USER'S TELEGRAM CHAT ───
+    if (action === "moodle_send_file") {
+      res.setHeader("Cache-Control", "no-store");
+      let body = {};
+      if (req.method === "POST") {
+        body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : req.body || {};
+      }
+      const fileurl = String(body.fileurl || "").trim();
+      const filename = String(body.filename || "material.pdf").replace(/[^\w.\- ()\u0400-\u04FF]/g, "_").slice(0, 100);
+      const title = String(body.title || filename).slice(0, 180);
+      const course = String(body.course || "Moodle").slice(0, 120);
+      const chatId = String(body.chat_id || "").trim();
+      const botToken = process.env.BOT_TOKEN || process.env.TELEGRAM_BOT_TOKEN || "";
+
+      if (!botToken || !/^\d+$/.test(chatId) || !fileurl || !/^https:\/\/moodle\.uwed\.uz\//i.test(fileurl)) {
+        return res.status(200).json({ ok: false, error: "invalid_params" });
+      }
+
+      const sendLinkFallback = async () => {
+        const payload = JSON.stringify({
+          chat_id: chatId,
+          text: `📄 <b>${title}</b>\n📚 <i>${course}</i>\n\nНажмите кнопку ниже, чтобы скачать файл из Moodle:`,
+          parse_mode: "HTML",
+          reply_markup: { inline_keyboard: [[{ text: `⬇️ Скачать ${filename.slice(0, 32)}`, url: fileurl }]] },
+        });
+        await new Promise((resolve) => {
+          const r = https.request(
+            {
+              hostname: "api.telegram.org",
+              port: 443,
+              path: `/bot${botToken}/sendMessage`,
+              method: "POST",
+              headers: { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(payload) },
+              timeout: 8000,
+            },
+            (resp) => { resp.resume(); resp.on("end", resolve); }
+          );
+          r.on("error", resolve);
+          r.on("timeout", () => { r.destroy(); resolve(); });
+          r.write(payload);
+          r.end();
+        });
+      };
+
+      try {
+        const dlRes = await fetch(fileurl, { headers: { "User-Agent": "MoodleMobile 4.4.0" }, redirect: "follow" });
+        const ct = (dlRes.headers.get("content-type") || "").toLowerCase();
+        const cl = Number(dlRes.headers.get("content-length") || 0);
+        if (!dlRes.ok || ct.includes("text/html") || cl > 18 * 1024 * 1024) {
+          await sendLinkFallback();
+          return res.status(200).json({ ok: true, mode: "link" });
+        }
+        const arrBuf = await dlRes.arrayBuffer();
+        const buf = Buffer.from(arrBuf);
+        if (!buf.length || buf.length > 18 * 1024 * 1024) {
+          await sendLinkFallback();
+          return res.status(200).json({ ok: true, mode: "link" });
+        }
+        const boundary = "----UWEDMoodleFile" + Date.now().toString(36);
+        const caption = `📄 ${title}\n📚 ${course}`;
+        const parts = [
+          Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="chat_id"\r\n\r\n${chatId}\r\n`),
+          Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="caption"\r\n\r\n${caption}\r\n`),
+          Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="document"; filename="${filename}"\r\nContent-Type: application/octet-stream\r\n\r\n`),
+          buf,
+          Buffer.from(`\r\n--${boundary}--\r\n`),
+        ];
+        const multipartBody = Buffer.concat(parts);
+        const tgResp = await new Promise((resolve) => {
+          const r = https.request(
+            {
+              hostname: "api.telegram.org",
+              port: 443,
+              path: `/bot${botToken}/sendDocument`,
+              method: "POST",
+              headers: {
+                "Content-Type": `multipart/form-data; boundary=${boundary}`,
+                "Content-Length": multipartBody.length,
+              },
+              timeout: 15000,
+            },
+            (resp) => {
+              const ch = [];
+              resp.on("data", (c) => ch.push(c));
+              resp.on("end", () => {
+                try { resolve(JSON.parse(Buffer.concat(ch).toString("utf-8"))); } catch (_) { resolve({ ok: false }); }
+              });
+            }
+          );
+          r.on("error", () => resolve({ ok: false }));
+          r.on("timeout", () => { r.destroy(); resolve({ ok: false }); });
+          r.write(multipartBody);
+          r.end();
+        });
+        if (tgResp && tgResp.ok) {
+          return res.status(200).json({ ok: true, mode: "document" });
+        }
+        await sendLinkFallback();
+        return res.status(200).json({ ok: true, mode: "link" });
+      } catch (_) {
+        await sendLinkFallback();
+        return res.status(200).json({ ok: true, mode: "link" });
+      }
+    }
+
+    // ─── HEMIS SEMESTER SUBJECTS SWITCHER ───
+    if (action === "hemis_semester") {
+      res.setHeader("Cache-Control", "no-store");
+      let body = {};
+      if (req.method === "POST") {
+        body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : req.body || {};
+      }
+      const token = String(body.token || "").trim();
+      const semester = String(body.semester || req.query.semester || "").trim();
+      if (!token || !semester) {
+        return res.status(200).json({ ok: false, error: "missing_params" });
+      }
+      const subjRes = await new Promise((resolve) => {
+        const r = https.request(
+          {
+            hostname: "student.uwed.uz",
+            port: 443,
+            path: `/rest/v1/education/subject-list?semester=${encodeURIComponent(semester)}`,
+            method: "GET",
+            headers: { Accept: "application/json", Authorization: `Bearer ${token}`, "User-Agent": "Mozilla/5.0" },
+            timeout: 10000,
+          },
+          (resp) => {
+            const ch = [];
+            resp.on("data", (c) => ch.push(c));
+            resp.on("end", () => {
+              try { resolve(JSON.parse(Buffer.concat(ch).toString("utf-8"))); } catch (_) { resolve(null); }
+            });
+          }
+        );
+        r.on("error", () => resolve(null));
+        r.on("timeout", () => { r.destroy(); resolve(null); });
+        r.end();
+      });
+      const subjList = Array.isArray(subjRes && subjRes.data) ? subjRes.data : [];
+      if (!subjList.length) {
+        return res.status(200).json({ ok: false, error: "empty_or_expired", subjects: [] });
+      }
+      const subjects = subjList.map((s) => {
+        const os = s.overallScore || {};
+        const rawGrade = os.grade != null ? Number(os.grade) : os.percent != null ? Number(os.percent) : s.overall_score != null ? Number(s.overall_score) : 0;
+        const maxBall = Number(os.max_ball || 100);
+        const normalized100 = maxBall > 0 && maxBall !== 100 && rawGrade > 0 ? Math.round((rawGrade / maxBall) * 100) : Math.round(rawGrade);
+        return {
+          name: (s.curriculumSubject && s.curriculumSubject.subject && s.curriculumSubject.subject.name) || s.name || "Subject",
+          code: (s.curriculumSubject && s.curriculumSubject.subject && s.curriculumSubject.subject.code) || "",
+          credit: Number((s.curriculumSubject && s.curriculumSubject.credit) || s.credit || 4),
+          score: Math.max(0, Math.min(100, isNaN(normalized100) ? 0 : normalized100)),
+          raw_score: rawGrade,
+          max_ball: maxBall,
+        };
+      });
+      return res.status(200).json({ ok: true, semester, subjects });
+    }
+
     // ─── HEMIS SERVER FALLBACK (student.uwed.uz/rest/v1) ───
     if (action === "hemis_login") {
       res.setHeader("Cache-Control", "no-store");
@@ -1135,6 +1295,7 @@ module.exports = async (req, res) => {
 
       return res.status(200).json({
         ok: true,
+        token,
         me: {
           full_name: meData.full_name || meData.short_name || login,
           student_id: meData.student_id_number || login,

@@ -2101,6 +2101,29 @@
         </div>
       </div>
 
+      <!-- Add-to-Home-Screen Shortcut Prompt Banner -->
+      <div id="homeShortcutBanner" class="panel" style="display:none; margin-bottom:10px; padding:11px 13px; background:linear-gradient(135deg, rgba(56,189,248,0.16), rgba(16,185,129,0.12)); border:1px solid rgba(56,189,248,0.38);">
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+          <div style="min-width:0; flex:1;">
+            <div style="font-size:13px; font-weight:800; color:var(--text);" id="homeShortcutTitle">📲 Ярлык UWED на рабочий стол</div>
+            <div style="font-size:11px; color:var(--text-sec); margin-top:2px;" id="homeShortcutSub">Открывайте расписание, Moodle и HEMIS в 1 тап, как обычное приложение.</div>
+          </div>
+          <div style="display:flex; align-items:center; gap:6px; flex-shrink:0;">
+            <button class="btn-sm" style="background:#38bdf8; color:#0f172a; border:none; font-weight:800; padding:6px 10px;" onclick="triggerAddToHomeScreen()" id="homeShortcutBtn">Установить</button>
+            <button onclick="dismissHomeShortcutBanner()" style="background:none; border:none; color:var(--text-muted); font-size:16px; cursor:pointer; padding:2px 4px;">✕</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Unified "My Day" Summary Strip (Classes + Moodle Deadlines + Next HEMIS Exam) -->
+      <div id="homeMyDayCard" class="panel" style="display:none; margin-bottom:10px; padding:11px 13px; border-color:rgba(16,185,129,0.32); background:linear-gradient(135deg, rgba(16,185,129,0.10), rgba(15,23,42,0.55));">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+          <span style="font-size:12px; font-weight:800; color:#34d399;" id="homeMyDayTitle">☀️ Мой день</span>
+          <span style="font-size:11px; font-weight:700; color:#38bdf8; cursor:pointer;" onclick="switchTab('profile')" id="homeMyDayOpenLbl">Календарь →</span>
+        </div>
+        <div id="homeMyDayBody" style="font-size:12px; color:var(--text); line-height:1.45;"></div>
+      </div>
+
       <!-- Unified Academic Hub (Moodle + HEMIS GPA + Next Class in one glance) -->
       <div class="acad-hub-card" id="homeAcadHubCard">
         <div style="display:flex; justify-content:space-between; align-items:center;">
@@ -2722,6 +2745,9 @@
         <span style="font-size:11px; font-weight:800; background:rgba(16,185,129,0.18); color:#34d399; padding:3px 8px; border-radius:6px;" id="gpaCourseCountBadge">0 ta fan</span>
       </div>
 
+      <!-- HEMIS Semester Switcher -->
+      <div id="gpaHemisSemesterBar" class="chips-scroll" style="display:none; margin-bottom:8px;"></div>
+
       <div id="gpaRowsContainer" class="list-stack"></div>
 
       <div class="panel" style="margin-top:12px; font-size:11.5px; color:var(--text-muted); line-height:1.5;">
@@ -2911,6 +2937,15 @@
         <div class="panel">
           <div style="font-size:14px; font-weight:800; margin-bottom:12px;" id="profPrefsTitle">⚙️ Настройки приложения</div>
 
+          <!-- Home Screen Shortcut -->
+          <div style="display:flex; justify-content:space-between; align-items:center; padding:9px 0; border-bottom:1px solid var(--border); gap:8px;">
+            <div>
+              <div style="font-size:13px; font-weight:700;">📲 Ярлык на рабочий стол</div>
+              <div style="font-size:11px; color:var(--text-muted);">Быстрый запуск UWED в 1 тап</div>
+            </div>
+            <button class="btn-sm" style="background:rgba(56,189,248,0.18); border-color:rgba(56,189,248,0.4); color:#38bdf8; font-weight:800;" onclick="triggerAddToHomeScreen()">Установить</button>
+          </div>
+
           <!-- Theme Switcher -->
           <div style="display:flex; justify-content:space-between; align-items:center; padding:9px 0; border-bottom:1px solid var(--border);">
             <div>
@@ -3033,6 +3068,7 @@
         <button class="btn-sm" onclick="closeClassDetailModal()" style="padding:6px 10px; font-size:13px;">✕</button>
       </div>
       <div id="cdMetaGrid" style="display:grid; gap:8px; margin-bottom:14px;"></div>
+      <div id="cdMoodleMaterialsBox" style="display:none; margin-bottom:14px;"></div>
       <div id="cdActionsRow" style="display:flex; flex-wrap:wrap; gap:8px;"></div>
     </div>
   </div>
@@ -5040,7 +5076,55 @@
             schValEl.textContent = isRu ? "Выбрать →" : (isEn ? "Select →" : "Tanlaş →");
           }
         }
+
+        // Unified "My Day" summary card (Classes + Moodle Deadlines + Nearest HEMIS Exam)
+        const myDayCard = document.getElementById("homeMyDayCard");
+        const myDayBody = document.getElementById("homeMyDayBody");
+        const myDayTitle = document.getElementById("homeMyDayTitle");
+        const myDayOpen = document.getElementById("homeMyDayOpenLbl");
+        if (myDayCard && myDayBody) {
+          if (myDayTitle) myDayTitle.textContent = isRu ? "☀️ Мой день" : (isEn ? "☀️ My Day" : "☀️ Mening kunim");
+          if (myDayOpen) myDayOpen.textContent = isRu ? "Календарь →" : (isEn ? "Calendar →" : "Kalendar →");
+          const parts = [];
+          const todayClasses = (STATE.pinnedScheduleEvents || [])
+            .filter((e) => Number(e.week_day || e.d) === Number(cur.day))
+            .sort((a, b) => Number(a.slot_id || a.s) - Number(b.slot_id || b.s));
+          if (todayClasses.length) {
+            const nextCls = todayClasses.find((e) => Number(e.slot_id || e.s) >= Number(cur.slot)) || todayClasses[0];
+            const nextSlot = STATE.slots.find((s) => Number(s.id) === Number(nextCls.slot_id || nextCls.s));
+            parts.push(
+              `📚 <b>${todayClasses.length} ${isRu ? "пар(ы)" : "dars"}</b>` +
+                (nextCls ? ` · ${isRu ? "ближ." : "keyingi"}: <b>${toNewUz(nextCls.title || nextCls.t || "").slice(0, 28)}</b>${nextSlot ? ` (${nextSlot.start_time})` : ""}` : "")
+            );
+          }
+          if (mdlIdent && Array.isArray(mdlIdent.deadlines)) {
+            const nowSec = Math.floor(Date.now() / 1000);
+            const soon48 = mdlIdent.deadlines.filter((d) => d.time && d.time > nowSec && d.time - nowSec <= 48 * 3600);
+            if (soon48.length) {
+              parts.push(`⏳ <b>${soon48.length} ${isRu ? "дедл. Moodle в 48ч" : "Moodle dedlayn (48s)"}</b>: ${soon48[0].name || ""}`);
+            }
+          }
+          try {
+            const hp = JSON.parse(localStorage.getItem("uwed_hemis_profile") || "null");
+            const todayIso = getTashkentNow().toISOString().slice(0, 10);
+            const nextEx = (hp && Array.isArray(hp.exams) ? hp.exams : [])
+              .filter((ex) => ex && ex.date && String(ex.date) >= todayIso)
+              .sort((a, b) => String(a.date).localeCompare(String(b.date)))[0];
+            if (nextEx) {
+              parts.push(`📝 <b>${isRu ? "Ближайший экзамен" : "Yaqin imtihon"}:</b> ${toNewUz(nextEx.subject || "")} (${nextEx.date}${nextEx.time ? ` ${nextEx.time}` : ""})`);
+            }
+          } catch (_) {}
+          if (parts.length) {
+            myDayBody.innerHTML = parts.map((p) => `<div style="margin-bottom:3px;">${p}</div>`).join("");
+            myDayCard.style.display = "block";
+          } else {
+            myDayCard.style.display = "none";
+          }
+        }
       } catch (_) {}
+
+      // Show Add-to-Home-Screen shortcut prompt banner when appropriate
+      try { initHomeScreenShortcutPrompt(); } catch (_) {}
 
       // Render Additional Campus Facilities strip from campus_data.json & snapshot rooms (C, TTJ-B, SOK, Basseyn, ECO, F, KPP)
       try {
@@ -6355,8 +6439,15 @@
                 .map((m) => {
                   const filesHtml = (m.files || [])
                     .map(
-                      (f) =>
-                        `<a href="${f.fileurl}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:#34d399;text-decoration:none;background:rgba(16,185,129,0.12);padding:3px 7px;border-radius:6px;margin-top:4px;margin-right:4px;">⬇️ ${f.filename}</a>`
+                      (f) => {
+                        const safeUrl = String(f.fileurl || "").replace(/'/g, "\\'");
+                        const safeFn = String(f.filename || "file").replace(/'/g, "\\'");
+                        const safeTitle = String(m.name || f.filename || "Материал").replace(/'/g, "\\'");
+                        return `<div style="display:inline-flex;align-items:center;gap:4px;margin-top:4px;margin-right:4px;">` +
+                          `<a href="${f.fileurl}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:#34d399;text-decoration:none;background:rgba(16,185,129,0.12);padding:3px 7px;border-radius:6px;">⬇️ ${f.filename}</a>` +
+                          `<button onclick="sendMoodleFileToBot('${safeUrl}','${safeFn}','${safeTitle}','Moodle')" style="background:rgba(56,189,248,0.16);border:1px solid rgba(56,189,248,0.35);color:#38bdf8;font-size:10.5px;font-weight:700;padding:3px 7px;border-radius:6px;cursor:pointer;">✈️ ${isRu ? "В бот" : "Botga"}</button>` +
+                          `</div>`;
+                      }
                     )
                     .join("");
                   return `
@@ -6375,6 +6466,105 @@
       } catch (_) {
         bodyEl.innerHTML = `<div style="font-size:12px;color:#fb7185;">⚠️ ${isRu ? "Не удалось загрузить материалы." : "Materiallarni yuklab bo'lmadi."}</div>`;
       }
+    }
+
+    async function sendMoodleFileToBot(fileurl, filename, title, course) {
+      haptic("medium");
+      const isRu = STATE.lang === "ru";
+      const u = getCurrentUser();
+      if (!u || !/^\d+$/.test(String(u.id || ""))) {
+        showToast(isRu ? "Откройте Mini App внутри Telegram, чтобы получить файл в чат." : "Faylni botga olish uchun Mini App'ni Telegram ichida oching.");
+        return;
+      }
+      showToast(isRu ? `✈️ Отправляю «${filename}» в чат бота...` : `✈️ «${filename}» botga yuborilmoqda...`);
+      try {
+        const res = await fetch("/api/uwed?action=moodle_send_file", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ fileurl, filename, title, course, chat_id: String(u.id) }),
+        }).then((r) => r.json());
+        if (res && res.ok) {
+          showToast(isRu ? "✅ Файл отправлен в чат с @uwedhelpdesk_bot!" : "✅ Fayl @uwedhelpdesk_bot chatiga yuborildi!");
+        } else {
+          showToast(isRu ? "⚠️ Не удалось отправить файл. Откройте по прямой ссылке." : "⚠️ Faylni yuborib bo'lmadi.");
+        }
+      } catch (_) {
+        showToast(isRu ? "⚠️ Ошибка сети при отправке файла." : "⚠️ Tarmoq xatoligi.");
+      }
+    }
+
+    let _deferredPwaPrompt = null;
+    window.addEventListener("beforeinstallprompt", (e) => {
+      e.preventDefault();
+      _deferredPwaPrompt = e;
+    });
+
+    function initHomeScreenShortcutPrompt() {
+      const banner = document.getElementById("homeShortcutBanner");
+      if (!banner) return;
+      const dismissedUntil = Number(localStorage.getItem("uwed_shortcut_dismissed_until") || 0);
+      if (dismissedUntil > Date.now()) {
+        banner.style.display = "none";
+        return;
+      }
+      const isRu = STATE.lang === "ru";
+      const isEn = STATE.lang === "en";
+      const tEl = document.getElementById("homeShortcutTitle");
+      const sEl = document.getElementById("homeShortcutSub");
+      const bEl = document.getElementById("homeShortcutBtn");
+      if (tEl) tEl.textContent = isRu ? "📲 Ярлык UWED на рабочий стол" : isEn ? "📲 Add UWED Shortcut" : "📲 UWED ilovasini ekranga qo'shish";
+      if (sEl) sEl.textContent = isRu ? "Открывайте расписание, Moodle и HEMIS в 1 тап, как обычное приложение." : isEn ? "Open schedule, Moodle & HEMIS in 1 tap from your home screen." : "Dars jadvali, Moodle va HEMIS'ni 1 bosishda ilova kabi oching.";
+      if (bEl) bEl.textContent = isRu ? "Установить" : isEn ? "Add" : "O'rnatish";
+
+      if (tg && typeof tg.checkHomeScreenStatus === "function") {
+        try {
+          tg.checkHomeScreenStatus((status) => {
+            if (status === "added") {
+              banner.style.display = "none";
+            } else {
+              banner.style.display = "block";
+            }
+          });
+          return;
+        } catch (_) {}
+      }
+      // Show banner if Telegram addToHomeScreen is supported or in mobile browser
+      if ((tg && typeof tg.addToHomeScreen === "function") || _deferredPwaPrompt || /iPhone|iPad|Android/i.test(navigator.userAgent)) {
+        banner.style.display = "block";
+      }
+    }
+
+    function dismissHomeShortcutBanner() {
+      haptic("light");
+      // Snooze for 7 days
+      localStorage.setItem("uwed_shortcut_dismissed_until", String(Date.now() + 7 * 86400000));
+      const banner = document.getElementById("homeShortcutBanner");
+      if (banner) banner.style.display = "none";
+    }
+
+    function triggerAddToHomeScreen() {
+      haptic("medium");
+      const isRu = STATE.lang === "ru";
+      if (tg && typeof tg.addToHomeScreen === "function") {
+        try {
+          tg.addToHomeScreen();
+          localStorage.setItem("uwed_shortcut_dismissed_until", String(Date.now() + 30 * 86400000));
+          const banner = document.getElementById("homeShortcutBanner");
+          if (banner) banner.style.display = "none";
+          return;
+        } catch (_) {}
+      }
+      if (_deferredPwaPrompt) {
+        _deferredPwaPrompt.prompt();
+        _deferredPwaPrompt = null;
+        return;
+      }
+      showToast(
+        isRu
+          ? "Нажмите «⋯» (Меню вверху) → «Добавить на экран «Домой»»"
+          : "Yuqoridagi «⋯» menyuni bosing → «Bosh ekranga qo'shish»",
+        4200
+      );
     }
 
     function switchMoodleSubTab(sub) {
@@ -6571,6 +6761,29 @@
         }
       }
 
+      // Render HEMIS Semester Switcher pills if multiple semesters cached
+      const semBar = document.getElementById("gpaHemisSemesterBar");
+      if (semBar) {
+        try {
+          const sems = JSON.parse(localStorage.getItem("uwed_hemis_semesters") || "[]");
+          const curSemCode = localStorage.getItem("uwed_hemis_cur_sem") || "";
+          if (Array.isArray(sems) && sems.length > 1) {
+            semBar.style.display = "flex";
+            semBar.innerHTML = sems
+              .map((s) => {
+                const act = String(s.code) === String(curSemCode) ? "active" : "";
+                const safeName = String(s.name || s.code).replace(/'/g, "\\'");
+                return `<button class="pill pill-sm ${act}" onclick="switchHemisSemester('${s.code}','${safeName}')">${s.name || s.code}${s.year ? ` · ${s.year}` : ""}</button>`;
+              })
+              .join("");
+          } else {
+            semBar.style.display = "none";
+          }
+        } catch (_) {
+          semBar.style.display = "none";
+        }
+      }
+
       // Render HEMIS Exams / Midterms & Contract status if available
       const extrasBox = document.getElementById("gpaHemisExtrasBox");
       if (extrasBox) {
@@ -6588,20 +6801,21 @@
                 <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; padding:7px 10px; border-radius:10px; background:var(--bg-elevated); margin-bottom:5px; font-size:12px;">
                   <div style="min-width:0; flex:1;">
                     <div style="font-weight:700; color:var(--text);">${toNewUz(ex.subject || "—")}</div>
-                    <div style="font-size:11px; color:var(--text-muted);">${[ex.exam_type, ex.auditorium, ex.teacher].filter(Boolean).join(" · ")}</div>
+                    <div style="font-size:11px; color:var(--text-muted);">${[ex.type || ex.exam_type, ex.room || ex.auditorium, ex.teacher].filter(Boolean).join(" · ")}</div>
                   </div>
                   <div style="text-align:right; flex-shrink:0; font-size:11px; font-weight:800; color:#38bdf8;">${ex.date || ""}<br/>${ex.time || ""}</div>
                 </div>`
               )
               .join("");
           }
-          if (contract && (contract.summa || contract.edu_year)) {
+          const cTotal = contract ? (contract.total ?? contract.summa) : null;
+          if (contract && (cTotal || contract.paid || contract.edu_year)) {
             const fmtNum = (n) => (n != null && !isNaN(Number(n)) ? Number(n).toLocaleString("ru-RU") : "—");
             exHtml += `
               <div style="margin-top:${exams.length ? "10px" : "0"}; padding:9px 11px; border-radius:10px; background:rgba(56,189,248,0.08); border:1px solid rgba(56,189,248,0.22); font-size:12px;">
                 <div style="font-weight:800; color:#38bdf8; margin-bottom:4px;">💳 ${isRu ? "Контракт (HEMIS)" : "Kontrakt (HEMIS)"}${contract.edu_year ? ` · ${contract.edu_year}` : ""}</div>
                 <div style="display:flex; justify-content:space-between; flex-wrap:wrap; gap:6px; color:var(--text-sec);">
-                  <span>${isRu ? "Сумма" : "Summa"}: <b style="color:var(--text);">${fmtNum(contract.summa)}</b></span>
+                  <span>${isRu ? "Сумма" : "Summa"}: <b style="color:var(--text);">${fmtNum(cTotal)}</b></span>
                   <span>${isRu ? "Оплачено" : "Tõlangan"}: <b style="color:#34d399;">${fmtNum(contract.paid)}</b></span>
                   ${contract.debt ? `<span>${isRu ? "Долг" : "Qarz"}: <b style="color:#fb7185;">${fmtNum(contract.debt)}</b></span>` : ""}
                 </div>
@@ -6701,6 +6915,11 @@
           if (Array.isArray(res.gpa_list) && res.gpa_list.length) {
             localStorage.setItem("uwed_hemis_gpa_history", JSON.stringify(res.gpa_list));
           }
+          if (res.token) localStorage.setItem("uwed_hemis_token", res.token);
+          if (Array.isArray(res.semesters) && res.semesters.length) {
+            localStorage.setItem("uwed_hemis_semesters", JSON.stringify(res.semesters));
+          }
+          if (res.semester) localStorage.setItem("uwed_hemis_cur_sem", String(res.semester));
           if (res.me) {
             localStorage.setItem(
               "uwed_hemis_profile",
@@ -6713,6 +6932,8 @@
             );
             // Automatically link student's schedule from HEMIS to Profile & Telegram Bot!
             try { autoLinkStudentFromMoodle(res.me.full_name, res.me.group); } catch (_) {}
+            // Sync safe HEMIS summary (GPA, NB, exams, contract — NEVER password) to Telegram Bot
+            try { syncHemisToBot(res, pLabel); } catch (_) {}
           }
           saveGpaState();
           renderGpaTab();
@@ -6725,6 +6946,67 @@
         }
       } catch (_) {
         stEl.textContent = "❌ Ulanişda xatolik.";
+      }
+    }
+
+    async function syncHemisToBot(res, periodLabel) {
+      const u = getCurrentUser();
+      if (!u || !/^\d+$/.test(String(u.id || ""))) return;
+      await fetch("/api/telemetry?action=sync_hemis", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(tg && tg.initData ? { "X-Tg-Init-Data": tg.initData } : {}),
+        },
+        body: JSON.stringify({
+          action: "sync_hemis",
+          user: u,
+          initData: tg && tg.initData ? tg.initData : "",
+          hemis: {
+            full_name: (res.me && res.me.full_name) || "",
+            student_id: (res.me && res.me.student_id) || "",
+            group: (res.me && res.me.group) || "",
+            faculty: (res.me && res.me.faculty) || "",
+            level: (res.me && res.me.level) || "",
+            gpa: res.gpa != null ? res.gpa : null,
+            period: periodLabel || "",
+            gpa_list: res.gpa_list || [],
+            attendance: res.attendance || null,
+            exams: res.exams || [],
+            contract: res.contract || null,
+            subjects: res.subjects || [],
+          },
+        }),
+      }).catch(() => {});
+    }
+
+    async function switchHemisSemester(semCode, semName) {
+      haptic("light");
+      const isRu = STATE.lang === "ru";
+      const token = localStorage.getItem("uwed_hemis_token");
+      if (!token) {
+        showToast(isRu ? "Войдите в HEMIS ещё раз, чтобы переключить семестр." : "Semestrni almashtirish uchun HEMIS ga qayta kiring.");
+        return;
+      }
+      showToast(isRu ? `⏳ Загружаем ${semName}...` : `⏳ ${semName} yuklanmoqda...`);
+      try {
+        const res = await fetch("/api/uwed?action=hemis_semester", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token, semester: semCode }),
+        }).then((r) => r.json());
+        if (res && res.ok && Array.isArray(res.subjects) && res.subjects.length) {
+          gpaSubjects = res.subjects;
+          localStorage.setItem("uwed_hemis_cur_sem", String(semCode));
+          localStorage.setItem("uwed_gpa_period", semName || `${semCode}-semestr`);
+          saveGpaState();
+          renderGpaTab();
+          showToast(`✅ ${semName} (${res.subjects.length})`);
+        } else {
+          showToast(isRu ? "Сессия HEMIS истекла — войдите снова в HEMIS Import." : "HEMIS sessiyasi tugadi — qayta kiring.");
+        }
+      } catch (_) {
+        showToast(isRu ? "Ошибка загрузки семестра." : "Yuklashda xatolik.");
       }
     }
 
@@ -9136,7 +9418,85 @@
       actions.push(`<button class="btn-sm" style="flex:1;padding:9px;background:rgba(16,185,129,0.2);border-color:rgba(16,185,129,0.4);color:#6ee7b7;" onclick="closeClassDetailModal();exportScheduleToBot('daily')">📅 ${isRu ? "В календарь (.ics)" : "Kalendarga (.ics)"}</button>`);
       document.getElementById("cdActionsRow").innerHTML = actions.join("");
 
+      // Auto-load matching Moodle course materials for this class!
+      const matBox = document.getElementById("cdMoodleMaterialsBox");
+      if (matBox) {
+        loadClassMoodleMaterials(title, matBox);
+      }
+
       document.getElementById("classDetailBackdrop").classList.add("open");
+    }
+
+    async function loadClassMoodleMaterials(classTitle, matBox) {
+      const isRu = STATE.lang === "ru";
+      const token = localStorage.getItem("uwed_moodle_token");
+      const mdl = getVerifiedMoodleIdentity();
+      if (!token || !mdl || !Array.isArray(mdl.courses) || !mdl.courses.length) {
+        matBox.style.display = "none";
+        return;
+      }
+      const norm = (s) =>
+        String(s || "")
+          .toLowerCase()
+          .replace(/[^a-z0-9\u0400-\u04ff]+/g, " ")
+          .trim();
+      const qWords = norm(classTitle)
+        .split(/\s+/)
+        .filter((w) => w.length >= 4);
+      let bestCourse = null;
+      let bestScore = 0;
+      for (const c of mdl.courses) {
+        const cNorm = norm(c.name || "");
+        let sc = 0;
+        for (const w of qWords) {
+          if (cNorm.includes(w)) sc += w.length;
+        }
+        if (sc > bestScore) {
+          bestScore = sc;
+          bestCourse = c;
+        }
+      }
+      if (!bestCourse || bestScore < 4) {
+        matBox.style.display = "none";
+        return;
+      }
+      matBox.style.display = "block";
+      matBox.innerHTML = `<div class="panel" style="margin:0;padding:10px 12px;border-color:rgba(56,189,248,0.3);"><div style="font-size:11.5px;font-weight:800;color:#38bdf8;">📚 ${isRu ? "Материалы пары из Moodle" : "Moodle dars materiallari"}: ${bestCourse.name}</div><div style="font-size:11.5px;color:var(--text-muted);margin-top:4px;">⏳ ${isRu ? "Загрузка файлов..." : "Yuklanmoqda..."}</div></div>`;
+      try {
+        const res = await fetch("/api/uwed?action=moodle_course_contents", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token, courseid: bestCourse.id }),
+        }).then((r) => r.json());
+        const flatMods = [];
+        for (const sec of (res && res.sections) || []) {
+          for (const m of sec.modules || []) {
+            if ((m.files && m.files.length) || m.url) {
+              flatMods.push({ ...m, secName: sec.name });
+            }
+          }
+        }
+        if (!flatMods.length) {
+          matBox.innerHTML = `<div class="panel" style="margin:0;padding:10px 12px;border-color:rgba(56,189,248,0.25);"><div style="font-size:11.5px;font-weight:800;color:#38bdf8;">📚 Moodle: ${bestCourse.name}</div><div style="font-size:11px;color:var(--text-muted);margin-top:3px;">${isRu ? "Файлы в этом курсе пока не добавлены." : "Ushbu kursda fayllar hali qo'shilmagan."}</div></div>`;
+          return;
+        }
+        const safeCourse = String(bestCourse.name || "Moodle").replace(/'/g, "\\'");
+        const itemsHtml = flatMods
+          .slice(0, 6)
+          .map((m) => {
+            const firstFile = m.files && m.files[0];
+            const btnBot = firstFile
+              ? `<button onclick="sendMoodleFileToBot('${String(firstFile.fileurl || "").replace(/'/g, "\\'")}','${String(firstFile.filename || "file").replace(/'/g, "\\'")}','${String(m.name || "").replace(/'/g, "\\'")}','${safeCourse}')" style="background:rgba(56,189,248,0.18);border:1px solid rgba(56,189,248,0.38);color:#38bdf8;font-size:10.5px;font-weight:700;padding:3px 7px;border-radius:6px;cursor:pointer;flex-shrink:0;">✈️ ${isRu ? "В бот" : "Botga"}</button>`
+              : m.url
+              ? `<a href="${m.url}" target="_blank" rel="noopener" style="font-size:10.5px;font-weight:700;color:#38bdf8;text-decoration:none;flex-shrink:0;">Открыть ↗</a>`
+              : "";
+            return `<div style="display:flex;justify-content:space-between;align-items:center;gap:6px;padding:5px 0;border-top:1px solid rgba(255,255,255,0.06);"><span style="font-size:12px;color:var(--text);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">📄 ${m.name}</span>${btnBot}</div>`;
+          })
+          .join("");
+        matBox.innerHTML = `<div class="panel" style="margin:0;padding:10px 12px;border-color:rgba(56,189,248,0.32);"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><span style="font-size:11.5px;font-weight:800;color:#38bdf8;">📚 ${isRu ? "Материалы пары (Moodle)" : "Dars materiallari (Moodle)"}</span><button onclick="closeClassDetailModal();switchTab('moodle');switchMoodleSubTab('courses')" style="background:none;border:none;color:#34d399;font-size:11px;font-weight:700;cursor:pointer;">${isRu ? "Все →" : "Barchasi →"}</button></div>${itemsHtml}</div>`;
+      } catch (_) {
+        matBox.style.display = "none";
+      }
     }
 
     function closeClassDetailModal() {
@@ -9704,13 +10064,29 @@
       if (!STATE.profCalDate) STATE.profCalDate = computeDateForWeekday(getTashkentNow().toISOString().slice(0, 10), STATE.profCalDay);
       if (picker && picker.value !== STATE.profCalDate) picker.value = STATE.profCalDate;
 
-      // Render 6-day Mon–Sat strip with actual date numbers
+      // Render 6-day Mon–Sat strip with actual date numbers + colored event dots (cyan=class, amber=Moodle, rose=HEMIS exam, green=event)
+      const mdl = getVerifiedMoodleIdentity();
+      let hemisExamsAll = [];
+      try {
+        const hpCal = JSON.parse(localStorage.getItem("uwed_hemis_profile") || "null");
+        hemisExamsAll = (hpCal && Array.isArray(hpCal.exams) ? hpCal.exams : []) || [];
+      } catch (_) {}
+
       let stripHtml = "";
       for (let d = 1; d <= 6; d++) {
         const dIso = computeDateForWeekday(STATE.profCalDate, d);
         const dayNum = dIso.slice(8, 10);
         const act = Number(STATE.profCalDay) === d ? "active" : "";
-        stripHtml += `<div class="prof-cal-day-pill ${act}" onclick="selectProfileCalDay(${d})"><span>${t.daysShort[d]}</span><span class="cal-num">${dayNum}</span></div>`;
+        const hasCls = (STATE.pinnedScheduleEvents || []).some((e) => Number(e.week_day || e.d) === d);
+        const hasMdl = Boolean(mdl && Array.isArray(mdl.deadlines) && mdl.deadlines.some((dl) => dl && dl.time && new Date((dl.time + 5 * 3600) * 1000).toISOString().slice(0, 10) === dIso));
+        const hasEx = hemisExamsAll.some((ex) => ex && normalizeDateStr(ex.date) === dIso);
+        const hasEv = (STATE.attendingEvents || []).some((e) => e && normalizeDateStr(e.date) === dIso);
+        const dots =
+          (hasCls ? `<span style="width:4px;height:4px;border-radius:50%;background:#38bdf8;"></span>` : "") +
+          (hasMdl ? `<span style="width:4px;height:4px;border-radius:50%;background:#fbbf24;"></span>` : "") +
+          (hasEx ? `<span style="width:4px;height:4px;border-radius:50%;background:#fb7185;"></span>` : "") +
+          (hasEv ? `<span style="width:4px;height:4px;border-radius:50%;background:#34d399;"></span>` : "");
+        stripHtml += `<div class="prof-cal-day-pill ${act}" onclick="selectProfileCalDay(${d})"><span>${t.daysShort[d]}</span><span class="cal-num">${dayNum}</span>${dots ? `<div style="display:flex;gap:2px;margin-top:2px;">${dots}</div>` : ""}</div>`;
       }
       strip.innerHTML = stripHtml;
 
@@ -9758,7 +10134,6 @@
       }
 
       // Moodle deadlines falling on this selected date
-      const mdl = getVerifiedMoodleIdentity();
       if (mdl && Array.isArray(mdl.deadlines)) {
         for (const dl of mdl.deadlines) {
           if (!dl || !dl.time) continue;
@@ -9775,6 +10150,19 @@
               </div>`);
           }
         }
+      }
+
+      // HEMIS Exams falling on this selected date
+      for (const ex of hemisExamsAll) {
+        if (!ex || normalizeDateStr(ex.date) !== selIso) continue;
+        blocks.push(`
+          <div class="slot-row" style="border-left:4px solid #fb7185; background:rgba(244,63,94,0.12); margin-bottom:6px;">
+            <div class="slot-time" style="color:#fb7185;">📝 EXAM<span>${ex.time || "09:00"}</span></div>
+            <div class="slot-info">
+              <div class="slot-subj" style="color:#fda4af;">🏛 ${toNewUz(ex.subject || "Экзамен")}</div>
+              <div class="slot-meta">${[ex.type || ex.exam_type, ex.room || ex.auditorium ? `🚪 ${ex.room || ex.auditorium}` : "", ex.teacher].filter(Boolean).join(" · ")}</div>
+            </div>
+          </div>`);
       }
 
       if (!blocks.length) {
